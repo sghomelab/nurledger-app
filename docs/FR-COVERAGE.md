@@ -2,7 +2,7 @@
 
 Audited after each milestone (per BUILD-PROMPT convention). Status: ✅ done · 🔜 scheduled · — not applicable.
 
-## M1 — Foundation (current)
+## M1 — Foundation (done)
 
 | FR | Requirement | Status | Files / tests |
 |----|-------------|--------|---------------|
@@ -27,8 +27,35 @@ Audited after each milestone (per BUILD-PROMPT convention). Status: ✅ done · 
 
 **Seed (PROTOTYPE-REFERENCE §9):** ✅ 6 categories + 11 products with barcodes, costs, prices, stock, thresholds, batches, expiries — `src/seed/data.ts` + `src/__tests__/seed.test.ts`.
 
-## M2 — Register (next)
-FR-100…FR-109 (scan, cart, payments, tax, receipt, offline decrement), FR-321, FR-302, outbox writes for sales.
+## M2 — Register (done)
+
+Core loop: scan → cart → live FIFO margin → payment → receipt → offline decrement, all on local
+SQLite with an idempotent outbox write. Money = integer minor units (ADR-004); every cart mutation
+is persisted (NFR-3) and `completeSale` is one atomic transaction (FIFO consume + immutable ledger
++ sale header/lines + payments + outbox) that rolls back as a whole on any failure.
+
+| FR | Requirement | Status | Files / tests |
+|----|-------------|--------|---------------|
+| FR-101 | Manual entry: SKU/name search + quick product chips | ✅ | `app/(tabs)/index.tsx` (search + `QuickChips`), `productRepository.findByBarcode` |
+| FR-102 | Bluetooth / USB keyboard-wedge scanner | ✅ | `index.tsx` scan field (`blurOnSubmit=false`, Enter submits, keeps focus) |
+| FR-105 | Cart: qty edit, remove line, per-line + order discount | ✅ | `useCart` (`setQty`/`removeLine`/`setLineDiscount`/`setOrderDiscount`), `CartLineRow`, `MoneyPrompt`; PIN-gating deferred (DEV-003) |
+| FR-107 | Payments: cash (tender/change), card, mobile, QR, split | ✅ (card/QR = ADR-006 stubs) | `src/lib/payment.ts` (`evenSplit`, `changeDue`, `PAYMENT_METHODS`), `PaymentSheet`, `payment.test.ts` |
+| FR-108 | Tax by TaxEngine (incl/excl), receipt shows breakdown by category | ✅ | `src/lib/tax.ts` (`flatRateTaxEngine`, `taxEngineFor`), `computeTotals`, `ReceiptView`; `tax.test.ts` |
+| FR-109 | Receipt (on-screen "no printer" fallback) | ✅ partial | `ReceiptView` + `saleRepository.getSale`; ESC/POS print + re-print → M5 (DEV-004) |
+| FR-302 | Real-time local stock decrement (the M2 decrement path) | ✅ | `stockRepository.applySaleInTx` (FIFO consume + immutable `stock_ledger` row, in-tx) |
+| FR-321 | Per-sale-line COGS recorded at sale time (FIFO) | ✅ | `saleRepository.completeSale` (per-line `unit_cost_minor`/`cogs_minor`), live preview via `allocateCogs`; `sale.test.ts` |
+| FR-502 | Client-UUID idempotency keys → outbox op per sale | ✅ | `saleRepository.completeSale` outbox INSERT (`sync_op_id`), `uuidv4()` |
+| FR-100 | Camera scan (MLKit/`expo-camera`) | 🔜 M5 | camera stub in `index.tsx` (DEV-004) |
+| FR-103 | Weighed items (weight × unit price) | 🔜 M5 | `CartLine.qty` is base units; weighed grams path in M5 (DEV-004) |
+| FR-104 | Embedded-weight EAN-13 parse (per-locale BarcodeParser) | 🔜 M5 | engine lands in M5 (DEV-004) |
+| FR-106 | Held / parked orders | 🔜 M3 | `current_order` is single-active today; parking in M3 |
+
+**Cart persistence + kill test (NFR-3):** ✅ schema v2 (`current_order`/`current_order_line`) + v1→v2
+migration (`database.ts`); `useCart` persists every mutation; `completeSale` clears the cart in the
+same transaction as the stock decrement. *On-device force-kill walkthrough: see M2 report in
+`MILESTONE-REPORTS.md`.*
+
+**Standing regression:** `npx tsc --noEmit` (0 errors) + `npx jest` (49 tests) green.
 
 ## M3 — Inventory & Expiry
 FR-304 (stocktake), FR-305 (alerts UI), FR-306 (PO + receive), FR-307 (Expiry Radar UI), FR-317 (labels), FR-320 (margin compression).

@@ -11,8 +11,8 @@ shifts — and syncs opportunistically (M5).
 | Milestone | Scope | State |
 |---|---|---|
 | **M1** | Foundation: schema, design tokens, product CRUD, seed (11 products), 5-tab nav | ✅ done |
-| M2 | Register: scan → cart → payment → receipt, offline decrement, kill test | next |
-| M3 | Inventory & Expiry: adjustments, PO + receive, Expiry Radar, stocktake | |
+| **M2** | Register: scan → cart → payment → receipt, offline decrement, kill test | ✅ done |
+| M3 | Inventory & Expiry: adjustments, PO + receive, Expiry Radar, stocktake | next |
 | M4 | Shifts + Insights: open/close, Z-report, dashboards, CSV exports | |
 | M5 | Cloud & sync: Supabase, idempotent outbox, multi-device | |
 | M6 | Hardening: refunds, labels, i18n, store packaging | |

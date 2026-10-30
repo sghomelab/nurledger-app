@@ -145,6 +145,16 @@ export async function commitConsume(productId: string, qty: number): Promise<Con
   return preview;
 }
 
+/** Raw FIFO cost layers for a product (for the cart's live-margin preview). */
+export async function costLayersOf(productId: string): Promise<LayerInput[]> {
+  const db = await getDb();
+  return await db.getAllAsync<LayerInput>(
+    `SELECT id, unit_cost_minor AS unitCostMinor, qty_remaining AS qtyRemaining, received_at AS receivedAt
+       FROM cost_layer WHERE product_id = ?`,
+    [productId],
+  );
+}
+
 /** Create a cost layer (PO receive / stock adjustment, ADR-003). */
 export async function addCostLayer(
   productId: string,
@@ -185,6 +195,72 @@ export async function ledgerHistory(productId: string, limit = 10): Promise<Stoc
       ORDER BY created_at DESC, rowid DESC LIMIT ?`,
     [productId, limit],
   );
+}
+
+/**
+ * Apply a sale's stock movement INSIDE the caller's transaction (M2, FR-321,
+ * ADR-002/003): consume FIFO cost layers and append an immutable 'sale'
+ * stock-ledger row (qty_delta negative). The caller (saleRepository.completeSale)
+ * owns the surrounding transaction + outbox. Throws on oversell so the whole
+ * sale rolls back atomically — stock is never partially decremented.
+ *
+ * stock_ledger is still written ONLY from this module (module-map rule).
+ */
+export interface SaleMoveResult {
+  cogsMinor: number;
+  unitCostMinor: number | null;
+  lotId: string | null;
+  short: boolean;
+  shortageQty: number;
+}
+
+export async function applySaleInTx(
+  db: SQLiteDatabase,
+  input: { productId: string; qty: number; refId: string; deviceId?: string | null },
+): Promise<SaleMoveResult> {
+  const outletRow = await db.getFirstAsync<{ id: string }>('SELECT id FROM outlet LIMIT 1');
+  if (!outletRow) throw new Error('No outlet — DB not seeded');
+
+  const layers = await db.getAllAsync<LayerInput>(
+    `SELECT id, unit_cost_minor AS unitCostMinor, qty_remaining AS qtyRemaining, received_at AS receivedAt
+       FROM cost_layer WHERE product_id = ?`,
+    [input.productId],
+  );
+  const result = consumeFifo(layers, input.qty);
+
+  // FEFO first lot for sale-line traceability (best-effort; layers carry no lot).
+  const lotRow = await db.getFirstAsync<{ id: string }>(
+    `SELECT id FROM lot WHERE product_id = ?
+      ORDER BY (expiry_date IS NULL), expiry_date, received_at, id LIMIT 1`,
+    [input.productId],
+  );
+  const lotId = lotRow?.id ?? null;
+
+  if (!result.short) {
+    const remaining = applyConsumption(layers, result);
+    for (const c of result.consumed) {
+      const newQty = remaining.get(c.layerId) ?? 0;
+      await db.runAsync('UPDATE cost_layer SET qty_remaining = ? WHERE id = ?', [newQty, c.layerId]);
+    }
+  }
+
+  const unitCostMinor = result.consumed[0]?.unitCostMinor ?? null;
+  await db.runAsync(
+    `INSERT INTO stock_ledger
+       (id, outlet_id, product_id, lot_id, type, qty_delta, unit_cost_minor, cogs_minor,
+        ref_type, ref_id, device_id, sync_op_id, created_at)
+     VALUES (?, ?, ?, ?, 'sale', ?, ?, ?, 'sale', ?, ?, ?, ?)`,
+    [uuidv4(), outletRow.id, input.productId, lotId, -input.qty, unitCostMinor,
+     result.cogsMinor, input.refId, input.deviceId ?? null, uuidv4(), Date.now()],
+  );
+
+  return {
+    cogsMinor: result.cogsMinor,
+    unitCostMinor,
+    lotId,
+    short: result.short,
+    shortageQty: result.shortageQty,
+  };
 }
 
 export type { SQLiteDatabase };

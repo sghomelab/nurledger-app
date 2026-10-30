@@ -46,3 +46,16 @@ export function marginPct(revenueMinor: number, cogsMinor: number): number {
   if (revenueMinor <= 0) return 0;
   return roundDivide((revenueMinor - cogsMinor) * 100, revenueMinor);
 }
+
+/**
+ * Parse a decimal string ("12.5", "12.50", "12") → integer minor units (no float).
+ * Invalid/empty input → 0. The inverse of formatMoneyBare.
+ */
+export function parseMoneyToMinor(input: string): number {
+  const cleaned = input.replace(/[^0-9.]/g, '');
+  if (!cleaned) return 0;
+  const [whole, frac = ''] = cleaned.split('.');
+  const w = parseInt(whole || '0', 10) || 0;
+  const f = parseInt((frac + '00').slice(0, 2), 10) || 0;
+  return w * 100 + f;
+}

@@ -142,3 +142,85 @@ export interface OutboxOp {
   createdAt: number;
   uploadedAt: number | null;
 }
+
+/**
+ * Payment methods (FR-107, ADR-006). Card is "tendered via external terminal"
+ * in the MVP; `qr` is the locale acquirer flow; `mobile` is the wallet tender.
+ * All behind the per-locale PaymentMethods registry (stubbed for M2 — no real
+ * payment API is wired; see BUILD-PROMPT non-negotiable).
+ */
+export type PaymentMethodId = 'cash' | 'card' | 'mobile' | 'qr';
+
+export interface PaymentAllocation {
+  method: PaymentMethodId;
+  amountMinor: number;
+  /** Card auth code / QR reference / tender detail (optional). */
+  reference?: string | null;
+}
+
+/**
+ * A line in the active (or parked) cart. Persisted to `current_order_line`
+ * (NFR-3: every mutation is written to SQLite so a kill mid-sale survives).
+ * Money is integer minor units (ADR-004); COGS is the FIFO *projection* filled
+ * by the cart hook for the live margin — the authoritative per-line COGS is
+ * re-derived at sale-commit time (FR-321).
+ */
+export interface CartLine {
+  /** Stable row identity (uuid). */
+  key: string;
+  productId: string;
+  sku: string;
+  name: string;
+  /** Owner-set stable selling price at time of add (ADR-003). */
+  unitPriceMinor: number;
+  /** Base units (each) — weighed items would store grams here (M5). */
+  qty: number;
+  taxCategory: string;
+  /** Per-line absolute discount (FR-105), minor. */
+  discountMinor: number;
+  /** Projected COGS from FIFO layers (live margin; recomputed at commit). */
+  cogsMinor: number;
+  unitCostMinor: number | null;
+  /** FEFO lot the projected COGS came from (M3 traceability). */
+  lotId: string | null;
+  /** On-hand snapshot at time of add (oversell guard + display). */
+  stockQty: number;
+}
+
+export interface Sale {
+  id: string;
+  uuid: string;
+  outletId: string;
+  deviceId: string | null;
+  cashierId: string | null;
+  shiftId: string | null;
+  status: string;
+  subtotalMinor: number;
+  discountMinor: number;
+  taxMinor: number;
+  totalMinor: number;
+  cogsMinor: number;
+  createdAt: number;
+}
+
+export interface SaleLine {
+  id: string;
+  saleId: string;
+  productId: string;
+  lotId: string | null;
+  sku: string;
+  name: string;
+  qty: number;
+  unitPriceMinor: number;
+  discountMinor: number;
+  taxMinor: number;
+  lineTotalMinor: number;
+  unitCostMinor: number | null;
+  cogsMinor: number | null;
+}
+
+/** A completed sale with its lines + payments (for the receipt, FR-109). */
+export interface CompletedSale extends Sale {
+  lines: SaleLine[];
+  payments: PaymentAllocation[];
+}

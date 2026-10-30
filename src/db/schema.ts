@@ -3,7 +3,38 @@
  * Bump SCHEMA_VERSION and add a migration step in database.ts when changing existing tables.
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
+
+/**
+ * M2: active-cart persistence (NFR-3 — every cart mutation is written to SQLite
+ * so a kill mid-sale survives; the completed sale + stock decrement are atomic).
+ * Kept as its own const so the same DDL is reused by the v1→v2 migration.
+ */
+const CART_TABLES_SQL = `
+-- M2: the register's active order (parked orders land in M3).
+CREATE TABLE IF NOT EXISTS current_order (
+  id TEXT PRIMARY KEY,
+  order_discount_minor INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS current_order_line (
+  id TEXT PRIMARY KEY,
+  order_id TEXT NOT NULL REFERENCES current_order(id) ON DELETE CASCADE,
+  product_id TEXT NOT NULL,
+  sku TEXT NOT NULL,
+  name TEXT NOT NULL,
+  unit_price_minor INTEGER NOT NULL,
+  qty INTEGER NOT NULL,
+  tax_category TEXT NOT NULL DEFAULT 'standard',
+  discount_minor INTEGER NOT NULL DEFAULT 0,
+  cogs_minor INTEGER NOT NULL DEFAULT 0,
+  unit_cost_minor INTEGER,
+  lot_id TEXT,
+  stock_qty INTEGER NOT NULL DEFAULT 0,
+  position INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_current_order_line ON current_order_line(order_id, position);
+`;
 
 export const SCHEMA_SQL = `
 -- FR-303 / ADR-007: single outlet at launch, multi-outlet schema from day one
@@ -257,4 +288,8 @@ CREATE TABLE IF NOT EXISTS delta_cursor (
   table_name TEXT PRIMARY KEY,
   last_updated_at INTEGER NOT NULL
 );
+${CART_TABLES_SQL}
 `;
+
+/** v1 → v2 (M2): add the cart-persistence tables. Idempotent. */
+export const MIGRATE_V1_TO_V2_SQL = CART_TABLES_SQL;

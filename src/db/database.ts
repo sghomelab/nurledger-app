@@ -7,7 +7,7 @@
  */
 
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
-import { SCHEMA_SQL, SCHEMA_VERSION } from './schema';
+import { MIGRATE_V1_TO_V2_SQL, SCHEMA_SQL, SCHEMA_VERSION } from './schema';
 import { runSeed, isSeeded } from './seed';
 
 const DB_NAME = 'nurledger.db';
@@ -41,8 +41,16 @@ export async function getDb(): Promise<SQLiteDatabase> {
           await runSeed(database);
         });
       } else if (current < SCHEMA_VERSION) {
-        // Future migrations land here (one step per version bump).
-        throw new Error(`Nurledger: schema migration ${current} → ${SCHEMA_VERSION} not implemented`);
+        // Forward migrations, one step per version bump (idempotent DDL).
+        await database.withTransactionAsync(async () => {
+          if (current < 2) {
+            await database.execAsync(MIGRATE_V1_TO_V2_SQL); // M2: cart persistence
+          }
+          // Future: if (current < 3) { ... }
+          await database.runAsync('INSERT OR REPLACE INTO schema_meta (id, v) VALUES (1, ?)', [
+            SCHEMA_VERSION,
+          ]);
+        });
       }
 
       db = database;
