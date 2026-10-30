@@ -13,8 +13,9 @@ shifts — and syncs opportunistically (M5).
 | **M1** | Foundation: schema, design tokens, product CRUD, seed (11 products), 5-tab nav | ✅ done (tag `m1`) |
 | **M2** | Register: scan → cart → payment → receipt, offline FIFO decrement, kill survival | ✅ done (tag `m2`) |
 | **M3** | Inventory & Expiry: product detail + adjustments (reason required), PO create + receive in batches, FEFO Expiry Radar, reorder→PO, carton break (FR-318/FR-322) | ✅ done (tag `m3`) |
+| **Post-M3** | Multi-currency + configurable tax locale (FR-600/FR-602): Store settings screen, any ISO currency (incl. zero-decimal JPY/KRW/VND display), tax presets + custom rate, `PickerOverlay` replacing 4 pickers broken by RN's 3-button Alert limit (incl. 2 latent M1/M3 bugs) | ✅ done (standalone commit) |
 | **M4** | Shifts & back office: open/close (float, counted cash, over/short), Z-report, KPI dashboards, CSV exports + PIN/role gating for adjustments & price overrides | next |
-| **M5** | Cloud & sync: Supabase, idempotent outbox sync, server-side stock recompute, multi-device, locale engines (Tax/PaymentMethods/Barcode) | |
+| **M5** | Cloud & sync: Supabase, idempotent outbox sync, server-side stock recompute, multi-device, locale engines (PaymentMethods/Barcode/receipt; Tax + currency done Post-M3) | |
 | **M6** | Release hardening: line-level refunds, stocktake UI, label printing, margin UI, PO print/share, i18n, Play/App Store packaging | |
 
 Deferred M3→M6 (DEV-005): stocktake UI, label printing, margin-compression UI, PO print/share.

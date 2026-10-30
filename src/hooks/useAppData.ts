@@ -4,11 +4,11 @@
  */
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useFocusEffect } from 'expo-router';
 import {
   createProduct,
   createCategory,
   deactivateProduct,
-  getOutlet,
   listCategories,
   listProducts,
   lowStockCount,
@@ -16,6 +16,7 @@ import {
   updateProduct,
   type ProductInput,
 } from '../repositories/productRepository';
+import { getOutlet } from '../repositories/outletRepository';
 import { listPOs, type POSummary } from '../repositories/poRepository';
 import type { Category, Outlet, ProductWithStock, ReorderCandidate } from '../types';
 
@@ -24,9 +25,13 @@ export function useOutlet() {
   const load = useCallback(async () => {
     setOutlet(await getOutlet());
   }, []);
-  useEffect(() => {
-    void load();
-  }, [load]);
+  // Refetch on every screen focus so a store-settings save (currency/tax
+  // locale) is picked up by every tab without a manual refresh (FR-602).
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
   return { outlet, reload: load };
 }
 

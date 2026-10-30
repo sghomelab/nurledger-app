@@ -3,9 +3,25 @@
  * No float math anywhere on money paths.
  */
 
+/**
+ * Zero-decimal ISO-4217 currencies (no subunit in circulation).
+ * FR-602: storage stays uniform 1/100 major unit for ALL currencies; only the
+ * display rounds to the currency's actual decimal places.
+ */
+export const ZERO_DECIMAL_CURRENCIES: ReadonlySet<string> = new Set([
+  'JPY', 'KRW', 'VND', 'ISK', 'CLP',
+]);
+
 /** Format integer minor units as a display string, e.g. 1290 + 'SGD' → 'S$12.90'. */
 export function formatMoney(minor: number, currency: string): string {
   try {
+    if (ZERO_DECIMAL_CURRENCIES.has(currency)) {
+      return new Intl.NumberFormat('en', {
+        style: 'currency',
+        currency,
+        maximumFractionDigits: 0,
+      }).format(Math.round(minor / 100));
+    }
     return new Intl.NumberFormat('en', {
       style: 'currency',
       currency,

@@ -7,6 +7,25 @@ describe('money — integer minor units (ADR-004, NFR-8)', () => {
     expect(formatMoney(-250, 'SGD')).toContain('-');
   });
 
+  it('formats non-SG currencies (FR-602 — currency is a per-outlet setting, not a constant)', () => {
+    expect(formatMoney(1290, 'MYR')).toContain('12.90'); // RM 12.90
+    expect(formatMoney(1290, 'THB')).toContain('12.90'); // ฿12.90
+    expect(formatMoney(1290, 'AED')).toContain('12.90');
+    expect(formatMoney(1290, 'EUR')).toContain('12.90');
+    expect(formatMoney(1290, 'IDR')).toContain('12.90');
+  });
+
+  it('formats zero-decimal currencies (JPY/KRW/VND) without subunits', () => {
+    expect(formatMoney(12350, 'JPY')).toBe('¥124'); // 123.50 → rounds to ¥124
+    expect(formatMoney(12345, 'JPY')).toBe('¥123'); // 123.45 → ¥123
+    expect(formatMoney(10000, 'KRW')).toBe('₩100');
+    expect(formatMoney(5, 'VND')).toBe('₫0'); // 0.05 → ₫0 (display only; storage stays 1/100)
+  });
+
+  it('falls back to "CODE x.xx" for unrecognizable currency codes', () => {
+    expect(formatMoney(1290, 'ZZ9')).toContain('12.90');
+  });
+
   it('bare formatting has no symbol and keeps 2 decimals', () => {
     expect(formatMoneyBare(5)).toBe('0.05');
     expect(formatMoneyBare(1290)).toBe('12.90');

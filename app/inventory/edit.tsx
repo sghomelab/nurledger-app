@@ -4,6 +4,7 @@ import {
   View, Text, TextInput, StyleSheet, ScrollView, Pressable, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { PickerOverlay } from '../../src/components/PickerOverlay';
 import { useCategories, useOutlet, useProducts } from '../../src/hooks/useAppData';
 import { createProduct, getProduct, updateProduct, type ProductInput } from '../../src/repositories/productRepository';
 import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
@@ -38,6 +39,7 @@ export default function ProductFormScreen() {
   const [description, setDescription] = useState('');
   const [loaded, setLoaded] = useState(isNew);
   const [saving, setSaving] = useState(false);
+  const [catPicker, setCatPicker] = useState(false);
 
   // Load existing product once (edit flow)
   useEffect(() => {
@@ -138,14 +140,7 @@ export default function ProductFormScreen() {
         </View>
 
         <Field label="Category">
-          <Pressable style={styles.selectBox} onPress={() => {
-            const cats = categories ?? [];
-            Alert.alert('Category', '', [
-              ...cats.map((c) => ({ text: c.name, onPress: () => setCategoryId(c.id) })),
-              { text: 'New category…', onPress: () => void addCat() },
-              { text: 'None', style: 'cancel', onPress: () => setCategoryId(null) },
-            ]);
-          }}>
+          <Pressable style={styles.selectBox} onPress={() => setCatPicker(true)}>
             <Text style={styles.selectText}>{categories?.find((c) => c.id === categoryId)?.name ?? 'None'}</Text>
             <Ionicons name="chevron-down" size={16} color={colors.slate400} />
           </Pressable>
@@ -175,6 +170,25 @@ export default function ProductFormScreen() {
           <Text style={styles.saveText}>{isNew ? 'Add product' : 'Save product'}</Text>
         </Pressable>
       </View>
+
+      {catPicker && (
+        <PickerOverlay
+          title="Category"
+          rows={[
+            ...(categories ?? []).map((c) => ({
+              key: c.id,
+              label: c.name,
+              onPress: () => {
+                setCategoryId(c.id);
+                setCatPicker(false);
+              },
+            })),
+            { key: 'new', label: 'New category…', onPress: () => { setCatPicker(false); void addCat(); } },
+            { key: 'none', label: 'None', onPress: () => { setCategoryId(null); setCatPicker(false); } },
+          ]}
+          onClose={() => setCatPicker(false)}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }

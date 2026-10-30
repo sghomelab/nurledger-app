@@ -73,6 +73,39 @@ describe('ratePctOverride (e.g. a temporary 0% promo)', () => {
   });
 });
 
+describe('non-reference locales (multi-currency/multi-tax support — FR-600/FR-602)', () => {
+  it('MY SST 10% inclusive: RM110.00 → RM100.00 + RM10.00', () => {
+    const sst = taxEngineFor('flat:my-sst-10-inclusive');
+    expect(sst.ratePct).toBe(10);
+    const r = sst.compute({ categories: [{ category: 'standard', amountMinor: 11_000 }] });
+    expect(r.taxMinor).toBe(1000); // 11000 × 10/110
+    expect(r.netMinor).toBe(10_000);
+  });
+
+  it('US flat 8.25% exclusive: $100.00 + $8.25', () => {
+    const us = taxEngineFor('flat:us-sales-8.25-exclusive');
+    expect(us.ratePct).toBe(8.25);
+    const r = us.compute({ categories: [{ category: 'standard', amountMinor: 10_000 }] });
+    expect(r.taxMinor).toBe(825); // 10000 × 8.25/100
+    expect(r.netMinor).toBe(10_000);
+  });
+
+  it('custom-built engine id (from Store Settings) resolves: 7.5% inclusive', () => {
+    const e = taxEngineFor('flat:custom-7.5-inclusive');
+    expect(e.ratePct).toBe(7.5);
+    const r = e.compute({ categories: [{ category: 'standard', amountMinor: 10_000 }] });
+    expect(r.taxMinor).toBe(698); // 10000 × 7.5/107.5 = 697.67 → 698
+    expect(r.netMinor).toBe(10_000 - r.taxMinor);
+  });
+
+  it('EU VAT 21% exclusive: €100.00 + €21.00', () => {
+    const eu = taxEngineFor('flat:eu-vat-21-exclusive');
+    const r = eu.compute({ categories: [{ category: 'standard', amountMinor: 10_000 }] });
+    expect(r.taxMinor).toBe(2100);
+    expect(r.netMinor).toBe(10_000);
+  });
+});
+
 describe('taxEngineFor (ADR-004 — rate comes from the engine id, never hardcoded)', () => {
   it('parses flat:sg-gst-9-inclusive → 9% inclusive (the reference locale)', () => {
     const e = taxEngineFor('flat:sg-gst-9-inclusive');

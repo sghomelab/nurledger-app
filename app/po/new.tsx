@@ -9,6 +9,7 @@ import { createPO } from '../../src/repositories/poRepository';
 import { cartonsToBase } from '../../src/lib/po';
 import { formatMoney } from '../../src/lib/money';
 import { NumberText } from '../../src/components/NumberText';
+import { PickerOverlay } from '../../src/components/PickerOverlay';
 import { colors, fonts, radius, spacing } from '../../src/theme/tokens';
 import type { POLineInput, ProductWithStock } from '../../src/types';
 
@@ -86,34 +87,36 @@ export default function NewPOScreen() {
     }
   }, [lines]);
 
-  /** Add a line by picking a product (default cost = product's cost, qty 1). */
+  // Product picker for adding lines (inline — Alert.alert only supports 3 buttons).
+  const [pickOpen, setPickOpen] = useState(false);
+
+  /** Open the product picker (default cost = product's cost, qty 1). */
   const addLine = () => {
-    const active = (products ?? []).filter((p) => p.active);
-    if (active.length === 0) {
+    if ((products ?? []).filter((p) => p.active).length === 0) {
       Alert.alert('No products', 'Add products to the catalog first.');
       return;
     }
-    Alert.alert('Add line — pick product', '', active.map((p) => ({
-      text: `${p.name} (${p.sku})`,
-      onPress: () => {
-        if (lines.some((l) => l.productId === p.id)) {
-          Alert.alert('Already on this PO', `"${p.name}" is already a line.`);
-          return;
-        }
-        setLines((cur) => [
-          ...cur,
-          {
-            productId: p.id,
-            sku: p.sku,
-            name: p.name,
-            qtyOrdered: 1,
-            unitCostMinor: p.costMinor,
-            lotCode: null,
-            expiryDate: null,
-          },
-        ]);
+    setPickOpen(true);
+  };
+
+  const addToPO = (p: ProductWithStock) => {
+    if (lines.some((l) => l.productId === p.id)) {
+      Alert.alert('Already on this PO', `"${p.name}" is already a line.`);
+      return;
+    }
+    setLines((cur) => [
+      ...cur,
+      {
+        productId: p.id,
+        sku: p.sku,
+        name: p.name,
+        qtyOrdered: 1,
+        unitCostMinor: p.costMinor,
+        lotCode: null,
+        expiryDate: null,
       },
-    })));
+    ]);
+    setPickOpen(false);
   };
 
   /** Carton product helpers (FR-318): cartons input × cartonSize = base units. */
@@ -262,6 +265,22 @@ export default function NewPOScreen() {
           <Text style={styles.saveText}>{saving ? 'Creating…' : 'Create PO (draft)'}</Text>
         </Pressable>
       </View>
+
+      {pickOpen && (
+        <PickerOverlay
+          title="Add line — pick product"
+          rows={(products ?? [])
+            .filter((p) => p.active)
+            .map((p) => ({
+              key: p.id,
+              label: p.name,
+              sublabel: p.sku,
+              disabled: lines.some((l) => l.productId === p.id),
+              onPress: () => addToPO(p),
+            }))}
+          onClose={() => setPickOpen(false)}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }

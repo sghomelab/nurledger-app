@@ -35,6 +35,7 @@ export default function RootLayout() {
         <Stack.Screen name="po" options={{ ...headerOptions, title: 'Purchase Orders' }} />
         <Stack.Screen name="po/new" options={{ ...headerOptions, title: 'New PO' }} />
         <Stack.Screen name="po/[id]" options={{ ...headerOptions, title: 'PO' }} />
+        <Stack.Screen name="settings" options={{ ...headerOptions, title: 'Store settings' }} />
       </Stack>
     </>
   );

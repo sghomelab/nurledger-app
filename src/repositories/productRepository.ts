@@ -220,16 +220,4 @@ export async function createCategory(name: string): Promise<Category> {
   return { id, name, active: true };
 }
 
-export async function getOutlet(): Promise<{
-  id: string; name: string; currency: string; locale: string; taxEngine: string; createdAt: number;
-} | null> {
-  const db = await getDb();
-  const row = await db.getFirstAsync<{
-    id: string; name: string; currency: string; locale: string; tax_engine: string; created_at: number;
-  }>('SELECT id, name, currency, locale, tax_engine, created_at FROM outlet LIMIT 1');
-  if (!row) return null;
-  return {
-    id: row.id, name: row.name, currency: row.currency, locale: row.locale,
-    taxEngine: row.tax_engine, createdAt: row.created_at,
-  };
-}
+/** Outlet reads/writes live in outletRepository (outlet is its own feature). */

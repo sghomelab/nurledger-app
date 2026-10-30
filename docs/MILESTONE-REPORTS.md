@@ -127,3 +127,63 @@ FR-305, FR-306 (print/share → M6), FR-307, FR-308, FR-316, FR-318, FR-319, FR-
 - Stocktake UI (FR-304), label printing (FR-317), margin-compression UI (FR-320), PO print/share → M6 (DEV-005).
 - Adjustment PIN-gating → M4 (roles).
 - Standing regression: `npx tsc --noEmit` (0 errors) + `npx jest` (58 tests) green.
+
+## Post-M3 — Multi-currency + configurable tax locale (2026-10-30)
+
+Standalone commit on `main` (no milestone tag), in response to the owner request:
+"The app needs to support other currencies not just sgd, please make sure of that."
+
+**Scope**
+- Store settings screen (`app/settings.tsx`, entered via the Store card on the Shift tab):
+  store name, currency (20 curated ISO codes + free-form 3-letter ISO entry, `Intl`-
+  validated), tax regime (5 presets as data: none / SG GST 9% incl / MY SST 10% incl /
+  US 8.25% excl / EU 21% excl, each with a suggested currency+locale; plus a custom rate
+  0–40% ≤2 decimals with inclusive/exclusive).
+- `src/lib/currency.ts` (new) — catalogs + pure helpers.
+- `src/repositories/outletRepository.ts` (new) — `getOutlet`/`updateOutlet` (moved out of
+  productRepository; feature isolation per the module map).
+- `useOutlet` now refetches on screen focus (`useFocusEffect`), so a settings save
+  propagates to every tab without a manual refresh.
+- `formatMoney` handles zero-decimal currencies (JPY/KRW/VND/ISK/CLP) — display-only
+  rounding; storage stays uniform 1/100 major unit for ALL currencies (FR-602).
+
+**RN bug found on-device: `Alert.alert` truncates to 3 buttons.**
+RN 0.86's `Alert.js:100` does `buttons.slice(0, 3)` — anything beyond the first three is
+*silently dropped* (and the three shown are mapped to neutral/negative/positive, so the
+order appears reversed). This broke the new 20-currency picker (only 3 options shown)
+and turned out to be a **latent production bug in two M1/M3 screens**: the category
+picker (`app/inventory/edit.tsx`, 8 options → only 3 visible) and the PO product picker
+(`app/po/new.tsx`, 11 products → only 3 visible).
+
+**Fix: `src/components/PickerOverlay.tsx`** — a shared bottom-sheet list picker (dimmed
+backdrop, definite `height: '72%'` sheet, own ScrollView, Cancel row). All four pickers
+now use it. Also learned: a nested ScrollView does not reliably steal the swipe gesture
+on Android (verified with adb swipes) — list pickers must be full-screen overlays with a
+definite height, not inline lists.
+
+**Device verification (cs-test AVD)**
+1. Shift store card: "SGD · Singapore GST 9% — inclusive" → saved MYR + SST 10% → card
+   updates to "MYR · Malaysia SST 10% — inclusive" (focus-refetch works).
+2. Cart with cheddar (850 minor): Subtotal **MYR 8.50**, Tax (10%, incl.) **MYR 0.77**
+   (850 × 10/110 = 77.27 → 77), Total **MYR 8.50**, margin 54% — math exact.
+3. Free-form currency "TWD" → preview "TWD — NT$123.45" → register shows NT$ amounts.
+4. JPY (zero-decimal) → line **¥9**, Subtotal ¥9, Tax (10%, incl.) **¥1**, CHARGE **¥9**.
+5. Full 22-row currency overlay scrolls; both legacy pickers (category, PO product) now
+   show their full lists — spot-checked and cancelled, nothing created.
+6. Restored to SG/SGD/GST 9% at the end: Sell shows the "Tax (9%, incl.)" row, cart
+   empty, no test sale written (DB still holds just the one pre-existing SGD sale in the
+   outbox).
+
+**Bugs found + fixed**
+- RN `Alert.alert` 3-button truncation — 4 pickers migrated to `PickerOverlay`
+  (2 new + 2 latent M1/M3 production bugs).
+- Nested-ScrollView swipe unreliability (Android) — overlays with definite height instead
+  of inline lists.
+
+**FR touched**
+FR-600, FR-602 → full. PIN/role gating for settings changes → M4 (DEV-003).
+
+**Open items**
+- PaymentMethods / BarcodeParser / receipt-template / e-invoicing locale engines remain
+  on the M5 list (the TaxEngine + currency surfaces of FR-600/FR-602 are now done).
+- Standing regression: `npx tsc --noEmit` (0 errors) + `npx jest` (77 tests) green.

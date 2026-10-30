@@ -87,11 +87,42 @@ suggestion UI, FR-306 print/share (PDF/WhatsApp) → **M6**. Adjustment PIN-gati
 
 **Standing regression:** `npx tsc --noEmit` (0 errors) + `npx jest` (58 tests) green.
 
+## Post-M3 — Multi-currency + configurable tax locale (FR-600, FR-602) (done)
+
+Standalone commit on `main` (not a milestone) — the register previously had no way to
+configure anything other than the seed locale (SG / SGD / GST 9% inclusive).
+
+| FR | Requirement | Status | Files / tests |
+|----|-------------|--------|---------------|
+| FR-600 | TaxEngine configurable per store (rate + inclusive/exclusive); presets are DATA, behavior always via the stored engine id | ✅ | `src/lib/tax.ts` (unchanged — `flat:<label>-<rate>-<mode>` resolution was already generic), `src/lib/currency.ts` (preset data + `buildCustomEngineId` + `taxEngineLabel`), `app/settings.tsx` (Store settings), `outletRepository.updateOutlet`; `tax.test.ts` (MY 10% incl, US 8.25% excl, EU 21% excl, custom 7.5% incl → 698 minor), `currency.test.ts` |
+| FR-602 | Currency: integer minor units + ISO code + locale formatting — now a first-class per-store setting | ✅ | `src/lib/currency.ts` (20 curated codes + free-form ISO entry, `Intl`-validated), `src/lib/money.ts` (`formatMoney` zero-decimal display for JPY/KRW/VND/ISK/CLP; storage stays uniform 1/100 major unit for ALL currencies), `app/settings.tsx`, `outletRepository`, `useOutlet` (focus-refetch); `money.test.ts` (MYR/THB/AED/EUR/IDR, zero-decimal, unknown-code fallback), `currency.test.ts` |
+| — | Picker correctness: RN `Alert.alert` silently truncates to 3 buttons (`Alert.js:100`) → shared `PickerOverlay` bottom sheet | ✅ | `src/components/PickerOverlay.tsx`; replaces 4 pickers — settings currency + tax, **latent M1 bug** category picker (`app/inventory/edit.tsx`), **latent M3 bug** PO product picker (`app/po/new.tsx`); all 4 verified on-device |
+
+**Behavior notes**
+- Presets (none / SG GST 9% incl / MY SST 10% incl / US 8.25% excl / EU 21% excl) are
+  *suggestions* carrying a suggested currency+locale; any ISO-4217 code and any 0–40%
+  rate (≤2 decimals) works via free-form / custom entry. Nothing in the math path is
+  country- or rate-specific (ADR-004).
+- Changing the currency reinterprets existing amounts in the new currency (UI warning in
+  settings; owner re-prices as needed).
+- PIN/role gating for settings changes ships with M4 (DEV-003).
+
+**Device evidence (cs-test AVD, 2026-10-30):** Shift store card
+"SGD · Singapore GST 9% — inclusive" → saved MYR + SST 10% → "MYR · Malaysia SST 10% —
+inclusive" (focus-refetch); cart cheddar 850 minor → Subtotal MYR 8.50, Tax (10%, incl.)
+MYR 0.77, Total MYR 8.50, margin 54%; free-form TWD → "NT$123.45" preview → register in
+NT$; JPY zero-decimal → line ¥9, Tax (10%, incl.) ¥1, CHARGE ¥9; full 22-row currency
+list scrolls in the overlay; restored to the SG reference locale at the end (Sell shows
+the 9% GST row, cart empty). See `MILESTONE-REPORTS.md` (Post-M3).
+
+**Standing regression:** `npx tsc --noEmit` (0 errors) + `npx jest` (77 tests) green.
+
 ## M4 — Shifts & Back office
 FR-200…FR-204, FR-400, FR-401, FR-402 (done), dashboard KPIs, CSV exports.
 
 ## M5 — Cloud & sync
-FR-502…FR-506, FR-600…FR-604 engines (TaxEngine reference locale SG/SGD/GST 9%).
+FR-502…FR-506, FR-601, FR-603, FR-604 locale engines (PaymentMethods, BarcodeParser,
+receipt template, e-invoicing interface). FR-600/FR-602 done Post-M3.
 
 ## M6 — Release hardening
 FR-110/FR-111 refunds, FR-315 transfers, FR-313 suppliers UI, FR-314 CSV import/export, FR-115 i18n.
