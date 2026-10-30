@@ -4,8 +4,8 @@
  * Locale behavior is pluggable — NO rate is hardcoded in the register. The
  * outlet carries a tax-engine id (e.g. 'flat:sg-gst-9-inclusive'); this module
  * resolves it to a concrete engine. The reference locale is SG / SGD / GST 9%
- * inclusive (spec: one reference locale fully wired; the prototype's 8.25% was
- * a demo fixture, never a constant — ADR-004).
+ * inclusive (spec: one reference locale fully wired; any other locale's rate
+ * is a preset or an owner-set custom rate — never a constant in code — ADR-004).
  *
  * Pure + integer minor units only — unit-testable in node.
  */

@@ -3,7 +3,7 @@
  * Bump SCHEMA_VERSION and add a migration step in database.ts when changing existing tables.
  */
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /**
  * M2: active-cart persistence (NFR-3 — every cart mutation is written to SQLite
@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS current_order_line (
   name TEXT NOT NULL,
   unit_price_minor INTEGER NOT NULL,
   qty INTEGER NOT NULL,
+  -- M5 (FR-103): weighed lines carry the weighed amount in grams (qty stays 1).
+  qty_g INTEGER,
   tax_category TEXT NOT NULL DEFAULT 'standard',
   discount_minor INTEGER NOT NULL DEFAULT 0,
   cogs_minor INTEGER NOT NULL DEFAULT 0,
@@ -64,6 +66,25 @@ CREATE TABLE IF NOT EXISTS app_user (
   active INTEGER NOT NULL DEFAULT 1,
   created_at INTEGER NOT NULL
 );
+`;
+
+/**
+ * The v5 `stock_view` (single source of truth — fresh installs, the v4→v5
+ * migration, and the every-bootstrap `ensureM5` self-heal all use this).
+ * DROP + CREATE because SQLite has NO `CREATE OR REPLACE VIEW` (that is
+ * PostgreSQL syntax — "near \"OR\": syntax error"). Dropping is safe: the view
+ * is a pure projection of the immutable ledger, it holds no state.
+ * NOTE: references `stock_ledger.qty_g_delta`, so callers must ensure that
+ * column exists first (ensureM5 runs its guarded ALTERs before this).
+ */
+export const STOCK_VIEW_SQL = `
+DROP VIEW IF EXISTS stock_view;
+CREATE VIEW stock_view AS
+SELECT product_id,
+       COALESCE(SUM(CASE WHEN qty_delta IS NOT NULL THEN qty_delta ELSE 0 END), 0)   AS qty,
+       COALESCE(SUM(CASE WHEN qty_g_delta IS NOT NULL THEN qty_g_delta ELSE 0 END), 0) AS qty_g
+FROM stock_ledger
+GROUP BY product_id;
 `;
 
 export const SCHEMA_SQL = `
@@ -163,11 +184,9 @@ CREATE TABLE IF NOT EXISTS cost_layer (
 CREATE INDEX IF NOT EXISTS idx_cost_layer_fifo ON cost_layer(product_id, received_at, id);
 
 -- Stock on hand = projection of the ledger (never stored in place).
-CREATE VIEW IF NOT EXISTS stock_view AS
-SELECT product_id, COALESCE(SUM(qty_delta), 0) AS qty
-FROM stock_ledger
-WHERE qty_delta IS NOT NULL
-GROUP BY product_id;
+-- M5: qty_g alongside qty — weighed products track stock in grams (FR-103);
+-- readers pick the column by product.is_weighed.
+${STOCK_VIEW_SQL}
 
 CREATE TABLE IF NOT EXISTS sale (
   id TEXT PRIMARY KEY,
@@ -306,6 +325,10 @@ CREATE TABLE IF NOT EXISTS outbox (
   created_at INTEGER NOT NULL,
   uploaded_at INTEGER
 );
+-- M5: the drain query (pending ops, FIFO) is the hot path — index it.
+-- (SQLite rejects the rowid pseudo-column in an index column list;
+-- FIFO tie-breaking on rowid happens in the SELECT, which is allowed.)
+CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox(created_at) WHERE uploaded_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS delta_cursor (
   table_name TEXT PRIMARY KEY,
@@ -333,6 +356,30 @@ export const MIGRATE_V2_TO_V3_SQL = 'ALTER TABLE stock_ledger ADD COLUMN reason 
  * existing install and breaks getDb() entirely.
  */
 export const MIGRATE_V3_TO_V4_SQL = APP_USER_TABLE_SQL + EXPENSE_TABLE_SQL;
+
+/**
+ * v4 → v5 (M5): recompute `stock_view` with the weighed-grams column (FR-103).
+ * Idempotent (DROP VIEW IF EXISTS + CREATE VIEW — SQLite has no CREATE OR
+ * REPLACE VIEW).
+ * NOTE: the outbox pending index + the non-idempotent `qty_g` column ALTERs are
+ * NOT here — they live in the every-bootstrap `ensureM5` self-heal
+ * (database.ts), because an early M5 build shipped this migration with a
+ * `rowid` index statement that SQLite rejects ("no such column: rowid"); on
+ * devices where that rejection interrupted the migration block, schema_meta
+ * was already bumped to 5 while `current_order_line.qty_g` was never added.
+ * The self-heal repairs exactly that state without a factory reset.
+ */
+export const MIGRATE_V4_TO_V5_SQL = STOCK_VIEW_SQL;
+
+/**
+ * M5 self-heal (run on EVERY bootstrap, regardless of version — see
+ * ENSURE_M4_SQL for the pattern). Re-asserts the outbox drain index and the
+ * guarded `qty_g` column ALTERs that an early M5 build's broken v4→v5
+ * migration may have skipped on already-migrated installs. Idempotent and
+ * cheap: one IF NOT EXISTS index + a PRAGMA table_info per guarded ALTER.
+ */
+export const OUTBOX_PENDING_INDEX_SQL =
+  'CREATE INDEX IF NOT EXISTS idx_outbox_pending ON outbox(created_at) WHERE uploaded_at IS NULL;';
 
 /**
  * M4 self-heal (run on every bootstrap after migrations, regardless of version):

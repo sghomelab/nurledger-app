@@ -112,13 +112,6 @@ export const TAX_PRESETS: TaxPreset[] = [
     suggestedLocale: 'en-MY',
   },
   {
-    id: 'us',
-    label: 'US flat sales tax 8.25% — exclusive',
-    engineId: 'flat:us-sales-8.25-exclusive',
-    suggestedCurrency: 'USD',
-    suggestedLocale: 'en-US',
-  },
-  {
     id: 'eu',
     label: 'EU VAT 21% — exclusive',
     engineId: 'flat:eu-vat-21-exclusive',

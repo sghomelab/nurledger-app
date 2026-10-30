@@ -7,7 +7,7 @@
  */
 
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
-import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, MIGRATE_V3_TO_V4_SQL, ENSURE_M4_SQL, SCHEMA_SQL, SCHEMA_VERSION } from './schema';
+import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, MIGRATE_V3_TO_V4_SQL, MIGRATE_V4_TO_V5_SQL, ENSURE_M4_SQL, SCHEMA_SQL, SCHEMA_VERSION, OUTBOX_PENDING_INDEX_SQL, STOCK_VIEW_SQL } from './schema';
 import { runSeed, isSeeded, ensureDefaultUsers } from './seed';
 import { uuidv4 } from '../lib/ids';
 
@@ -59,6 +59,12 @@ export async function getDb(): Promise<SQLiteDatabase> {
             // owner/cashier so M4 roles work without a factory reset.
             await ensureDefaultUsers(database);
           }
+          if (current < 5) {
+            // M5: stock_view +qty_g (weighed, FR-103). The outbox index and the
+            // qty_g column ALTERs run in ensureM5() below (every bootstrap) so
+            // installs the early broken migration left half-done self-heal.
+            await database.execAsync(MIGRATE_V4_TO_V5_SQL);
+          }
           await database.runAsync('INSERT OR REPLACE INTO schema_meta (id, v) VALUES (1, ?)', [
             SCHEMA_VERSION,
           ]);
@@ -72,6 +78,12 @@ export async function getDb(): Promise<SQLiteDatabase> {
       // one COUNT.
       await database.execAsync(ENSURE_M4_SQL);
       await ensureDefaultUsers(database);
+
+      // M5 self-heal: the early broken v4→v5 migration (a `rowid` index that
+      // SQLite rejects) can leave schema_meta at 5 while `current_order_line`
+      // lacks `qty_g` — the register then fails with "no such column: qty_g".
+      // Re-assert the guarded ALTERs + index on EVERY bootstrap (idempotent).
+      await ensureM5(database);
 
       // FR-200: shift = {device, cashier} pair — stable device identity
       // (created once on first run; persists across restarts).
@@ -106,4 +118,32 @@ export async function isSeededAsync(): Promise<boolean> {
 async function hasColumn(db: SQLiteDatabase, table: string, column: string): Promise<boolean> {
   const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
   return rows.some((r) => r.name === column);
+}
+
+/**
+ * M5 self-heal (every bootstrap). Repairs installs whose early v4→v5
+ * migration was interrupted by the rejected `rowid` index (and by the
+ * invalid `CREATE OR REPLACE VIEW`): re-asserts the outbox drain index, the
+ * `qty_g` columns the register reads (FR-103), and the v5 `stock_view`
+ * definition. Every step is idempotent — a PRAGMA guard, IF NOT EXISTS, or a
+ * safe DROP+CREATE of a stateless projection — so a healthy DB pays only a
+ * few cheap PRAGMAs and two view statements per launch.
+ */
+async function ensureM5(db: SQLiteDatabase): Promise<void> {
+  await db.execAsync(OUTBOX_PENDING_INDEX_SQL);
+  if (!(await hasColumn(db, 'current_order_line', 'qty_g'))) {
+    await db.execAsync('ALTER TABLE current_order_line ADD COLUMN qty_g INTEGER;');
+  }
+  if (!(await hasColumn(db, 'sale_line', 'qty_g'))) {
+    await db.execAsync('ALTER TABLE sale_line ADD COLUMN qty_g INTEGER;');
+  }
+  if (!(await hasColumn(db, 'stock_ledger', 'qty_g_delta'))) {
+    await db.execAsync('ALTER TABLE stock_ledger ADD COLUMN qty_g_delta INTEGER;');
+  }
+  // Recreate the projection with the v5 definition. Repairs installs where the
+  // early broken migration (CREATE OR REPLACE VIEW — invalid in SQLite) left
+  // the OLD m4 view in place (no qty_g column → "no such column: qty_g" from
+  // every stock read). Runs AFTER the ALTERs because the view references
+  // stock_ledger.qty_g_delta. Cheap: one DROP + one CREATE per launch.
+  await db.execAsync(STOCK_VIEW_SQL);
 }

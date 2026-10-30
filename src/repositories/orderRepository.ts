@@ -19,6 +19,7 @@ interface RawLine {
   name: string;
   unit_price_minor: number;
   qty: number;
+  qty_g: number | null;
   tax_category: string;
   discount_minor: number;
   cogs_minor: number;
@@ -35,6 +36,7 @@ function mapLine(r: RawLine): CartLine {
     name: r.name,
     unitPriceMinor: r.unit_price_minor,
     qty: r.qty,
+    qtyG: r.qty_g,
     taxCategory: r.tax_category,
     discountMinor: r.discount_minor,
     cogsMinor: r.cogs_minor,
@@ -45,7 +47,7 @@ function mapLine(r: RawLine): CartLine {
 }
 
 const LINE_COLS = `
-  id, product_id, sku, name, unit_price_minor, qty, tax_category,
+  id, product_id, sku, name, unit_price_minor, qty, qty_g, tax_category,
   discount_minor, cogs_minor, unit_cost_minor, lot_id, stock_qty
 `;
 
@@ -81,10 +83,10 @@ export async function saveActiveOrder(orderDiscountMinor: number, lines: CartLin
       if (!l) continue;
       await db.runAsync(
         `INSERT INTO current_order_line
-           (id, order_id, product_id, sku, name, unit_price_minor, qty, tax_category,
+           (id, order_id, product_id, sku, name, unit_price_minor, qty, qty_g, tax_category,
             discount_minor, cogs_minor, unit_cost_minor, lot_id, stock_qty, position)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [l.key, ACTIVE_ORDER_ID, l.productId, l.sku, l.name, l.unitPriceMinor, l.qty, l.taxCategory,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [l.key, ACTIVE_ORDER_ID, l.productId, l.sku, l.name, l.unitPriceMinor, l.qty, l.qtyG ?? null, l.taxCategory,
          l.discountMinor, l.cogsMinor, l.unitCostMinor, l.lotId, l.stockQty, i],
       );
     }

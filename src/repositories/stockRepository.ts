@@ -17,6 +17,8 @@ import {
   type LayerInput,
 } from '../lib/stock';
 import { uuidv4 } from '../lib/ids';
+import { cogsForWeight } from '../lib/weighed';
+import { enqueueOpInTx } from './outboxRepository';
 import type {
   BatchWithQty,
   CostLayer,
@@ -245,8 +247,12 @@ async function firstFefoLotIdInTx(db: SQLiteDatabase, productId: string): Promis
  */
 export interface StockMoveInput {
   productId: string;
-  /** Signed base-unit delta: >0 in, <0 out, 0 = no-op. */
+  /** Signed base-unit delta: >0 in, <0 out, 0 = no-op (use qtyGDelta for weighed). */
   qtyDelta: number;
+  /** M5 (FR-103): signed GRAMS delta for weighed products. When non-zero this
+   *  move bypasses the unit/FIFO path: no cost layer, COGS recorded as a per-kg
+   *  fact (documented approximation — SYNC-DESIGN §weighed). */
+  qtyGDelta?: number | null;
   type: StockMoveType;
   /** Unit cost (minor) for stock-in; ignored on stock-out (FIFO derives it). */
   unitCostMinor?: number | null;
@@ -268,6 +274,8 @@ export interface StockMoveResult {
   lotId: string | null;
   short: boolean;
   shortageQty: number;
+  /** The ledger row's client-UUID idempotency key (null on a 0-qty no-op). */
+  syncOpId: string | null;
 }
 
 export async function applyStockMoveInTx(
@@ -279,8 +287,38 @@ export async function applyStockMoveInTx(
   const now = Date.now();
   const { productId } = input;
 
-  if (input.qtyDelta === 0) {
-    return { cogsMinor: 0, unitCostMinor: null, lotId: input.lotId ?? null, short: false, shortageQty: 0 };
+  if (input.qtyDelta === 0 && (input.qtyGDelta ?? 0) === 0) {
+    return { cogsMinor: 0, unitCostMinor: null, lotId: input.lotId ?? null, short: false, shortageQty: 0, syncOpId: null };
+  }
+
+  // Pre-generated: the caller needs it (outbox enqueue, atomic with this move)
+  // and it is the server idempotency key for the ledger row.
+  const syncOpId = uuidv4();
+
+  // WEIGHED (FR-103): stock lives in grams; no FIFO layer, COGS is a per-kg fact.
+  const gramsDelta = input.qtyGDelta ?? 0;
+  if (gramsDelta !== 0) {
+    let cogs = 0;
+    let unitCost: number | null = null;
+    if (gramsDelta < 0) {
+      const p = await db.getFirstAsync<{ cost_minor: number }>(
+        'SELECT cost_minor FROM product WHERE id = ?',
+        [productId],
+      );
+      unitCost = p ? p.cost_minor : 0;
+      cogs = cogsForWeight(unitCost, -gramsDelta);
+    }
+    const lotId = input.lotId ?? null;
+    await db.runAsync(
+      `INSERT INTO stock_ledger
+         (id, outlet_id, product_id, lot_id, type, qty_delta, qty_g_delta, unit_cost_minor, cogs_minor,
+          ref_type, ref_id, reason, device_id, sync_op_id, created_at)
+       VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [uuidv4(), outletRow.id, productId, lotId, input.type, gramsDelta,
+       gramsDelta < 0 ? unitCost : null, gramsDelta < 0 ? cogs : null,
+       input.refType, input.refId, input.reason ?? null, input.deviceId ?? null, syncOpId, now],
+    );
+    return { cogsMinor: cogs, unitCostMinor: unitCost, lotId, short: false, shortageQty: 0, syncOpId };
   }
 
   if (input.qtyDelta > 0) {
@@ -307,9 +345,9 @@ export async function applyStockMoveInTx(
           ref_type, ref_id, reason, device_id, sync_op_id, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`,
       [uuidv4(), outletRow.id, productId, lotId, input.type, qty, unitCost,
-       input.refType, input.refId, input.reason ?? null, input.deviceId ?? null, uuidv4(), now],
+       input.refType, input.refId, input.reason ?? null, input.deviceId ?? null, syncOpId, now],
     );
-    return { cogsMinor: 0, unitCostMinor: unitCost, lotId, short: false, shortageQty: 0 };
+    return { cogsMinor: 0, unitCostMinor: unitCost, lotId, short: false, shortageQty: 0, syncOpId };
   }
 
   // STOCK OUT: consume FIFO cost layers (oldest first) + negative ledger row.
@@ -335,7 +373,7 @@ export async function applyStockMoveInTx(
         ref_type, ref_id, reason, device_id, sync_op_id, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [uuidv4(), outletRow.id, productId, lotId, input.type, -qty, unitCostMinor,
-     result.cogsMinor, input.refType, input.refId, input.reason ?? null, input.deviceId ?? null, uuidv4(), now],
+     result.cogsMinor, input.refType, input.refId, input.reason ?? null, input.deviceId ?? null, syncOpId, now],
   );
   return {
     cogsMinor: result.cogsMinor,
@@ -343,6 +381,7 @@ export async function applyStockMoveInTx(
     lotId,
     short: result.short,
     shortageQty: result.shortageQty,
+    syncOpId,
   };
 }
 
@@ -356,6 +395,12 @@ export async function applyStockMove(input: StockMoveInput): Promise<StockMoveRe
   const box: { r?: StockMoveResult } = {};
   await db.withTransactionAsync(async () => {
     box.r = await applyStockMoveInTx(db, input);
+    // M5 (FR-502): enqueue the standalone move's sync op atomically with the
+    // ledger row it just wrote (the sale path enqueues at sale-commit instead —
+    // sale ledger rows ride along in the sale op's payload).
+    if (box.r && box.r.syncOpId) {
+      await enqueueOpInTx(db, 'ledger', box.r.syncOpId);
+    }
   });
   if (!box.r) throw new Error('Stock move did not complete');
   return box.r;
@@ -370,11 +415,14 @@ export type SaleMoveResult = StockMoveResult;
 
 export async function applySaleInTx(
   db: SQLiteDatabase,
-  input: { productId: string; qty: number; refId: string; deviceId?: string | null },
+  input: { productId: string; qty: number; qtyG?: number | null; refId: string; deviceId?: string | null },
 ): Promise<SaleMoveResult> {
+  // Weighed (FR-103): the ledger delta is in grams; the unit qty stays 0.
+  const grams = input.qtyG ?? null;
   return applyStockMoveInTx(db, {
     productId: input.productId,
-    qtyDelta: -input.qty,
+    qtyDelta: grams != null ? 0 : -input.qty,
+    qtyGDelta: grams != null ? -grams : null,
     type: 'sale',
     refType: 'sale',
     refId: input.refId,

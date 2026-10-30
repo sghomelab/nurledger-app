@@ -80,20 +80,20 @@ describe('TAX_PRESETS (data, not hardcoded math)', () => {
 
 describe('buildCustomEngineId + isValidCustomRate', () => {
   it('builds a resolvable flat engine id', () => {
-    const id = buildCustomEngineId(8.25, 'exclusive');
-    expect(id).toBe('flat:custom-8.25-exclusive');
+    const id = buildCustomEngineId(7.75, 'exclusive');
+    expect(id).toBe('flat:custom-7.75-exclusive');
     const e = taxEngineFor(id);
-    expect(e.ratePct).toBe(8.25);
+    expect(e.ratePct).toBe(7.75);
     expect(e.mode).toBe('exclusive');
   });
 
   it('accepts 0–40 with up to 2 decimals', () => {
     expect(isValidCustomRate('0')).toBe(true);
-    expect(isValidCustomRate('8.25')).toBe(true);
+    expect(isValidCustomRate('7.75')).toBe(true);
     expect(isValidCustomRate('40')).toBe(true);
     expect(isValidCustomRate('40.01')).toBe(false);
     expect(isValidCustomRate('100')).toBe(false);
-    expect(isValidCustomRate('8.255')).toBe(false);
+    expect(isValidCustomRate('7.755')).toBe(false);
     expect(isValidCustomRate('abc')).toBe(false);
     expect(isValidCustomRate('')).toBe(false);
   });

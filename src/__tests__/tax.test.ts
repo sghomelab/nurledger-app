@@ -82,11 +82,11 @@ describe('non-reference locales (multi-currency/multi-tax support — FR-600/FR-
     expect(r.netMinor).toBe(10_000);
   });
 
-  it('US flat 8.25% exclusive: $100.00 + $8.25', () => {
-    const us = taxEngineFor('flat:us-sales-8.25-exclusive');
-    expect(us.ratePct).toBe(8.25);
-    const r = us.compute({ categories: [{ category: 'standard', amountMinor: 10_000 }] });
-    expect(r.taxMinor).toBe(825); // 10000 × 8.25/100
+  it('EU VAT 21% exclusive: €100.00 + €21.00 (switching locale switches the rate)', () => {
+    const eu = taxEngineFor('flat:eu-vat-21-exclusive');
+    expect(eu.ratePct).toBe(21);
+    const r = eu.compute({ categories: [{ category: 'standard', amountMinor: 10_000 }] });
+    expect(r.taxMinor).toBe(2100); // 10000 × 21/100
     expect(r.netMinor).toBe(10_000);
   });
 

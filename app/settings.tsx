@@ -1,11 +1,23 @@
 import { useEffect, useState } from 'react';
 import {
-  View, Text, TextInput, StyleSheet, ScrollView, Pressable, Alert, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, StyleSheet, ScrollView, Pressable, Alert, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { useOutlet } from '../src/hooks/useAppData';
 import { useUsers } from '../src/hooks/useShift';
+import { useSync } from '../src/hooks/useSync';
 import { updateOutlet } from '../src/repositories/outletRepository';
+import {
+  disconnectCloud,
+  getCloudConfig,
+  setSyncEnabled,
+} from '../src/repositories/cloudConfigRepository';
+import {
+  getReceiptWidth,
+  setReceiptWidth,
+  type ReceiptWidthSetting,
+} from '../src/repositories/saleRepository';
 import {
   CURRENCY_OPTIONS,
   NO_TAX_ENGINE_ID,
@@ -144,7 +156,7 @@ export default function SettingsScreen() {
       return;
     }
     if (taxPresetId === 'custom' && !isValidCustomRate(customRate)) {
-      Alert.alert('Invalid tax rate', 'Rate must be 0–40 with up to 2 decimals, e.g. 8.25.');
+      Alert.alert('Invalid tax rate', 'Rate must be 0–40 with up to 2 decimals, e.g. 7.75.');
       return;
     }
     const preset = TAX_PRESETS.find((p) => p.id === taxPresetId);
@@ -172,6 +184,64 @@ export default function SettingsScreen() {
       return;
     }
     setGateVisible(true);
+  };
+
+  // ── Cloud sync (FR-503, ADR-010 BYO) ─────────────────────────────────────
+  const sync = useSync();
+  const [cloudCfg, setCloudCfg] = useState<{ url: string; ownerEmail?: string } | null>(null);
+  const [cloudGate, setCloudGate] = useState<(() => void) | null>(null);
+
+  useEffect(() => {
+    void getCloudConfig().then(setCloudCfg);
+  }, [sync.connected]);
+
+  /** Cloud changes are store-level (FR-500 'store_settings' gate). */
+  const requireCloudGate = (job: () => void) => {
+    if (active && roleCanAct(active.role, 'store_settings')) {
+      void job();
+      return;
+    }
+    setCloudGate(job);
+  };
+
+  const toggleSync = (on: boolean) => {
+    requireCloudGate(async () => {
+      await setSyncEnabled(on);
+      if (on) await sync.syncNow(); // turning it on drains the backlog immediately
+      await sync.refresh();
+    });
+  };
+
+  const confirmDisconnect = () => {
+    Alert.alert(
+      'Disconnect backend?',
+      'The connection is removed from this device. Sales, stock and the sync queue are NOT touched — reconnect any time to resume from where it left off.',
+      [
+        { text: 'Cancel' },
+        {
+          text: 'Disconnect',
+          style: 'destructive',
+          onPress: () =>
+            requireCloudGate(async () => {
+              await disconnectCloud();
+              setCloudCfg(null);
+              await sync.refresh();
+              Alert.alert('Disconnected', 'You can connect again any time.');
+            }),
+        },
+      ],
+    );
+  };
+
+  // ── Receipt width (FR-109, device-local) ─────────────────────────────────
+  const [receiptWidth, setReceiptWidthState] = useState<ReceiptWidthSetting>('80mm');
+  useEffect(() => {
+    void getReceiptWidth().then(setReceiptWidthState);
+  }, []);
+  const onReceiptWidth = (v: string) => {
+    const width = v as ReceiptWidthSetting;
+    setReceiptWidthState(width);
+    void setReceiptWidth(width);
   };
 
   return (
@@ -230,7 +300,7 @@ export default function SettingsScreen() {
                     style={styles.inputMono}
                     value={customRate}
                     onChangeText={setCustomRate}
-                    placeholder="e.g. 8.25"
+                    placeholder="e.g. 7.75"
                     keyboardType="decimal-pad"
                   />
                 </Field>
@@ -245,6 +315,87 @@ export default function SettingsScreen() {
           <Text style={styles.note}>
             Inclusive: prices already contain tax (SG GST style). Exclusive: tax is added on
             top. Presets are suggestions only — any rate works via Custom.
+          </Text>
+        </Card>
+
+        <Card>
+          <SectionTitle>Cloud sync · FR-503</SectionTitle>
+          {!cloudCfg ? (
+            <>
+              <Text style={styles.note}>
+                Optional. Link this store to its own free Supabase project (BYO — your data
+                stays in your project). Everything keeps working offline either way; queued
+                sales sync when you turn it on.
+              </Text>
+              <Pressable
+                style={styles.cloudBtn}
+                onPress={() => requireCloudGate(() => router.push('/cloud-setup'))}
+              >
+                <Text style={styles.cloudBtnText}>Connect your backend</Text>
+              </Pressable>
+            </>
+          ) : (
+            <>
+              <View style={styles.cloudRow}>
+                <Ionicons name="cloud-outline" size={18} color={colors.primary} />
+                <View style={styles.cloudInfo}>
+                  <Text style={styles.cloudUrl} numberOfLines={1}>
+                    {cloudCfg.url}
+                  </Text>
+                  {cloudCfg.ownerEmail && (
+                    <Text style={styles.cloudSub}>owner: {cloudCfg.ownerEmail}</Text>
+                  )}
+                </View>
+                <Switch
+                  value={sync.enabled}
+                  onValueChange={(on) => toggleSync(on)}
+                  trackColor={{ true: colors.positive, false: colors.slate200 }}
+                />
+              </View>
+              <View style={styles.cloudMeta}>
+                <Text style={styles.cloudMetaText}>
+                  {sync.enabled
+                    ? sync.syncing
+                      ? 'Syncing…'
+                      : sync.pending > 0
+                        ? `${sync.pending} ops queued — syncing automatically`
+                        : sync.lastSyncedAt
+                          ? `Synced ${new Date(sync.lastSyncedAt).toLocaleTimeString()}`
+                          : 'Connected'
+                    : sync.pending > 0
+                      ? `${sync.pending} ops queued · sync off`
+                      : 'Sync off — sales queue locally'}
+                </Text>
+                {sync.lastError && <Text style={styles.cloudError}>{sync.lastError}</Text>}
+              </View>
+              <View style={styles.cloudBtns}>
+                <Pressable
+                  style={[styles.cloudBtn, { flex: 1 }, (sync.syncing || !sync.enabled) && { opacity: 0.5 }]}
+                  onPress={() =>
+                    requireCloudGate(async () => {
+                      await sync.syncNow();
+                      await sync.refresh();
+                    })
+                  }
+                  disabled={sync.syncing || !sync.enabled}
+                >
+                  <Text style={styles.cloudBtnText}>Sync now</Text>
+                </Pressable>
+                <Pressable style={[styles.cloudBtn, { flex: 1, backgroundColor: colors.danger }]} onPress={confirmDisconnect}>
+                  <Text style={styles.cloudBtnText}>Disconnect</Text>
+                </Pressable>
+              </View>
+            </>
+          )}
+        </Card>
+
+        <Card>
+          <SectionTitle>Receipt · FR-109</SectionTitle>
+          <Field label="Printer width">
+            <Segmented options={['58mm', '80mm']} value={receiptWidth} onChange={onReceiptWidth} />
+          </Field>
+          <Text style={styles.note}>
+            The on-screen receipt (and any future printer output) renders at this width.
           </Text>
         </Card>
       </ScrollView>
@@ -265,6 +416,20 @@ export default function SettingsScreen() {
             void save();
           }}
           onCancel={() => setGateVisible(false)}
+        />
+      )}
+
+      {cloudGate && (
+        <PinPrompt
+          visible
+          action="store_settings"
+          users={users ?? []}
+          onSuccess={() => {
+            const job = cloudGate;
+            setCloudGate(null);
+            void job();
+          }}
+          onCancel={() => setCloudGate(null)}
         />
       )}
 
@@ -339,4 +504,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 14, alignItems: 'center',
   },
   saveText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
+  cloudRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+    backgroundColor: colors.slate50, borderRadius: radius.control, padding: spacing.md, marginBottom: spacing.sm,
+  },
+  cloudInfo: { flex: 1, gap: 2 },
+  cloudUrl: { fontFamily: fonts.mono, fontSize: 13, color: colors.slate900 },
+  cloudSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
+  cloudMeta: { gap: 4, marginBottom: spacing.md },
+  cloudMetaText: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500 },
+  cloudError: { fontFamily: fonts.sans, fontSize: 12, color: colors.danger, lineHeight: 16 },
+  cloudBtns: { flexDirection: 'row', gap: spacing.sm },
+  cloudBtn: {
+    backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 12, alignItems: 'center',
+  },
+  cloudBtnText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.white },
 });

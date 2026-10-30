@@ -13,10 +13,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { uuidv4 } from '../lib/ids';
+import { parserForLocale } from '../lib/barcode';
+import { cogsForWeight, linePriceForWeight } from '../lib/weighed';
 import { allocateCogs, computeTotals } from '../lib/sale';
 import { taxEngineFor } from '../lib/tax';
 import { loadActiveOrder, saveActiveOrder } from '../repositories/orderRepository';
-import { findByBarcode } from '../repositories/productRepository';
+import { findByBarcode, findByWeighedKey } from '../repositories/productRepository';
 import { completeSale, outboxCount, type SaleReceipt } from '../repositories/saleRepository';
 import { costLayersOf, lotsFefo } from '../repositories/stockRepository';
 import type { CartLine, PaymentAllocation, ProductWithStock } from '../types';
@@ -49,11 +51,14 @@ export function useCart() {
     [lines, orderDiscountMinor, taxEngine],
   );
 
-  /** Refill a line's projected COGS from the current FIFO layers (live margin). */
+  /** Refill a line's projected COGS from the current FIFO layers (live margin).
+   *  WEIGHED lines (qtyG != null) keep their per-kg FACT COGS — they bypass
+   *  fractional FIFO layer consumption by design (FR-103, SYNC-DESIGN). */
   const refreshCogs = useCallback(async (nextLines: CartLine[]): Promise<CartLine[]> => {
     if (nextLines.length === 0) return nextLines;
     const byProduct = new Map<string, CartLine[]>();
     for (const l of nextLines) {
+      if (l.qtyG != null) continue; // weighed — COGS fact, no FIFO projection
       const arr = byProduct.get(l.productId) ?? [];
       arr.push(l);
       byProduct.set(l.productId, arr);
@@ -140,6 +145,7 @@ export function useCart() {
           name: p.name,
           unitPriceMinor: p.priceMinor,
           qty,
+          qtyG: null,
           taxCategory: p.taxCategory,
           discountMinor: 0,
           cogsMinor: 0,
@@ -153,17 +159,67 @@ export function useCart() {
     [mutate],
   );
 
+  /**
+   * M5 (FR-103): add a weighed line for `weightG` grams. The product's
+   * priceMinor/costMinor are PER-KG rates; the line carries qty = 1 with the
+   * per-line price = round(per-kg × grams / 1000) (FR-103) and a per-kg COGS
+   * fact (bypasses fractional FIFO — documented).
+   * `p.stockQty` is in grams for weighed products (STOCK_QTY_SQL).
+   */
+  const addWeighed = useCallback(
+    async (p: ProductWithStock, weightG: number) => {
+      if (weightG <= 0) throw new Error('Weight must be greater than zero');
+      if (weightG > p.stockQty) throw new Error(`Only ${p.stockQty} g of ${p.name} in stock`);
+      await mutate((cur) => {
+        const line: CartLine = {
+          key: uuidv4(),
+          productId: p.id,
+          sku: p.sku,
+          name: p.name,
+          unitPriceMinor: linePriceForWeight(p.priceMinor, weightG),
+          qty: 1,
+          qtyG: weightG,
+          taxCategory: p.taxCategory,
+          discountMinor: 0,
+          cogsMinor: cogsForWeight(p.costMinor, weightG),
+          unitCostMinor: p.costMinor,
+          lotId: null,
+          stockQty: p.stockQty,
+        };
+        return [...cur, line];
+      });
+    },
+    [mutate],
+  );
+
+  /**
+   * Scan a barcode (FR-101/102/104). Routes through the outlet locale's
+   * BarcodeParser (pluggable, spec §4.4):
+   *  - plain GTIN → exact product match (unit or carton barcode, FR-322);
+   *  - weighed in-store EAN-13 → the scale's item key; returns
+   *    `{ needsWeight: { product, weightG } }` — `weightG` comes from the
+   *    barcode tail so the register prompt can PRE-FILL it (the cashier
+   *    confirms, or re-keys a manual weight).
+   */
   const addByBarcode = useCallback(
-    async (barcode: string) => {
+    async (barcode: string): Promise<{ needsWeight?: { product: ProductWithStock; weightG: number } }> => {
       const code = barcode.trim();
+      const parsed = parserForLocale(outlet?.locale).parse(code);
+      if (parsed.kind === 'unknown') throw new Error(`Unrecognized barcode "${code}"`);
+      if (parsed.kind === 'weighed') {
+        const product = await findByWeighedKey(parsed.itemKey);
+        if (!product) throw new Error(`No weighed product for scale key "${parsed.itemKey}"`);
+        return { needsWeight: { product, weightG: parsed.weightG } };
+      }
       const product = await findByBarcode(code);
       if (!product) throw new Error(`No product for barcode "${code}"`);
       // FR-318/FR-322: scanning the CARTON barcode sells a whole carton (cartonSize
       // base units); scanning the unit barcode sells 1 base unit.
       const qty = product.cartonBarcode === code ? product.cartonSize : 1;
       await addProduct(product, qty);
+      return {};
     },
-    [addProduct],
+    [addProduct, outlet?.locale],
   );
 
   const setQty = useCallback(
@@ -265,6 +321,7 @@ export function useCart() {
     busy,
     pending,
     addProduct,
+    addWeighed,
     addByBarcode,
     setQty,
     removeLine,

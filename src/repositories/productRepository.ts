@@ -7,6 +7,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { getDb } from '../db/database';
 import { reorderSuggestion, stockStatus } from '../lib/stock';
 import { uuidv4 } from '../lib/ids';
+import { enqueueOpInTx } from './outboxRepository';
 import type {
   Category,
   Product,
@@ -25,6 +26,14 @@ const PRODUCT_COLS = `
   p.velocity_class AS velocityClass, p.description, p.active,
   p.created_at AS createdAt, p.updated_at AS updatedAt
 `;
+
+/**
+ * Stock on hand in the product's NATIVE unit (M5, FR-103): base units for
+ * each/carton products, GRAMS for weighed products. `stock_view` carries both
+ * projections; readers pick by `is_weighed` so every UI surface (chips,
+ * oversell guards, reorder math) sees one consistent number.
+ */
+const STOCK_QTY_SQL = `CASE WHEN p.is_weighed = 1 THEN COALESCE(sv.qty_g, 0) ELSE COALESCE(sv.qty, 0) END`;
 
 interface RawProduct extends Omit<Product, 'isWeighed' | 'active'> {
   isWeighed: number;
@@ -45,7 +54,7 @@ export async function listProducts(search = ''): Promise<ProductWithStock[]> {
   const like = search.trim() ? `%${search.trim()}%` : '';
   const rows = await db.getAllAsync<RawProduct & { stockQty: number }>(
     `SELECT ${PRODUCT_COLS},
-            COALESCE(sv.qty, 0) AS stockQty
+             ${STOCK_QTY_SQL} AS stockQty
        FROM product p
        LEFT JOIN stock_view sv ON sv.product_id = p.id
       WHERE p.active = 1
@@ -66,7 +75,7 @@ export async function lowStockCount(): Promise<number> {
   const row = await db.getFirstAsync<{ n: number }>(
     `SELECT COUNT(*) AS n
        FROM product p LEFT JOIN stock_view sv ON sv.product_id = p.id
-      WHERE p.active = 1 AND COALESCE(sv.qty, 0) <= p.min_qty`,
+      WHERE p.active = 1 AND ${STOCK_QTY_SQL} <= p.min_qty`,
   );
   return row ? row.n : 0;
 }
@@ -91,9 +100,9 @@ export async function reorderCandidates(): Promise<ReorderCandidate[]> {
   }>(
     `SELECT p.id, p.sku, p.name, p.category_id, p.cost_minor, p.price_minor,
             p.min_qty, p.max_qty, p.velocity_class,
-            COALESCE(sv.qty, 0) AS stockQty
+            ${STOCK_QTY_SQL} AS stockQty
        FROM product p LEFT JOIN stock_view sv ON sv.product_id = p.id
-       WHERE p.active = 1 AND COALESCE(sv.qty, 0) < p.min_qty
+       WHERE p.active = 1 AND ${STOCK_QTY_SQL} < p.min_qty
        ORDER BY p.name COLLATE NOCASE`,
   );
   return rows.map((r) => ({
@@ -114,7 +123,7 @@ export async function reorderCandidates(): Promise<ReorderCandidate[]> {
 export async function getProduct(id: string): Promise<ProductWithStock | null> {
   const db = await getDb();
   const row = await db.getFirstAsync<RawProduct & { stockQty: number } | null>(
-    `SELECT ${PRODUCT_COLS}, COALESCE(sv.qty, 0) AS stockQty
+    `SELECT ${PRODUCT_COLS}, ${STOCK_QTY_SQL} AS stockQty
        FROM product p LEFT JOIN stock_view sv ON sv.product_id = p.id
       WHERE p.id = ?`,
     [id],
@@ -126,10 +135,31 @@ export async function getProduct(id: string): Promise<ProductWithStock | null> {
 export async function findByBarcode(barcode: string): Promise<ProductWithStock | null> {
   const db = await getDb();
   const row = await db.getFirstAsync<RawProduct & { stockQty: number } | null>(
-    `SELECT ${PRODUCT_COLS}, COALESCE(sv.qty, 0) AS stockQty
+    `SELECT ${PRODUCT_COLS}, ${STOCK_QTY_SQL} AS stockQty
        FROM product p LEFT JOIN stock_view sv ON sv.product_id = p.id
       WHERE p.active = 1 AND (p.barcode = ? OR p.carton_barcode = ?)`,
     [barcode, barcode],
+  );
+  if (!row) return null;
+  return { ...mapProduct(row), stockQty: row.stockQty, status: stockStatus(row.stockQty, row.minQty, true) };
+}
+
+/**
+ * M5 (FR-104): resolve a weighed product from a scale barcode's item key. The
+ * owner stores the scale's 8-digit item prefix on the product's `barcode`;
+ * a scanned in-store EAN-13 (`2…` + 5-digit weight) matches by prefix.
+ * stockQty is in GRAMS for weighed products (see STOCK_QTY_SQL).
+ */
+export async function findByWeighedKey(itemKey: string): Promise<ProductWithStock | null> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<RawProduct & { stockQty: number } | null>(
+    `SELECT ${PRODUCT_COLS}, ${STOCK_QTY_SQL} AS stockQty
+       FROM product p LEFT JOIN stock_view sv ON sv.product_id = p.id
+      WHERE p.active = 1 AND p.is_weighed = 1
+        AND (p.barcode = ? OR p.barcode LIKE ?)
+      ORDER BY length(p.barcode) DESC
+      LIMIT 1`,
+    [itemKey, `${itemKey}%`],
   );
   if (!row) return null;
   return { ...mapProduct(row), stockQty: row.stockQty, status: stockStatus(row.stockQty, row.minQty, true) };
@@ -173,6 +203,9 @@ export async function createProduct(input: ProductInput): Promise<Product> {
       input.velocityClass, input.description, input.active ? 1 : 0, now, now,
     ],
   );
+  // M5 (FR-502): the new product syncs as a product op. op_id = product.id —
+  // the same key the one-time backfill uses, so backfill never double-queues it.
+  await enqueueOpInTx(db, 'product', id);
   const created = await getProduct(id);
   if (!created) throw new Error('Product insert failed');
   return created;
@@ -194,6 +227,11 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Pr
       input.velocityClass, input.description, input.active ? 1 : 0, Date.now(), id,
     ],
   );
+  // M5 (FR-502): each edit is its own op (op_id = fresh client UUID). The
+  // payload is reconstructed from the current row at drain time, and the
+  // server's LWW (updated_at, device tie-break) makes convergent retries safe.
+  // The fresh op id is resolved back to the row via the { productId } hint.
+  await enqueueOpInTx(db, 'product', uuidv4(), JSON.stringify({ productId: id }));
   const updated = await getProduct(id);
   if (!updated) throw new Error(`Product ${id} not found`);
   return updated;
@@ -203,6 +241,9 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Pr
 export async function deactivateProduct(id: string): Promise<void> {
   const db = await getDb();
   await db.runAsync('UPDATE product SET active = 0, updated_at = ? WHERE id = ?', [Date.now(), id]);
+  // M5 (FR-502): deactivation syncs too (other devices see the product retire).
+  // Fresh op id + { productId } hint (see updateProduct).
+  await enqueueOpInTx(db, 'product', uuidv4(), JSON.stringify({ productId: id }));
 }
 
 export async function listCategories(): Promise<Category[]> {

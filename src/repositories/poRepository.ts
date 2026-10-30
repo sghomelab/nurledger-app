@@ -11,6 +11,7 @@ import { getDb } from '../db/database';
 import { poTotalCostMinor } from '../lib/po';
 import { uuidv4 } from '../lib/ids';
 import { applyStockMoveInTx } from './stockRepository';
+import { enqueueOpInTx } from './outboxRepository';
 import type { POLine, POLineInput, PurchaseOrder } from '../types';
 
 const PO_COLS = `
@@ -176,7 +177,7 @@ export async function receivePO(id: string): Promise<PurchaseOrder> {
       );
 
       // Stock-in: FIFO cost layer (linked to the lot) + immutable receive_po ledger row.
-      await applyStockMoveInTx(db, {
+      const move = await applyStockMoveInTx(db, {
         productId: line.productId,
         qtyDelta: remaining,
         type: 'receive_po',
@@ -186,6 +187,11 @@ export async function receivePO(id: string): Promise<PurchaseOrder> {
         refId: id,
         costLayerRef: { type: 'lot', id: lotId },
       });
+      // M5 (FR-502): the received stock is syncable — enqueue its ledger op
+      // atomically with the move (op_id = the ledger row's sync_op_id).
+      if (move.syncOpId) {
+        await enqueueOpInTx(db, 'ledger', move.syncOpId);
+      }
 
       await db.runAsync(
         'UPDATE po_line SET qty_received = ? WHERE id = ?',

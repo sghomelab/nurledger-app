@@ -44,8 +44,13 @@ export async function completeSale(input: CompleteSaleInput): Promise<SaleReceip
   if (totals.totalMinor < 0) throw new Error('Invalid sale total');
 
   // Friendly oversell guard up front; the transaction re-checks authoritatively.
+  // Weighed lines compare GRAMS against on-hand grams (STOCK_QTY_SQL native units).
   for (const l of input.lines) {
-    if (l.qty > l.stockQty) {
+    if (l.qtyG != null) {
+      if (l.qtyG > l.stockQty) {
+        throw new Error(`Insufficient stock for ${l.name} (have ${l.stockQty} g, need ${l.qtyG} g)`);
+      }
+    } else if (l.qty > l.stockQty) {
       throw new Error(`Insufficient stock for ${l.name} (have ${l.stockQty}, need ${l.qty})`);
     }
   }
@@ -71,7 +76,13 @@ export async function completeSale(input: CompleteSaleInput): Promise<SaleReceip
     // 1 + 2a: consume FIFO + append immutable ledger; accumulate authoritative COGS.
     let cogsTotal = 0;
     for (const line of input.lines) {
-      const cogs = await applySaleInTx(db, { productId: line.productId, qty: line.qty, refId: saleId, deviceId });
+      const cogs = await applySaleInTx(db, {
+        productId: line.productId,
+        qty: line.qty,
+        qtyG: line.qtyG ?? null,
+        refId: saleId,
+        deviceId,
+      });
       if (cogs.short) throw new Error(`Insufficient stock for ${line.name}`);
       cogsTotal += cogs.cogsMinor;
       lineCommits.push({
@@ -97,10 +108,10 @@ export async function completeSale(input: CompleteSaleInput): Promise<SaleReceip
     // header carries the authoritative total tax (FR-108).
     for (const lc of lineCommits) {
       await db.runAsync(
-        `INSERT INTO sale_line (id, sale_id, product_id, lot_id, qty, unit_price_minor,
+        `INSERT INTO sale_line (id, sale_id, product_id, lot_id, qty, qty_g, unit_price_minor,
           discount_minor, tax_minor, line_total_minor, unit_cost_minor, cogs_minor, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
-        [uuidv4(), saleId, lc.line.productId, lc.lotId, lc.line.qty, lc.line.unitPriceMinor,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
+        [uuidv4(), saleId, lc.line.productId, lc.lotId, lc.line.qty, lc.line.qtyG ?? null, lc.line.unitPriceMinor,
          Math.max(0, lc.line.discountMinor), lc.lineTotalMinor, lc.unitCostMinor, lc.cogsMinor, now],
       );
     }
@@ -114,10 +125,12 @@ export async function completeSale(input: CompleteSaleInput): Promise<SaleReceip
     }
 
     // 4: outbox op (FR-502, idempotent by client UUID). The sale is the sync unit;
-    // stock_ledger rows carry their own sync_op_id for the M5 drain.
+    // op_id = sale.uuid (stable client UUID — a retry of this op after a dropped
+    // reply must be a server no-op, not a new sale). Stock_ledger rows for this
+    // sale ride along in the sale op's payload (they carry their own sync_op_id).
     await db.runAsync(
-      'INSERT INTO outbox (id, op_id, entity, payload, created_at) VALUES (?, ?, ?, ?, ?)',
-      [uuidv4(), uuidv4(), 'sale', JSON.stringify({
+      'INSERT INTO outbox (id, op_id, entity, payload, created_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT (op_id) DO NOTHING',
+      [uuidv4(), saleUuid, 'sale', JSON.stringify({
         saleId, saleUuid, outletId: outlet.id, totalMinor: totals.totalMinor,
         cogsMinor: cogsTotal, payments: input.payments, createdAt: now,
       }), now],
@@ -155,6 +168,7 @@ interface RawLine {
   product_id: string;
   lot_id: string | null;
   qty: number;
+  qty_g: number | null;
   unit_price_minor: number;
   discount_minor: number;
   tax_minor: number;
@@ -183,7 +197,7 @@ export async function getSale(id: string): Promise<CompletedSale | null> {
   if (!sale) return null;
 
   const lines = await db.getAllAsync<RawLine>(
-    `SELECT sl.id, sl.sale_id, sl.product_id, sl.lot_id, sl.qty, sl.unit_price_minor,
+    `SELECT sl.id, sl.sale_id, sl.product_id, sl.lot_id, sl.qty, sl.qty_g, sl.unit_price_minor,
             sl.discount_minor, sl.tax_minor, sl.line_total_minor, sl.unit_cost_minor, sl.cogs_minor,
             p.name, p.sku
        FROM sale_line sl LEFT JOIN product p ON p.id = sl.product_id
@@ -203,6 +217,7 @@ export async function getSale(id: string): Promise<CompletedSale | null> {
     sku: l.sku ?? '',
     name: l.name ?? 'Unknown item',
     qty: l.qty,
+    qtyG: l.qty_g,
     unitPriceMinor: l.unit_price_minor,
     discountMinor: l.discount_minor,
     taxMinor: l.tax_minor,
@@ -245,4 +260,29 @@ export async function outboxCount(): Promise<number> {
     'SELECT COUNT(*) AS n FROM outbox WHERE uploaded_at IS NULL',
   );
   return row ? row.n : 0;
+}
+
+// ---------------------------------------------------------------------------
+// Receipt width (FR-109) — device-local print-template choice
+// ---------------------------------------------------------------------------
+
+export type ReceiptWidthSetting = '58mm' | '80mm';
+
+const RECEIPT_WIDTH_KEY = 'receipt.width';
+const RECEIPT_WIDTH_DEFAULT: ReceiptWidthSetting = '80mm';
+
+export async function getReceiptWidth(): Promise<ReceiptWidthSetting> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM settings WHERE key = '${RECEIPT_WIDTH_KEY}'`,
+  );
+  return row?.value === '58mm' ? '58mm' : RECEIPT_WIDTH_DEFAULT;
+}
+
+export async function setReceiptWidth(width: ReceiptWidthSetting): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [
+    RECEIPT_WIDTH_KEY,
+    width,
+  ]);
 }

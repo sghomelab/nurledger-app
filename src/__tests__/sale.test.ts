@@ -24,6 +24,7 @@ const line = (o: Partial<CartLine> = {}): CartLine => ({
   lotId: null,
   stockQty: 99,
   ...o,
+  qtyG: o.qtyG ?? null, // normalize: the Partial spread must not leak undefined
 });
 
 describe('computeTotals — inclusive reference locale', () => {

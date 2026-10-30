@@ -173,10 +173,14 @@ export interface CartLine {
   productId: string;
   sku: string;
   name: string;
-  /** Owner-set stable selling price at time of add (ADR-003). */
+  /** Owner-set stable selling price at time of add (ADR-003). For WEIGHED
+   *  products this is the per-line price for the weighed amount (per-kg rate ×
+   *  grams, FR-103), with qty fixed at 1. */
   unitPriceMinor: number;
-  /** Base units (each) — weighed items would store grams here (M5). */
+  /** Base units (each). Weighed lines keep qty = 1 and carry `qtyG`. */
   qty: number;
+  /** M5 (FR-103): weighed amount in grams. Null for unit (each/carton) lines. */
+  qtyG: number | null;
   taxCategory: string;
   /** Per-line absolute discount (FR-105), minor. */
   discountMinor: number;
@@ -213,6 +217,8 @@ export interface SaleLine {
   sku: string;
   name: string;
   qty: number;
+  /** Weighed amount in grams (FR-103); null for unit lines. */
+  qtyG: number | null;
   unitPriceMinor: number;
   discountMinor: number;
   taxMinor: number;

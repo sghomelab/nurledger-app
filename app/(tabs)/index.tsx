@@ -1,9 +1,11 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ComponentProps } from 'react';
+import { useFocusEffect } from 'expo-router';
 import { Alert, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../../src/hooks/useCart';
 import { useProducts } from '../../src/hooks/useAppData';
 import { useShift, useUsers } from '../../src/hooks/useShift';
+import { useSync } from '../../src/hooks/useSync';
 import { QuickChips } from '../../src/components/register/QuickChips';
 import { CartLineRow } from '../../src/components/register/CartLineRow';
 import { TotalsBlock } from '../../src/components/register/TotalsBlock';
@@ -13,11 +15,12 @@ import { MoneyPrompt } from '../../src/components/register/MoneyPrompt';
 import { PinPrompt } from '../../src/components/PinPrompt';
 import { NumberText } from '../../src/components/NumberText';
 import { formatMoney } from '../../src/lib/money';
+import { formatWeight, linePriceForWeight, parseWeightToG } from '../../src/lib/weighed';
 import { roleCanAct, type GateAction } from '../../src/lib/roles';
 import { getDeviceId } from '../../src/repositories/shiftRepository';
+import { getReceiptWidth, type ReceiptWidthSetting, type SaleReceipt } from '../../src/repositories/saleRepository';
 import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
 import type { PaymentAllocation, ProductWithStock } from '../../src/types';
-import type { SaleReceipt } from '../../src/repositories/saleRepository';
 
 type PromptState =
   | { kind: 'order' }
@@ -52,6 +55,19 @@ export default function SellTab() {
   const [changeMinor, setChangeMinor] = useState(0);
   const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [gate, setGate] = useState<{ action: GateAction; onOk: () => void } | null>(null);
+  /** M5 (FR-103): weighed-item weight prompt (pre-filled from the scale barcode). */
+  const [weigh, setWeigh] = useState<{ product: ProductWithStock; text: string } | null>(null);
+
+  // M5 (FR-503): sync status for the banner + receipt width for the receipt.
+  const sync = useSync();
+  const [receiptWidth, setReceiptWidthState] = useState<ReceiptWidthSetting>('80mm');
+  // Reload on FOCUS (not just mount): the width is changed in Settings, which
+  // is a pushed screen — returning to this tab must pick up the new value.
+  useFocusEffect(
+    useCallback(() => {
+      void getReceiptWidth().then(setReceiptWidthState);
+    }, []),
+  );
 
   const currency = cart.currency;
   const { lines, totals, orderDiscountMinor } = cart;
@@ -59,6 +75,32 @@ export default function SellTab() {
   // M4 (FR-200/FR-500): register is locked unless a shift is open. The active
   // user is the cashier; a shift must exist before anything can be charged.
   const shiftOpen = shift.open !== null;
+
+  /**
+   * FR-503 sync banner: one compact line under the scan row.
+   *  - offline device (no BYO connection): nothing — purely local operation.
+   *  - connected + sync ON: Syncing… / N queued / Synced / error.
+   *  - connected + sync OFF + backlog: “N ops queued · Sync off”.
+   */
+  const syncBanner = useMemo<{ icon: ComponentProps<typeof Ionicons>['name']; color: string; bg: string; text: string } | null>(() => {
+    if (!sync.connected) return null;
+    if (sync.enabled) {
+      if (sync.syncing) return { icon: 'sync-outline', color: '#B45309', bg: colors.warningSoft, text: 'Syncing…' };
+      if (sync.pending > 0) {
+        return { icon: 'cloud-upload-outline', color: '#B45309', bg: colors.warningSoft, text: `${sync.pending} ops queued — syncing automatically` };
+      }
+      if (sync.lastError) {
+        return { icon: 'warning-outline', color: colors.danger, bg: colors.dangerSoft, text: `Sync error: ${sync.lastError}` };
+      }
+      return sync.lastSyncedAt
+        ? { icon: 'cloud-done-outline', color: colors.positive, bg: colors.primarySoft, text: `Synced ${new Date(sync.lastSyncedAt).toLocaleTimeString()}` }
+        : { icon: 'cloud-outline', color: colors.slate500, bg: colors.slate100, text: 'Connected' };
+    }
+    if (sync.pending > 0) {
+      return { icon: 'cloud-offline-outline', color: '#B45309', bg: colors.warningSoft, text: `${sync.pending} ops queued · Sync off` };
+    }
+    return null;
+  }, [sync.connected, sync.enabled, sync.syncing, sync.pending, sync.lastError, sync.lastSyncedAt]);
 
   /**
    * PIN gate (FR-500 / DEV-003): run `job` directly when the active user's role
@@ -106,7 +148,13 @@ export default function SellTab() {
       return;
     }
     try {
-      await cart.addByBarcode(code);
+      const r = await cart.addByBarcode(code);
+      // M5 (FR-104): scale barcode → open the weight prompt, pre-filled with
+      // the weight the parser extracted from the barcode tail.
+      if (r.needsWeight) {
+        const { product, weightG } = r.needsWeight;
+        setWeigh({ product, text: (weightG / 1000).toString() });
+      }
     } catch (e) {
       Alert.alert('Scan failed', errMsg(e));
     }
@@ -116,6 +164,12 @@ export default function SellTab() {
     async (p: ProductWithStock) => {
       if (!shiftOpen) {
         Alert.alert('Register locked', 'Open a shift first (Shift tab) to start selling.');
+        return;
+      }
+      // M5 (FR-103): weighed products go through the weight prompt, not a
+      // plain qty-1 add.
+      if (p.isWeighed) {
+        setWeigh({ product: p, text: '' });
         return;
       }
       try {
@@ -138,7 +192,27 @@ export default function SellTab() {
     [cart],
   );
 
+  /** M5 (FR-103): confirm the weight prompt → add the weighed line. */
+  const confirmWeigh = useCallback(async () => {
+    if (!weigh) return;
+    const g = parseWeightToG(weigh.text);
+    if (g == null) {
+      Alert.alert('Invalid weight', 'Enter the weight in kg, e.g. 0.25 or 1.25');
+      return;
+    }
+    const product = weigh.product;
+    setWeigh(null);
+    try {
+      await cart.addWeighed(product, g);
+    } catch (e) {
+      Alert.alert('Could not add', errMsg(e));
+    }
+  }, [weigh, cart]);
+
   const canCharge = cart.loaded && !cart.busy && lines.length > 0 && shiftOpen;
+
+  /** Live grams for the weight prompt (valid kg string → grams, else null). */
+  const weighG = weigh ? parseWeightToG(weigh.text) : null;
 
   const onCharge = useCallback(() => {
     if (!canCharge) return;
@@ -250,11 +324,12 @@ export default function SellTab() {
         </Pressable>
       </View>
 
-      {cart.pending > 0 && (
-        <View style={styles.pendingBanner}>
-          <Ionicons name="cloud-offline-outline" size={14} color="#B45309" />
-          <Text style={styles.pendingText}>
-            {cart.pending} sale{cart.pending === 1 ? '' : 's'} in the offline queue — syncs when online
+      {/* M5 (FR-503): sync status banner (replaces the old "offline queue" hint) */}
+      {syncBanner && (
+        <View style={[styles.pendingBanner, { backgroundColor: syncBanner.bg }]}>
+          <Ionicons name={syncBanner.icon} size={14} color={syncBanner.color} />
+          <Text style={[styles.pendingText, { color: syncBanner.color }]} numberOfLines={1}>
+            {syncBanner.text}
           </Text>
         </View>
       )}
@@ -350,25 +425,77 @@ export default function SellTab() {
         </Text>
       </Pressable>
 
-      {/* Payment sheet (FR-107) */}
+      {/* Payment sheet (FR-107) — methods localized by outlet (FR-601) */}
       <Modal visible={payVisible} animationType="slide" onRequestClose={() => setPayVisible(false)}>
         <PaymentSheet
           totalMinor={totals.totalMinor}
           currency={currency}
+          locale={cart.outlet?.locale ?? null}
           onClose={() => setPayVisible(false)}
           onComplete={(p, c) => void onPaymentComplete(p, c)}
         />
       </Modal>
 
-      {/* On-screen receipt (FR-109) */}
+      {/* On-screen receipt (FR-109) — rendered via the shared template engine */}
       <Modal visible={receipt !== null} animationType="slide" onRequestClose={() => setReceipt(null)}>
         {receipt && (
           <ReceiptView
             receipt={receipt}
             currency={currency}
             changeMinor={changeMinor}
+            outletName={cart.outlet?.name ?? 'NURLEDGER'}
+            cashierName={users?.find((u) => u.id === receipt.sale.cashierId)?.name ?? null}
+            locale={cart.outlet?.locale ?? null}
+            width={receiptWidth}
             onDone={() => setReceipt(null)}
           />
+        )}
+      </Modal>
+
+      {/* M5 (FR-103): weighed-item weight prompt (scale pre-fill or manual kg) */}
+      <Modal visible={weigh !== null} animationType="slide" onRequestClose={() => setWeigh(null)}>
+        {weigh && (
+          <View style={styles.weighWrap}>
+            <Text style={styles.weighTitle}>Weighed — {weigh.product.name}</Text>
+            <Text style={styles.weighSub}>
+              {formatWeight(weigh.product.stockQty)} in stock · {formatMoney(weigh.product.priceMinor, currency)}/kg
+            </Text>
+            <View style={styles.weighFieldRow}>
+              <TextInput
+                style={styles.weighInput}
+                value={weigh.text}
+                onChangeText={(t) => setWeigh({ ...weigh, text: t })}
+                keyboardType="decimal-pad"
+                placeholder="0.000"
+                autoFocus
+                autoCorrect={false}
+                maxLength={8}
+              />
+              <Text style={styles.weighUnit}>kg</Text>
+            </View>
+            {weighG != null && weighG > 0 && (
+              <View style={styles.weighPreview}>
+                <Text style={styles.weighPreviewLabel}>
+                  {formatWeight(weighG)} · line price
+                </Text>
+                <NumberText style={styles.weighPreviewValue}>
+                  {formatMoney(linePriceForWeight(weigh.product.priceMinor, weighG), currency)}
+                </NumberText>
+              </View>
+            )}
+            <View style={styles.weighActions}>
+              <Pressable style={styles.weighCancel} onPress={() => setWeigh(null)}>
+                <Text style={styles.weighCancelText}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.weighOk, (weighG == null || weighG <= 0) && { opacity: 0.45 }]}
+                onPress={() => void confirmWeigh()}
+                disabled={weighG == null || weighG <= 0}
+              >
+                <Text style={styles.weighOkText}>Add to order</Text>
+              </Pressable>
+            </View>
+          </View>
         )}
       </Modal>
 
@@ -526,4 +653,53 @@ const styles = StyleSheet.create({
   },
   chargeBtnDisabled: { opacity: 0.45 },
   chargeText: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.white, letterSpacing: 0.5 },
+  weighWrap: { flex: 1, backgroundColor: colors.slate50, padding: spacing.lg, gap: spacing.md },
+  weighTitle: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900 },
+  weighSub: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
+  weighFieldRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.white,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    borderRadius: radius.control,
+    paddingHorizontal: spacing.md,
+  },
+  weighInput: { flex: 1, fontFamily: fonts.monoSemiBold, fontSize: 30, color: colors.slate900, paddingVertical: spacing.sm, textAlign: 'right' },
+  weighUnit: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate400 },
+  weighPreview: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.white,
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  weighPreviewLabel: { fontFamily: fonts.sansMedium, fontSize: typography.body, color: colors.slate500 },
+  weighPreviewValue: { fontFamily: fonts.monoSemiBold, fontSize: 22, color: colors.slate900 },
+  weighActions: { flexDirection: 'row', gap: spacing.md, marginTop: 'auto' },
+  weighCancel: {
+    flex: 1,
+    height: 54,
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.slate300,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weighCancelText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
+  weighOk: {
+    flex: 2,
+    height: 54,
+    borderRadius: radius.control,
+    backgroundColor: colors.positive,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  weighOkText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
 });

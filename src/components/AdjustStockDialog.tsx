@@ -27,7 +27,7 @@ export function AdjustStockDialog({
   onApplied,
   onClose,
 }: {
-  product: { id: string; name: string; stockQty: number; costMinor: number };
+  product: { id: string; name: string; stockQty: number; costMinor: number; isWeighed?: boolean };
   currency: string;
   onApplied: () => void;
   onClose: () => void;
@@ -48,9 +48,13 @@ export function AdjustStockDialog({
     if (!canConfirm || saving) return;
     setSaving(true);
     try {
+      // Weighed products keep stock in GRAMS (FR-103): the dialog's quantity
+      // is in the product's base unit, so route it to qtyGDelta for weighed —
+      // a qtyDelta on a weighed product would be invisible to stockQty.
       await applyStockMove({
         productId: product.id,
-        qtyDelta: delta,
+        qtyDelta: product.isWeighed ? 0 : delta,
+        qtyGDelta: product.isWeighed ? delta : null,
         type: 'adjustment',
         reason: reason.trim(),
         refType: 'adjustment',
@@ -106,7 +110,9 @@ export function AdjustStockDialog({
             </Pressable>
           </View>
 
-          <Text style={styles.label}>Quantity (base units) *</Text>
+          <Text style={styles.label}>
+            {product.isWeighed ? 'Quantity (grams) *' : 'Quantity (base units) *'}
+          </Text>
           <TextInput
             style={styles.inputMono}
             value={qty}

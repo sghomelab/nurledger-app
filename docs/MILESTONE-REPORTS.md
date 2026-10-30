@@ -304,3 +304,168 @@ rates). FR-500 → full (stricter on cashier close-shift). FR-501 → partial
 - Sync of the closed-shift record (outbox op) → M5 with the rest of FR-502.
 - Standing regression: `npx tsc --noEmit` (0 errors) + `npx jest`
   (145 tests, 13 suites) green.
+
+## M5 — Cloud & sync (2026-10-31)
+
+**Scope (per handoff BUILD-PROMPT M5):** BYO Supabase (the store owns its own
+backend — ADR-010/DEV-006), idempotent outbox sync (push + pull deltas),
+product LWW + immutable audit, server-side stock recompute (never
+client-merged), two-device concurrency, locale engines (PaymentMethods,
+BarcodeParser, receipt template — TaxEngine + currency already done Post-M3),
+weighed items (FR-103/FR-104), receipt widths (FR-604), FR-503 status surface,
+lossless disconnect/reconnect. Design: `docs/SYNC-DESIGN.md`.
+
+### What shipped
+- **BYO cloud (ADR-010, DEV-006):** `app/cloud-setup.tsx` wizard — paste
+  URL + anon + service keys → paste-SQL step (copy the bundle → Supabase SQL
+  Editor → verify via a service-key `schemaDeployed` check) → owner
+  sign-up (or "already registered" → sign-in) → create-or-join store.
+  `src/lib/cloud/schemaSql.ts` is the versioned idempotent SQL bundle (tables,
+  RLS, views, audit). `src/lib/cloud/supabaseAdapter.ts` implements the
+  `CloudAdapter` interface on `@supabase/supabase-js` (pure JS — **no new
+  native deps**; peer-deps checked before install). The creator is never a
+  data custodian: there is no Nurledger-hosted backend.
+- **Outbox + cursors (FR-502):** `outboxRepository` — enqueue-at-write for
+  `product` / `ledger` / `sale` (PO receive enqueues its stock move as a
+  `ledger` op); FIFO pending; `markUploaded`; `delta_cursor` table (per-entity
+  monotonic `MAX`). `useSync` hook — drain → push → mark, then pull deltas →
+  apply; exposes the banner status. **Sync is OFF by default** (per-device
+  runtime toggle in Settings → Cloud sync).
+- **Correctness (SYNC-DESIGN §3):** server dedupe by **data-row conflicts**
+  (`product.id`, `sale.uuid`, `stock_ledger.sync_op_id`) — there is no server
+  ops table. Product edits merge **LWW on `updated_at`** and write an
+  immutable `product_audit` row per attempt: `created` / `rejected`
+  (same-value no-op) / `applied` (winning change), with before/after JSON +
+  `changed_by_device`. **Stock is recomputed server-side from the sale
+  ledger — never client-merged.** Tenant mapping: each device keeps its local
+  outlet UUID; push payloads remap `outlet_id` local→tenant at drain time;
+  pulled rows are written with the local outlet id. Multi-device seed
+  identity via `deterministicId(name)` (SHA-256 → v5 UUID, namespace
+  `nurledger:seed:v1:`) so two devices seed the *same* products.
+- **Locale engines:** `paymentMethodsForLocale` (en-SG: Cash/Card/PayNow
+  QR/Split; en-MY: Cash/Card/Touch 'n Go QR/Split) + QR stub acquirer behind
+  an interface (ADR-006: Prepare QR → `QR-XXXXXXXX` reference → "no live
+  acquirer" note → Confirm paid). `src/lib/barcode.ts` — per-locale
+  `BarcodeParser` (pure): GTIN exact match + EAN-13 in-store range (first
+  digit `2`) weighed parse (last 5 digits = grams, first 8 = item key matched
+  via `findByWeighedKey`: `barcode = key OR key LIKE 'key%'`).
+  `src/lib/receipt.ts` — receipt layout engine (pure): 58mm = 32 cols, 80mm =
+  48 cols, long names truncated to fit; width chosen in Settings, reloaded on
+  Sell-tab focus.
+- **Weighed items (FR-103/104):** per-kg rates, stock tracked in **grams**
+  (`stock_view.qty_g`; `STOCK_QTY_SQL` routes weighed products to grams),
+  `linePriceForWeight = round(priceMinor × g / 1000)`. Scale barcode →
+  "Weighed — <name>" prompt (weight editable) → explicit **Add to order** →
+  line at per-kg math. Sale commit writes a ledger row `(qty_delta=0,
+  qty_g_delta=−g)` and bypasses FIFO (COGS recorded as a per-kg fact).
+  Adjust dialog is grams-aware for weighed products ("Quantity (grams) *",
+  routes to `qtyGDelta`).
+- **Schema v5:** `stock_view` gains `qty_g`; outbox partial index;
+  `delta_cursor` table; upgrade path is self-healing (T8: app updated over a
+  live v4 DB with real data → zero loss).
+- **FR-503 status surface:** Sell banner + Settings cloud section (connect
+  state, ON/OFF toggle, last-synced, queue count, Sync now, Disconnect).
+- **No hardcoded country/tax:** the 8.25 US preset is gone —
+  `grep -rn "8.25" src/ app/` → **0 matches**; all rates come from presets or
+  the custom-rate entry (engine id only, never a literal in the math).
+
+### Exit test — two-device E2E (PASSED, 9/9)
+Two emulators (A = emulator-5554, B = emulator-5556) against a **local
+Supabase** (Postgres + PostgREST + GoTrue + RLS — full fidelity; the emulator
+reaches the host at `10.0.2.2`).
+- **T1 wizard (CREATE + JOIN):** A creates the store → server outlet id =
+  A's local id `39e044dd-c930-4890-a199-93ae168a1fae`, 1 `org_member`,
+  1 auth user. B, same backend + credentials → "This email already has an
+  account — sign in instead" → sign-in → create-or-join → B's local outlet
+  **untouched**, `cloud.outlet_id` = tenant id.
+- **T2 sync OFF by default:** fresh profile is pure-local (no cloud config);
+  B queues with sync off: `1 ops queued · sync off`.
+- **T3 offline sale on B:** Supabase STOPPED, verified offline window
+  (container down, health endpoint refused) → B sells (uuid
+  `d79ac3f3…`) → start server → B's op uploads.
+- **T4 convergence + idempotency:** both devices converge; psql: server
+  **5 sales / 11 products / 19 ledger / 22 audit**; both devices identical
+  (croissant stock 10, sourdough 7); **re-sync is a no-op** (counts
+  unchanged — no double-apply).
+- **T5 product LWW + audit:** A edits croissant 3.50 → 4.00; B (holding the
+  pulled 4.00) edits 4.00 → 4.50 with a later timestamp (1793388766265).
+  Server = **450** (B wins); A pulls `(450, 1793388766265)`. `product_audit`
+  chain: `created 350 → rejected (same-value 350, B's seed push) → applied
+  350→400 (device A) → applied 400→450 (device B)`.
+- **T6 no hardcoded tax + locale switch:** grep zero (above). Switched the
+  store to the MY preset (SST 10% inclusive, en-MY, MYR) → Sell shows
+  `Tax (10%, incl.)` + MYR + methods Cash/Card/**Touch 'n Go QR**/Split →
+  sale of 6.50 shows tax **0.59** (inclusive: 650×10/110). Reverted to
+  SGD / en-SG / GST 9% / 80mm.
+- **T7 QR stub + weighed + receipts:** Touch 'n Go QR → Prepare QR →
+  REFERENCE **QR-FD5D88B0** + stub note (ADR-006) → Confirm paid → payment
+  row `(method='qr', 650, 'QR-FD5D88B0')`, reference on receipt #0BBAE031.
+  Weighed: created "Russet Apples" (unit type kg, 8.90/kg, item key
+  `20000000`); scale code `2000000001250` → "Weighed — Russet Apples · 1.25 kg
+  · line price MYR 11.13" (= round(890×1250/1000)) → sale **1113/tax 101**;
+  ledger `+5000 g` (adjust) → `−1250 g` (sale); stock 5000 → **3750 g**.
+  Receipts: 80mm = 48-col separators; 58mm = 32-col + truncated names
+  (`Artisan Country S…`).
+- **T8 upgrade with live data:** app updated v4 → v5 on device A over a
+  populated DB → all data intact (zero loss).
+- **T9 lossless disconnect/reconnect:** sync OFF + sale → `1 ops queued ·
+  Sync off` → **Disconnect** (cloud config cleared except `cloud.backfill_v1`;
+  outbox + `delta_cursor` **intact**) → reconnect wizard ("already
+  registered" → sign-in → "Your backend is linked") → sync ON → `Synced`.
+  Server now has the queued sale (`acd75cf9…`, 650); cursors advanced
+  monotonically (sale 1793390101688 → 1793390228519, ledger → 1793390228520,
+  product unchanged); device A: **0 pending / 0 FK violations**.
+
+### Bugs found + fixed (this milestone — all live-verified)
+1. **Outbox FIFO index** — the pending-queue query indexed on `rowid` to get
+   stable FIFO order without an extra column.
+2. **`stock_view` migration** — SQLite views can't be `CREATE ... IF NOT
+   EXISTS`; the v5 migration now `DROP VIEW IF EXISTS` + re-create.
+3. **Unescaped backticks in the BYO SQL bundle** — the template literal ate
+   SQL identifiers; bundle now deploys clean (verified via `schemaDeployed`).
+4. **`useSync` stale banner** — status state not refreshed after a manual
+   sync; now derived from a single store-driven update.
+5. **Multi-device seed identity** — each device seeded *different* product
+   UUIDs, so two devices disagreed about seed rows. Fixed with
+   `deterministicId` (SHA-256 → v5 UUID) — cross-device proven live.
+6. **Drain payload resolution** — push payloads referenced local row ids that
+   didn't exist on the server; builders now resolve by
+   `uuid = ? OR id = ?` (pure helpers in `src/lib/sync.ts`).
+7. **Product push payload ignored the tenant outlet remap** — a joined
+   device (B) pushed its local outlet id → server rejected it ("not a
+   member") → **FIFO stall** (queue never drained). Remap applied at drain
+   for all entities.
+8. **Pull wrote `sale_uuid` into child `sale_id`** — child rows pointed at
+   the server UUID instead of the local id → FK failure → **the whole pull
+   rolled back forever**. Fixed with a uuid→local-id map applied to child
+   rows.
+9. **Rekey artifact (device A):** 12 `lot` rows had a dangling `product_id`
+   after the tenant remap; repaired from A's own `cost_layer` rows
+   (`ref_type='lot'`), DB pushed back to the device.
+10. **Adjust dialog routed weighed qty to `qtyDelta`** — a grams restock
+    landed in the base-unit column, invisible to the grams stock
+    (`stockQty` for weighed = `qty_g`). Now `qtyDelta: isWeighed ? 0 :
+    delta`, `qtyGDelta: isWeighed ? delta : null`, label "Quantity (grams)
+    *".
+11. **Receipt width loaded once on mount** — a Settings change had no effect
+    until app restart. `app/(tabs)/index.tsx` now re-reads
+    `getReceiptWidth()` on tab focus (`useFocusEffect`).
+
+### FR touched
+FR-502 → full (product/ledger/sale; shift *headers* remain local — see open
+items). FR-503 → full. FR-504 → full (two devices, server arbitrates).
+FR-505 → full (owner cloud auth; cashiers local-PIN per DEV-006). FR-506 →
+full (tenant RLS in the BYO bundle). FR-601 → full (QR = stub per ADR-006).
+FR-603 → full. FR-604 → full (layout engine; physical print M6). FR-103/104
+→ full. FR-109 → partial remains (print + re-print UI → M6). DEV-006 logged.
+
+### Open items
+- **Shift/PO header records are not synced** — sales, stock and products
+  converge, but the `shift` framing (float, Z-report) stays per-device
+  (register state). Syncing closed-shift records is an M6 item (the M4
+  report's pointer).
+- Camera scan (FR-100) — `expo-camera` wiring → M6 (visible stub, DEV-004).
+- Physical ESC/POS print + re-print from sales history (FR-109 tail) → M6
+  (DEV-005) with label printing.
+- Standing regression: `npx tsc --noEmit` (0 errors) + `npx jest`
+  (209 tests, 18 suites) green.

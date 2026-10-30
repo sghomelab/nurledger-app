@@ -1,4 +1,4 @@
-import { changeDue, evenSplit, isCovered } from '../lib/payment';
+import { acquirerFor, changeDue, evenSplit, isCovered, paymentMethodsFor } from '../lib/payment';
 import type { PaymentAllocation, PaymentMethodId } from '../types';
 
 /**
@@ -60,5 +60,50 @@ describe('evenSplit (FR-107) — allocations always sum to the total', () => {
         expect(sum).toBe(total);
       }
     }
+  });
+});
+
+describe('paymentMethodsFor (FR-601: method list per locale)', () => {
+  it('en-SG offers Cash / Card / PayNow QR', () => {
+    const m = paymentMethodsFor('en-SG');
+    expect(m.map((x) => x.id)).toEqual(['cash', 'card', 'qr']);
+    const qr = m.find((x) => x.id === 'qr');
+    expect(qr?.qrAcquirer).toBe('paynow');
+  });
+
+  it('en-MY offers Touch \'n Go QR', () => {
+    const m = paymentMethodsFor('en-MY');
+    const qr = m.find((x) => x.id === 'qr');
+    expect(qr?.qrAcquirer).toBe('tng');
+    expect(qr?.label).toContain('Touch');
+  });
+
+  it('unknown locales fall back to the generic list (still has QR)', () => {
+    for (const locale of [null, undefined, 'xx-XX']) {
+      const m = paymentMethodsFor(locale);
+      expect(m.some((x) => x.id === 'cash')).toBe(true);
+      expect(m.find((x) => x.id === 'qr')?.qrAcquirer).toBe('generic');
+    }
+  });
+});
+
+describe('QR acquirer stub (FR-601: show QR + record reference)', () => {
+  it('resolves every configured locale acquirer to the stub', () => {
+    for (const id of ['paynow', 'tng', 'generic']) {
+      const a = acquirerFor(id);
+      expect(a).not.toBeNull();
+    }
+    expect(acquirerFor(undefined)).toBeNull();
+    expect(acquirerFor('not-a-real-acquirer')).toBeNull();
+  });
+
+  it('prepare() returns a reference code (no live acquirer, ADR-006)', () => {
+    const a = acquirerFor('paynow')!;
+    const prep = a.prepare(1234, 'SGD');
+    expect(prep.reference).toMatch(/^QR-[A-Z0-9]{8}$/);
+    expect(prep.imageUrl).toBeNull();
+    expect(prep.note).toContain('Stub acquirer');
+    // Two prepares are distinct (unique reference per transaction).
+    expect(a.prepare(1234, 'SGD').reference).not.toBe(prep.reference);
   });
 });
