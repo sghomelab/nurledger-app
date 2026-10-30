@@ -1,20 +1,22 @@
 import { useEffect, useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, Pressable, Alert, KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useCategories, useOutlet } from '../../../src/hooks/useAppData';
-import { createProduct, getProduct, updateProduct, type ProductInput } from '../../../src/repositories/productRepository';
-import { useProducts } from '../../../src/hooks/useAppData';
-import { colors, fonts, radius, spacing, typography } from '../../../src/theme/tokens';
-import type { UnitType, VelocityClass } from '../../../src/types';
+import { useCategories, useOutlet } from '../../src/hooks/useAppData';
+import { createProduct, getProduct, updateProduct, type ProductInput } from '../../src/repositories/productRepository';
+import { useProducts } from '../../src/hooks/useAppData';
+import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
+import type { UnitType, VelocityClass } from '../../src/types';
 
 /**
  * Product add/edit (M1 local CRUD, FR-300/FR-302).
  * Money fields are entered as decimal strings and stored as integer minor units (ADR-004).
  */
-export default function ProductFormScreen({ id }: { id?: string }) {
+export default function ProductFormScreen() {
+  // Route params arrive via useLocalSearchParams (routes are untyped — no prop injection).
+  const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
   const isNew = id === undefined;
   const { categories, addCategory } = useCategories();

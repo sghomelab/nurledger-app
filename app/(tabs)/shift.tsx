@@ -1,4 +1,4 @@
-import { ComingSoon } from './ComingSoon';
+import { ComingSoon } from '../../src/components/ComingSoon';
 
 /** Tab 5 — Cash Drawer / Shift (M4). */
 export default function ShiftTab() {

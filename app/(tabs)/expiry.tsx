@@ -1,4 +1,4 @@
-import { ComingSoon } from './ComingSoon';
+import { ComingSoon } from '../../src/components/ComingSoon';
 
 /** Tab 3 — FIFO Expiry Radar (M3). */
 export default function ExpiryTab() {

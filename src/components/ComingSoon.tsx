@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
+import { colors, fonts, radius, spacing, typography } from '../theme/tokens';
 
 /** Placeholder for milestone-gated tabs (M2–M6) with scope label. */
 export function ComingSoon({

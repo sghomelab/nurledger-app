@@ -23,6 +23,8 @@ export async function getDb(): Promise<SQLiteDatabase> {
       const database = await openDatabaseAsync(DB_NAME);
       await database.execAsync('PRAGMA foreign_keys = ON;');
 
+      // Meta table must exist before we can read the version (fresh DB = no tables yet).
+      await database.execAsync('CREATE TABLE IF NOT EXISTS schema_meta (id INTEGER PRIMARY KEY, v INTEGER NOT NULL);');
       const row = await database.getFirstAsync<{ v: number }>(
         'SELECT v FROM schema_meta WHERE id = 1',
       );
@@ -30,7 +32,6 @@ export async function getDb(): Promise<SQLiteDatabase> {
 
       if (current === 0) {
         await database.withTransactionAsync(async () => {
-          await database.execAsync('CREATE TABLE IF NOT EXISTS schema_meta (id INTEGER PRIMARY KEY, v INTEGER NOT NULL);');
           await database.execAsync(SCHEMA_SQL);
           await database.runAsync('INSERT OR REPLACE INTO schema_meta (id, v) VALUES (1, ?)', [
             SCHEMA_VERSION,
@@ -46,7 +47,11 @@ export async function getDb(): Promise<SQLiteDatabase> {
 
       db = database;
       return database;
-    })();
+    })().catch((e) => {
+      // Don't cache a failed init — a later call should be able to retry.
+      initPromise = null;
+      throw e;
+    });
   }
   return initPromise;
 }

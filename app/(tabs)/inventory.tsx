@@ -72,7 +72,7 @@ export default function InventoryTab() {
           <ProductRow
             product={item}
             currency={outlet?.currency ?? 'SGD'}
-            onPress={() => router.push({ pathname: '/(tabs)/inventory/[id]', params: { id: item.id } })}
+            onPress={() => router.push({ pathname: '/inventory/[id]', params: { id: item.id } })}
           />
         )}
       />
@@ -80,7 +80,7 @@ export default function InventoryTab() {
       {/* Add product (prototype: [ + ADD ] header action) */}
       <Pressable
         style={({ pressed }) => [styles.fab, pressed && { opacity: 0.9 }]}
-        onPress={() => router.push('/(tabs)/inventory/new')}
+        onPress={() => router.push('/inventory/new')}
       >
         <Ionicons name="add" size={26} color={colors.white} />
       </Pressable>

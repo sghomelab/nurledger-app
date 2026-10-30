@@ -1,4 +1,4 @@
-import { ComingSoon } from './ComingSoon';
+import { ComingSoon } from '../../src/components/ComingSoon';
 
 /** Tab 4 — Analytics & Reports (M4). */
 export default function InsightsTab() {

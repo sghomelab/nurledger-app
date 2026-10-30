@@ -4,7 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { loadFonts } from '../src/fonts';
 import { getDb } from '../src/db/database';
-import { colors } from '../src/theme/tokens';
+import { colors, fonts } from '../src/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -27,7 +27,29 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style="dark" />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.slate50 } }} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.slate50 } }}>
+        {/* Product form screens live outside the (tabs) group — header + back button. */}
+        <Stack.Screen
+          name="inventory/new"
+          options={{
+            headerShown: true,
+            title: 'New product',
+            headerStyle: { backgroundColor: colors.slate50 },
+            headerTitleStyle: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate900 },
+            headerTintColor: colors.slate900,
+          }}
+        />
+        <Stack.Screen
+          name="inventory/[id]"
+          options={{
+            headerShown: true,
+            title: 'Edit product',
+            headerStyle: { backgroundColor: colors.slate50 },
+            headerTitleStyle: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate900 },
+            headerTintColor: colors.slate900,
+          }}
+        />
+      </Stack>
     </>
   );
 }

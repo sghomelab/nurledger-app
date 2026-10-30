@@ -1,4 +1,4 @@
-import { ComingSoon } from './ComingSoon';
+import { ComingSoon } from '../../src/components/ComingSoon';
 
 /**
  * Tab 1 — POS Register (M2).
