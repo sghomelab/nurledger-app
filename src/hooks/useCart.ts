@@ -223,8 +223,16 @@ export function useCart() {
     await persist([], 0);
   }, [persist]);
 
+  /**
+   * Attribution for the completed sale (M4): who was at the register and
+   * under which open shift. Both are recorded on the sale (sale.cashier_id /
+   * sale.shift_id) so reports and the drawer math tie back to the person + shift.
+   */
   const charge = useCallback(
-    async (payments: PaymentAllocation[]): Promise<SaleReceipt> => {
+    async (
+      payments: PaymentAllocation[],
+      attribution?: { cashierId?: string | null; shiftId?: string | null },
+    ): Promise<SaleReceipt> => {
       if (linesRef.current.length === 0) throw new Error('Cart is empty');
       setBusy(true);
       try {
@@ -233,6 +241,8 @@ export function useCart() {
           payments,
           orderDiscountMinor: discountRef.current,
           taxEngineId: outlet?.taxEngine ?? REFERENCE_TAX_ENGINE,
+          cashierId: attribution?.cashierId ?? null,
+          shiftId: attribution?.shiftId ?? null,
         });
         // completeSale already cleared the DB cart; sync local state.
         await persist([], 0);

@@ -3,14 +3,18 @@ import { Alert, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextIn
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../../src/hooks/useCart';
 import { useProducts } from '../../src/hooks/useAppData';
+import { useShift, useUsers } from '../../src/hooks/useShift';
 import { QuickChips } from '../../src/components/register/QuickChips';
 import { CartLineRow } from '../../src/components/register/CartLineRow';
 import { TotalsBlock } from '../../src/components/register/TotalsBlock';
 import { PaymentSheet } from '../../src/components/register/PaymentSheet';
 import { ReceiptView } from '../../src/components/register/ReceiptView';
 import { MoneyPrompt } from '../../src/components/register/MoneyPrompt';
+import { PinPrompt } from '../../src/components/PinPrompt';
 import { NumberText } from '../../src/components/NumberText';
 import { formatMoney } from '../../src/lib/money';
+import { roleCanAct, type GateAction } from '../../src/lib/roles';
+import { getDeviceId } from '../../src/repositories/shiftRepository';
 import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
 import type { PaymentAllocation, ProductWithStock } from '../../src/types';
 import type { SaleReceipt } from '../../src/repositories/saleRepository';
@@ -18,7 +22,8 @@ import type { SaleReceipt } from '../../src/repositories/saleRepository';
 type PromptState =
   | { kind: 'order' }
   | { kind: 'price'; key: string }
-  | { kind: 'discount'; key: string };
+  | { kind: 'discount'; key: string }
+  | { kind: 'openshift' };
 
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -37,6 +42,8 @@ function errMsg(e: unknown): string {
 export default function SellTab() {
   const cart = useCart();
   const { products, reload } = useProducts();
+  const { active, users } = useUsers();
+  const shift = useShift();
 
   const [barcode, setBarcode] = useState('');
   const [search, setSearch] = useState('');
@@ -44,9 +51,36 @@ export default function SellTab() {
   const [receipt, setReceipt] = useState<SaleReceipt | null>(null);
   const [changeMinor, setChangeMinor] = useState(0);
   const [prompt, setPrompt] = useState<PromptState | null>(null);
+  const [gate, setGate] = useState<{ action: GateAction; onOk: () => void } | null>(null);
 
   const currency = cart.currency;
   const { lines, totals, orderDiscountMinor } = cart;
+
+  // M4 (FR-200/FR-500): register is locked unless a shift is open. The active
+  // user is the cashier; a shift must exist before anything can be charged.
+  const shiftOpen = shift.open !== null;
+
+  /**
+   * PIN gate (FR-500 / DEV-003): run `job` directly when the active user's role
+   * permits the action; otherwise prompt for an owner/manager unlock PIN.
+   * Single-action — the unlock never persists.
+   */
+  const requireGate = useCallback(
+    (action: GateAction, job: () => void) => {
+      if (active && roleCanAct(active.role, action)) {
+        job();
+        return;
+      }
+      setGate({ action, onOk: job });
+    },
+    [active],
+  );
+
+  const onGateOk = useCallback(() => {
+    const g = gate;
+    setGate(null);
+    g?.onOk();
+  }, [gate]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -61,27 +95,36 @@ export default function SellTab() {
   }, [products, search]);
 
   /** Barcode entry (FR-101) + keyboard wedge (FR-102): Enter submits; the field
-   *  keeps focus (blurOnSubmit=false) so a wedge can fire scan after scan. */
+   *  keeps focus (blurOnSubmit=false) so a wedge can fire scan after scan.
+   *  Blocked while the register is locked (no open shift — FR-200). */
   const submitBarcode = useCallback(async () => {
     const code = barcode.trim();
     if (!code) return;
     setBarcode('');
+    if (!shiftOpen) {
+      Alert.alert('Register locked', 'Open a shift first (Shift tab) to start selling.');
+      return;
+    }
     try {
       await cart.addByBarcode(code);
     } catch (e) {
       Alert.alert('Scan failed', errMsg(e));
     }
-  }, [barcode, cart]);
+  }, [barcode, cart, shiftOpen]);
 
   const pickProduct = useCallback(
     async (p: ProductWithStock) => {
+      if (!shiftOpen) {
+        Alert.alert('Register locked', 'Open a shift first (Shift tab) to start selling.');
+        return;
+      }
       try {
         await cart.addProduct(p);
       } catch (e) {
         Alert.alert('Could not add', errMsg(e));
       }
     },
-    [cart],
+    [cart, shiftOpen],
   );
 
   const bumpQty = useCallback(
@@ -95,19 +138,27 @@ export default function SellTab() {
     [cart],
   );
 
-  const canCharge = cart.loaded && !cart.busy && lines.length > 0;
+  const canCharge = cart.loaded && !cart.busy && lines.length > 0 && shiftOpen;
 
   const onCharge = useCallback(() => {
     if (!canCharge) return;
+    if (!shiftOpen) {
+      Alert.alert('Register locked', 'Open a shift first (Shift tab) to take payment.');
+      return;
+    }
     Keyboard.dismiss();
     setPayVisible(true);
-  }, [canCharge]);
+  }, [canCharge, shiftOpen]);
 
   const onPaymentComplete = useCallback(
     async (payments: PaymentAllocation[], change: number) => {
       setPayVisible(false);
       try {
-        const r = await cart.charge(payments);
+        // M4: attribute the sale to the cashier at the register + the open shift.
+        const r = await cart.charge(payments, {
+          cashierId: active?.id ?? null,
+          shiftId: shift.open?.id ?? null,
+        });
         setChangeMinor(change);
         setReceipt(r);
         void reload(); // stock changed — refresh the product list (stock levels, chips)
@@ -115,30 +166,56 @@ export default function SellTab() {
         Alert.alert('Sale failed', errMsg(e));
       }
     },
-    [cart, reload],
+    [cart, reload, active, shift.open],
   );
 
-  const promptLine = prompt && prompt.kind !== 'order' ? lines.find((l) => l.key === prompt.key) : undefined;
+  const promptLine =
+    prompt !== null && (prompt.kind === 'price' || prompt.kind === 'discount')
+      ? lines.find((l) => l.key === prompt.key)
+      : undefined;
   const promptInitial =
     prompt?.kind === 'order'
       ? orderDiscountMinor
       : prompt?.kind === 'price'
         ? (promptLine?.unitPriceMinor ?? 0)
-        : (promptLine?.discountMinor ?? 0);
+        : prompt?.kind === 'discount'
+          ? (promptLine?.discountMinor ?? 0)
+          : 0;
+
+  /** FR-200: open the shift from the locked register (float prompt). */
+  const doOpenShift = useCallback(
+    async (floatMinor: number) => {
+      try {
+        await shift.openShift({
+          outletId: cart.outlet!.id,
+          deviceId: await getDeviceId(),
+          cashierId: active?.id ?? null,
+          floatMinor,
+        });
+      } catch (e) {
+        Alert.alert('Could not open shift', errMsg(e));
+      }
+    },
+    [shift, cart.outlet, active],
+  );
 
   const onPromptSave = useCallback(
     (minor: number) => {
       if (!prompt) return;
+      setPrompt(null);
+      if (prompt.kind === 'openshift') {
+        void doOpenShift(minor);
+        return;
+      }
       const job =
         prompt.kind === 'order'
           ? () => cart.setOrderDiscount(minor)
           : prompt.kind === 'price'
             ? () => cart.setLinePrice(prompt.key, minor)
             : () => cart.setLineDiscount(prompt.key, minor);
-      setPrompt(null);
       job().catch((e) => Alert.alert('Error', errMsg(e)));
     },
-    [prompt, cart],
+    [prompt, cart, doOpenShift],
   );
 
   const cameraStub = useCallback(() => {
@@ -179,6 +256,19 @@ export default function SellTab() {
           <Text style={styles.pendingText}>
             {cart.pending} sale{cart.pending === 1 ? '' : 's'} in the offline queue — syncs when online
           </Text>
+        </View>
+      )}
+
+      {/* M4 (FR-200): register locked until a shift is open */}
+      {!shiftOpen && (
+        <View style={styles.lockBanner}>
+          <Ionicons name="lock-closed" size={16} color={colors.danger} />
+          <Text style={styles.lockText} numberOfLines={2}>
+            Register locked — no shift open.
+          </Text>
+          <Pressable style={styles.lockBtn} onPress={() => setPrompt({ kind: 'openshift' })} hitSlop={6}>
+            <Text style={styles.lockBtnText}>Open shift</Text>
+          </Pressable>
         </View>
       )}
 
@@ -231,18 +321,18 @@ export default function SellTab() {
                 currency={currency}
                 onQty={(d) => void bumpQty(l.key, l.qty, d)}
                 onRemove={() => void cart.removeLine(l.key).catch((e) => Alert.alert('Error', errMsg(e)))}
-                onSetPrice={() => setPrompt({ kind: 'price', key: l.key })}
-                onSetDiscount={() => setPrompt({ kind: 'discount', key: l.key })}
+                onSetPrice={() => requireGate('price_override', () => setPrompt({ kind: 'price', key: l.key }))}
+                onSetDiscount={() => requireGate('discount', () => setPrompt({ kind: 'discount', key: l.key }))}
               />
             ))}
           </ScrollView>
         )}
       </View>
 
-      {/* Order-level discount (FR-105) */}
+      {/* Order-level discount (FR-105) — PIN-gated for cashiers (FR-500) */}
       <Pressable
         style={[styles.orderDiscRow, lines.length === 0 && { opacity: 0.45 }]}
-        onPress={() => setPrompt({ kind: 'order' })}
+        onPress={() => requireGate('discount', () => setPrompt({ kind: 'order' }))}
         disabled={lines.length === 0}
       >
         <Text style={styles.orderDiscLabel}>Order discount</Text>
@@ -282,18 +372,31 @@ export default function SellTab() {
         )}
       </Modal>
 
-      {/* Money prompt: order discount / line price / line discount (FR-105, price adjust) */}
+      {/* Money prompt: order discount / line price / line discount (FR-105) / shift float (FR-200) */}
       {prompt && (
         <MoneyPrompt
           title={
-            prompt.kind === 'order'
-              ? 'Order discount'
-              : `${prompt.kind === 'price' ? 'Price' : 'Discount'} — ${promptLine?.name ?? ''}`
+            prompt.kind === 'openshift'
+              ? 'Open shift — starting float'
+              : prompt.kind === 'order'
+                ? 'Order discount'
+                : `${prompt.kind === 'price' ? 'Price' : 'Discount'} — ${promptLine?.name ?? ''}`
           }
           currency={currency}
           initialMinor={promptInitial}
           onSave={onPromptSave}
           onCancel={() => setPrompt(null)}
+        />
+      )}
+
+      {/* PIN gate (FR-500) — discount / price override for cashiers */}
+      {gate && (
+        <PinPrompt
+          visible
+          action={gate.action}
+          users={users ?? []}
+          onSuccess={onGateOk}
+          onCancel={() => setGate(null)}
         />
       )}
     </View>
@@ -338,6 +441,25 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   pendingText: { flex: 1, fontFamily: fonts.sansMedium, fontSize: typography.caption, color: '#B45309' },
+  lockBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radius.control,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+  },
+  lockText: { flex: 1, fontFamily: fonts.sansMedium, fontSize: typography.caption, color: colors.danger },
+  lockBtn: {
+    backgroundColor: colors.danger,
+    borderRadius: radius.chip,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+  },
+  lockBtnText: { fontFamily: fonts.sansBold, fontSize: typography.caption, color: colors.white },
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',

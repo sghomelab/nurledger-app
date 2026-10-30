@@ -7,8 +7,9 @@
  */
 
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
-import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, SCHEMA_SQL, SCHEMA_VERSION } from './schema';
-import { runSeed, isSeeded } from './seed';
+import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, MIGRATE_V3_TO_V4_SQL, ENSURE_M4_SQL, SCHEMA_SQL, SCHEMA_VERSION } from './schema';
+import { runSeed, isSeeded, ensureDefaultUsers } from './seed';
+import { uuidv4 } from '../lib/ids';
 
 const DB_NAME = 'nurledger.db';
 
@@ -52,10 +53,36 @@ export async function getDb(): Promise<SQLiteDatabase> {
               await database.execAsync(MIGRATE_V2_TO_V3_SQL);
             }
           }
+          if (current < 4) {
+            await database.execAsync(MIGRATE_V3_TO_V4_SQL); // M4: expense table
+            // Existing installs predate the user seed — backfill the default
+            // owner/cashier so M4 roles work without a factory reset.
+            await ensureDefaultUsers(database);
+          }
           await database.runAsync('INSERT OR REPLACE INTO schema_meta (id, v) VALUES (1, ?)', [
             SCHEMA_VERSION,
           ]);
         });
+      }
+
+      // M4 self-heal: an early M4 build committed v4 without the app_user/expense
+      // tables or the default user seed. Re-assert both (idempotent DDL) and the
+      // count-guarded user seed on EVERY bootstrap so any such install repairs
+      // itself without a factory reset. Cheap: two CREATE TABLE IF NOT EXISTS +
+      // one COUNT.
+      await database.execAsync(ENSURE_M4_SQL);
+      await ensureDefaultUsers(database);
+
+      // FR-200: shift = {device, cashier} pair — stable device identity
+      // (created once on first run; persists across restarts).
+      const devRow = await database.getFirstAsync<{ value: string }>(
+        "SELECT value FROM settings WHERE key = 'device_id'",
+      );
+      if (!devRow) {
+        await database.runAsync(
+          "INSERT INTO settings (key, value) VALUES ('device_id', ?)",
+          [uuidv4()],
+        );
       }
 
       db = database;

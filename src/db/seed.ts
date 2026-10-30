@@ -6,6 +6,7 @@
 
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { uuidv4 } from '../lib/ids';
+import { createPinHash } from '../lib/pin';
 import { SEED_CATEGORIES, SEED_PRODUCTS, SEED_OUTLET } from '../seed/data';
 
 export async function isSeeded(db: SQLiteDatabase): Promise<boolean> {
@@ -77,4 +78,39 @@ export async function runSeed(db: SQLiteDatabase): Promise<void> {
   }
 
   await db.runAsync("INSERT INTO settings (key, value) VALUES ('seeded_v1', '1')");
+
+  // M4: default users (Owner + Cashier) — idempotent, also run by the v3→v4
+  // migration for existing installs.
+  await ensureDefaultUsers(db);
+}
+
+/**
+ * M4 (FR-500): seed the default Owner + Cashier when no users exist yet.
+ * Idempotent — safe to call on every bootstrap.
+ *
+ * NOTE: the Owner's default PIN is **1234** — a documented fixture so the PIN
+ * gates are testable on a fresh install. There is no change-PIN UI in M4
+ * (open item; logged in FR-COVERAGE). The salted hash is computed at seed time
+ * (never stored as plaintext — see src/lib/pin.ts threat model).
+ */
+export async function ensureDefaultUsers(db: SQLiteDatabase): Promise<void> {
+  const row = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM app_user');
+  if (row && row.n > 0) return;
+
+  const now = Date.now();
+  const ownerId = uuidv4();
+
+  await db.runAsync(
+    'INSERT INTO app_user (id, name, role, pin_hash, active, created_at) VALUES (?, ?, ?, ?, 1, ?)',
+    [ownerId, 'Owner', 'owner', createPinHash('1234'), now],
+  );
+  await db.runAsync(
+    'INSERT INTO app_user (id, name, role, pin_hash, active, created_at) VALUES (?, ?, ?, ?, 1, ?)',
+    [uuidv4(), 'Jun', 'cashier', null, now],
+  );
+
+  // First run defaults to the Owner as the active user (the PIN holder).
+  await db.runAsync("INSERT OR REPLACE INTO settings (key, value) VALUES ('active_user_id', ?)", [
+    ownerId,
+  ]);
 }

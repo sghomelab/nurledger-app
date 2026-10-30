@@ -118,7 +118,40 @@ the 9% GST row, cart empty). See `MILESTONE-REPORTS.md` (Post-M3).
 **Standing regression:** `npx tsc --noEmit` (0 errors) + `npx jest` (77 tests) green.
 
 ## M4 — Shifts & Back office
-FR-200…FR-204, FR-400, FR-401, FR-402 (done), dashboard KPIs, CSV exports.
+FR-200…FR-204, FR-400, FR-401, FR-403, FR-500, FR-501.
+
+| FR | Requirement | Status | Files / tests |
+|----|-------------|--------|---------------|
+| FR-200 | Open shift: float; shift = {device, cashier}; one open per device; register locked when closed | ✅ | `src/lib/shift.ts` (`expectedCashMinor`, `zReport`), `src/repositories/shiftRepository.ts` (open/close, one-open guard), `app/(tabs)/shift.tsx` (open w/ float + locked card), `app/(tabs)/index.tsx` (register lock banner + inline Open shift); `shift.test.ts` (drawer math incl. card exclusion, variance sign) |
+| FR-201 | Cash in/out during shift with reason | ✅ | `cash_move` table (schema v4), `shiftRepository.recordCashMove`, `app/(tabs)/shift.tsx` (Cash in/out prompts + Cash movements list); `shift.test.ts` (movement aggregation) |
+| FR-202 | Close shift: counted → expected vs counted variance → Z-report (sales by method, cash movements, variance) | ✅ | `shiftRepository.closeShift` (persists `z_report_json`), `src/lib/shift.ts:zReport`, `src/components/report/ReportView.tsx` (Z/X sheet), `app/shift/[id].tsx` (closed-shift detail w/ persisted Z-report); **exit test passed on-device** (counted 227.50 vs expected 237.50 → Short −SGD 10.00). Refunds line in Z-report awaits M6 (`refundsMinor` = 0 for now) |
+| FR-203 | X-report anytime | ✅ | `shiftRepository.getXReport` (sales by method + cash on hand, non-destructive), `app/(tabs)/shift.tsx` (X-report sheet) |
+| FR-204 | Offline shift open/close + sync later | ✅ | All shift reads/writes hit local SQLite only (no network in the path); close is local — outbox op for the closed shift lands with M5 sync (same pattern as M2 sales, FR-502). Verified: full shift day offline (device airplane-mode AVD) |
+| FR-400 | Owner dashboard KPIs (net sales, tx, avg basket, gross margin, top SKUs, payment-method split, low-stock / expiring-soon / stockout lists) | ⚠️ partial | `src/repositories/insightsRepository.ts` + `src/lib/kpi.ts` + `app/(tabs)/insights.tsx`: KPI cards (net revenue, COGS, gross profit, ONM %, discounted items, units + tx/avg basket/UPT) ✓; top SKUs via Velocity/ABC top-15 (revenue share) ✓; stockout list via Stockout Forecast ✓; low-stock list on Inventory tab (badge + Low Stock Only filter) ✓; expiring-soon via Expiry Radar (FEFO) ✓. **Caveat: payment-method split is per-shift (X/Z-report "sales by method"), not a daily dashboard tile — deferred, no data-model gap (query exists: `getShiftSalesByMethod`)** |
+| FR-401 | Sales history searchable by date/product/cashier + CSV export | ✅ | `insightsRepository.getSalesHistory` (cashier join), `app/(tabs)/insights.tsx` (live search across product/cashier/sale ID + date sort), `src/lib/csv.ts:buildSalesHistoryCsv`; `csv.test.ts`; device-verified (search "Jun" → 1 row) |
+| FR-403 | KPI page — full research-doc §4 list | ✅ | `src/lib/kpi.ts` (all extended KPIs: GM %, mark-up %, inv. turnover, days on hand, sell-through, GMROI, shrinkage, stockout rate, expiry waste, fill rate) + `insights.tsx` Extended KPIs card; `kpi.test.ts` (markup 119.42 %, turnover 0.01× on fixture, fill rate). Period selector: Today / Current period (month) / All time. Turnover/GMROI use period-end inventory at cost as the average (documented approximation); stockout rate + expiry waste are snapshot figures |
+| FR-500 | Roles: Owner (all) / Cashier (sell) — PIN + role-aware UI | ✅ | `src/lib/roles.ts` (`roleCanAct`, 5 gate actions), `app_user` table + seeded Owner/Cashier (schema v4), `useUsers` hook, cashier switch sheet on Shift tab (no PIN to switch — active user is device-scoped state); role-aware UI: cashier sees the same register, gated actions prompt for owner/manager PIN (single-action unlock, never persisted); **stricter than spec**: spec lets cashiers "close own shift" — we PIN-gate close for cashiers too (defense in depth; owner/manager close without PIN) |
+| FR-501 | Manager PIN gates: refunds, order discounts, price edits, stocktake apply, settings | ⚠️ partial | `src/lib/pin.ts` (4–8 digit validate/verify) + `src/lib/sha256.ts` (pure-JS; `s:<salt16>:<hash>` format) + `src/components/PinPrompt.tsx` (keypad, pending <8 digits, definite-fail at 8). Gates live: **discount (line + order), price override, stock adjust, close shift, store settings** — all 5 device-verified (owner direct; cashier → PinPrompt; wrong PIN 9999×2 → "Wrong PIN"; 1234 → action proceeds; gate re-applies on the next action). **Refunds + stocktake-apply gates await M6** (the actions ship in M6; `GATE_ACTION_LABELS` is the extension point) |
+
+**Behavior notes**
+- KPI cards are **NET** basis (netSales = Σsubtotal − Σdiscount − Σtax; avgBasket = netSales/tx);
+  the P&L is **GROSS money-in** basis (Operating Net Margin = grossMargin/grossSales,
+  matching the prototype's P&L structure). The KPI "Operating net margin" tile shows the
+  P&L-derived value (both are `src/lib/kpi.ts`, tested).
+- Card sales are **excluded from the cash drawer** (terminal capture, ADR-006) — drawer =
+  float + cash sales + cash in − cash out; device-verified (drawer unchanged after a card sale).
+- PIN unlock is single-action and session-scoped: it never persists, never upgrades the
+  active user, and re-appears for the next gated action.
+- Seed fixture users: Owner (PIN `1234` — documented test fixture only) + Jun, Cashier (no PIN).
+  `ensureDefaultUsers` is idempotent and runs on seed, on v3→v4 migration, and on every
+  bootstrap (self-heal).
+
+**Device evidence (cs-test AVD, 2026-10-30)** — full matrix (a)–(l) in
+`MILESTONE-REPORTS.md` (M4), incl. the exit test: full offline shift day → close →
+counted 227.50 vs expected 237.50 → Z-report variance **Short −SGD 10.00** (matches
+counted cash), register re-locks (FR-200), closed shift persists with its Z-report.
+
+**Standing regression:** `npx tsc --noEmit` (0 errors) + `npx jest` (145 tests, 13 suites) green.
 
 ## M5 — Cloud & sync
 FR-502…FR-506, FR-601, FR-603, FR-604 locale engines (PaymentMethods, BarcodeParser,

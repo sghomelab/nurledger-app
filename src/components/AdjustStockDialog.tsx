@@ -3,8 +3,11 @@ import { Modal, Pressable, StyleSheet, Text, TextInput, View, Alert } from 'reac
 import { Ionicons } from '@expo/vector-icons';
 import { NumberText } from './NumberText';
 import { Chip } from './Chip';
+import { PinPrompt } from './PinPrompt';
 import { colors, fonts, radius, spacing, typography } from '../theme/tokens';
 import { applyStockMove } from '../repositories/stockRepository';
+import { useUsers } from '../hooks/useShift';
+import { roleCanAct } from '../lib/roles';
 import { uuidv4 } from '../lib/ids';
 import { formatMoney } from '../lib/money';
 
@@ -15,8 +18,8 @@ const PRESET_REASONS = ['Damage', 'Lost / stolen', 'Found', 'Counting correction
 /**
  * Stock adjustment (M3, FR-305): a signed quantity correction with a REQUIRED
  * reason, applied via an immutable `stock_ledger` row (type 'adjustment').
- * PIN-gating of the apply action is deferred to M4 with the roles/PIN system
- * (SPEC-DEVIATION DEV-003, same as price-override).
+ * M4 (FR-500 / DEV-005): applying is PIN-gated — cashiers need an
+ * owner/manager PIN; the gate is single-action.
  */
 export function AdjustStockDialog({
   product,
@@ -29,10 +32,12 @@ export function AdjustStockDialog({
   onApplied: () => void;
   onClose: () => void;
 }) {
+  const { active, users } = useUsers();
   const [dir, setDir] = useState<Dir>('add');
   const [qty, setQty] = useState('');
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
+  const [gateVisible, setGateVisible] = useState(false);
 
   const qtyNum = Math.max(0, Math.floor(Number.parseInt(qty, 10) || 0));
   const delta = dir === 'add' ? qtyNum : -qtyNum;
@@ -58,6 +63,15 @@ export function AdjustStockDialog({
     } finally {
       setSaving(false);
     }
+  };
+
+  const requestApply = () => {
+    // FR-500: applying a stock adjustment is gated for cashiers.
+    if (active && roleCanAct(active.role, 'stock_adjust')) {
+      void apply();
+      return;
+    }
+    setGateVisible(true);
   };
 
   return (
@@ -118,10 +132,22 @@ export function AdjustStockDialog({
             placeholderTextColor={colors.slate400}
           />
 
-          <Pressable style={[styles.confirmBtn, !canConfirm && { opacity: 0.5 }]} onPress={() => void apply()} disabled={!canConfirm || saving}>
+          <Pressable style={[styles.confirmBtn, !canConfirm && { opacity: 0.5 }]} onPress={requestApply} disabled={!canConfirm || saving}>
             <Text style={styles.confirmText}>{saving ? 'Applying…' : 'Confirm adjustment'}</Text>
           </Pressable>
           <Text style={styles.foot}>Applies an immutable ledger entry. {formatMoney(0, currency)} = no cost change recorded.</Text>
+          {gateVisible && (
+            <PinPrompt
+              visible
+              action="stock_adjust"
+              users={users ?? []}
+              onSuccess={() => {
+                setGateVisible(false);
+                void apply();
+              }}
+              onCancel={() => setGateVisible(false)}
+            />
+          )}
         </Pressable>
       </Pressable>
     </Modal>

@@ -4,6 +4,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useOutlet } from '../src/hooks/useAppData';
+import { useUsers } from '../src/hooks/useShift';
 import { updateOutlet } from '../src/repositories/outletRepository';
 import {
   CURRENCY_OPTIONS,
@@ -19,6 +20,8 @@ import { formatMoney } from '../src/lib/money';
 import type { TaxMode } from '../src/lib/tax';
 import { Card } from '../src/components/Screen';
 import { PickerOverlay } from '../src/components/PickerOverlay';
+import { PinPrompt } from '../src/components/PinPrompt';
+import { roleCanAct } from '../src/lib/roles';
 import { colors, fonts, radius, spacing } from '../src/theme/tokens';
 
 /**
@@ -29,10 +32,13 @@ import { colors, fonts, radius, spacing } from '../src/theme/tokens';
  * flat rate/mode can be entered free-form. Behavior always flows through the
  * TaxEngine resolved from the stored engine id (src/lib/tax.ts).
  *
- * PIN/role gating for settings changes ships with the rest of M4 (DEV-003).
+ * Saving is PIN-gated for cashiers (FR-500 / DEV-005 — "store_settings"):
+ * an owner/manager PIN unlocks the save, single-action.
  */
 export default function SettingsScreen() {
   const router = useRouter();
+  const { active, users } = useUsers();
+  const [gateVisible, setGateVisible] = useState(false);
   const { outlet, reload } = useOutlet();
 
   const [name, setName] = useState('');
@@ -159,6 +165,15 @@ export default function SettingsScreen() {
     }
   };
 
+  const requestSave = () => {
+    // FR-500: cashiers can't change store settings without an owner/manager PIN.
+    if (active && roleCanAct(active.role, 'store_settings')) {
+      void save();
+      return;
+    }
+    setGateVisible(true);
+  };
+
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -235,10 +250,23 @@ export default function SettingsScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pressable style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={() => void save()} disabled={saving}>
+        <Pressable style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={requestSave} disabled={saving}>
           <Text style={styles.saveText}>Save settings</Text>
         </Pressable>
       </View>
+
+      {gateVisible && (
+        <PinPrompt
+          visible
+          action="store_settings"
+          users={users ?? []}
+          onSuccess={() => {
+            setGateVisible(false);
+            void save();
+          }}
+          onCancel={() => setGateVisible(false)}
+        />
+      )}
 
       {picker === 'currency' && (
         <PickerOverlay title="Currency" rows={currencyRows} onClose={() => setPicker(null)} />

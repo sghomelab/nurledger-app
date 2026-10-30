@@ -3,7 +3,7 @@
  * Bump SCHEMA_VERSION and add a migration step in database.ts when changing existing tables.
  */
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 /**
  * M2: active-cart persistence (NFR-3 — every cart mutation is written to SQLite
@@ -34,6 +34,36 @@ CREATE TABLE IF NOT EXISTS current_order_line (
   position INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_current_order_line ON current_order_line(order_id, position);
+`;
+
+/**
+ * M4: operating expenses for the P&L (prototype Analytics "Operating Costs":
+ * Staff Payroll / Maintenance / Other Operational). Immutable rows (no
+ * UPDATE/DELETE paths) — an expense is a fact, like a ledger row.
+ */
+const EXPENSE_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS expense (
+  id TEXT PRIMARY KEY,
+  uuid TEXT NOT NULL UNIQUE,
+  outlet_id TEXT NOT NULL,
+  type TEXT NOT NULL,
+  amount_minor INTEGER NOT NULL,
+  description TEXT,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_expense_created ON expense(created_at);
+`;
+
+/** FR-500 / FR-501: app users (roles + PIN hashes). */
+const APP_USER_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS app_user (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL DEFAULT 'cashier',
+  pin_hash TEXT,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL
+);
 `;
 
 export const SCHEMA_SQL = `
@@ -265,15 +295,7 @@ CREATE TABLE IF NOT EXISTS stocktake_count (
   expected_qty INTEGER
 );
 
--- FR-500 / FR-501
-CREATE TABLE IF NOT EXISTS app_user (
-  id TEXT PRIMARY KEY,
-  name TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'cashier',
-  pin_hash TEXT,
-  active INTEGER NOT NULL DEFAULT 1,
-  created_at INTEGER NOT NULL
-);
+${APP_USER_TABLE_SQL}
 
 -- FR-502 / FR-503: idempotent outbox (client UUIDs)
 CREATE TABLE IF NOT EXISTS outbox (
@@ -289,6 +311,7 @@ CREATE TABLE IF NOT EXISTS delta_cursor (
   table_name TEXT PRIMARY KEY,
   last_updated_at INTEGER NOT NULL
 );
+${EXPENSE_TABLE_SQL}
 ${CART_TABLES_SQL}
 `;
 
@@ -302,3 +325,19 @@ export const MIGRATE_V1_TO_V2_SQL = CART_TABLES_SQL;
  * checking the column exists first (see database.ts).
  */
 export const MIGRATE_V2_TO_V3_SQL = 'ALTER TABLE stock_ledger ADD COLUMN reason TEXT;';
+
+/**
+ * v3 → v4 (M4): add the operating-expense table AND the app_user table
+ * (CREATE TABLE IF NOT EXISTS — idempotent). Both are new in M4; forgetting
+ * app_user here makes `ensureDefaultUsers` throw "no such table" on every
+ * existing install and breaks getDb() entirely.
+ */
+export const MIGRATE_V3_TO_V4_SQL = APP_USER_TABLE_SQL + EXPENSE_TABLE_SQL;
+
+/**
+ * M4 self-heal (run on every bootstrap after migrations, regardless of version):
+ * installs that already reached v4 with an early M4 build can be missing the
+ * app_user/expense tables or the default users. Idempotent DDL + the
+ * count-guarded user seed make this safe and cheap to repeat.
+ */
+export const ENSURE_M4_SQL = APP_USER_TABLE_SQL + EXPENSE_TABLE_SQL;

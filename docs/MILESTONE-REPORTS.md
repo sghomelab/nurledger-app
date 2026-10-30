@@ -187,3 +187,120 @@ FR-600, FR-602 → full. PIN/role gating for settings changes → M4 (DEV-003).
 - PaymentMethods / BarcodeParser / receipt-template / e-invoicing locale engines remain
   on the M5 list (the TaxEngine + currency surfaces of FR-600/FR-602 are now done).
 - Standing regression: `npx tsc --noEmit` (0 errors) + `npx jest` (77 tests) green.
+
+## M4 — Shifts & Back office (2026-10-30)
+
+**Scope (per handoff BUILD-PROMPT M4):** shift lifecycle (float, register lock, cash
+in/out, X-report, close → Z-report, offline), cashier switch + role-aware UI + PIN
+gates, Insights (KPI cards, extended KPIs, P&L, Velocity/ABC, stockout forecast,
+expense entry, searchable sales history, CSV exports).
+
+**Exit test (PASSED):** full offline shift day on the `cs-test` AVD → open shift
+(float 200.00) → Owner cash sale 7.50 → switch to Jun (cashier) → Jun card sale 8.00
+→ cash in 50.00 / cash out 20.00 → X-report (expected cash on hand 237.50) → close
+shift (PIN 1234) → counted **227.50** → Z-report variance **Short −SGD 10.00**
+(expected 237.50 vs counted 227.50 — matches counted cash exactly). After close the
+register re-locks (FR-200) and the closed shift persists with its full Z-report
+(`z_report_json`) on the detail screen.
+
+### What shipped
+- **Schema v4:** `app_user` (role + `pin_hash`), `expense`; `shift.cashier_id`,
+  `shift.z_report_json`, `shift.closed_at`. Migration is **self-healing**: the M4
+  tables + default users are re-asserted (`ENSURE_M4_SQL` + `ensureDefaultUsers`) on
+  every bootstrap, so an app upgraded from a pre-M4 install repairs itself (this
+  fixed the launch crash on the existing v3 DB — device-verified).
+- **Shifts (FR-200…204):** open with float (register locked + inline Open shift
+  otherwise), cash in/out with reason + movement list, X-report (sales by method +
+  cash on hand, non-destructive), close with counted-cash → variance → Z-report
+  (sales by method, cash movements, variance; refunds line = 0 until M6). Card sales
+  excluded from the drawer (ADR-006). All local-SQLite-only (offline by
+  construction; the closed-shift outbox op ships with M5).
+- **Roles & PIN (FR-500/FR-501):** seeded Owner (PIN `1234` — documented test
+  fixture) + Jun (Cashier, no PIN). `roleCanAct` gates 5 actions: `discount`
+  (line + order), `price_override`, `stock_adjust`, `close_shift`, `store_settings`.
+  `PinPrompt` (keypad, 4–8 digits, pending <8, definite-fail at 8, "Wrong PIN"
+  error). Unlock is single-action and never persisted. SHA-256 in pure JS
+  (`s:<salt16>:<hash>`). Stricter than spec: cashiers' close-shift is PIN-gated too.
+- **Insights (FR-400/401/403):** period selector (Today / Current period / All
+  time), KPI cards (net basis: revenue, COGS, GP, ONM %, discounted items, units +
+  tx/avg basket/UPT), Extended KPIs (GM %, markup, turnover, days on hand,
+  sell-through, GMROI, shrinkage, stockout rate, expiry waste, fill rate), P&L
+  (GROSS money-in basis, prototype structure + Operating Costs + Inventory Asset
+  Position), Velocity/ABC top-15, stockout forecast (days-left at today velocity,
+  red ≤1d), operating-expense entry (3 categories) feeding P&L, sales history with
+  live search (product/cashier/sale ID) + cashier attribution.
+- **CSV exports** (`src/lib/csv.ts`): P&L, Velocity/ABC, stockout forecast, sales
+  history — in-app preview sheet (file saved to app exports dir) + Android share
+  sheet (`expo-sharing`).
+- **Seed:** `ensureDefaultUsers` idempotent (seed + v3→v4 migration + every
+  bootstrap).
+
+### Device verification (cs-test AVD, matrix (a)–(l))
+- (a) register-locked banner + inline Open shift (float 200) ✓
+- (b) shift card: float 200, expected 200, active user Owner ✓
+- (c) Owner sale: cheddar 8.50, discount 1.00 **without PIN** (owner ungated) →
+  total 7.50 (tax 0.62, margin 48%·4.60) → cash 7.50 → receipt #DF0BC498 ✓
+- (d) Switch → Jun (direct, no PIN); Jun discount → **PinPrompt**; 9999 stays
+  pending at 4 digits (PIN may be longer); 99999999 → "Wrong PIN — try again" + dots
+  cleared; **1234 → MoneyPrompt** ✓ (all 4 gate paths)
+- (e) Jun sale: discount 0.50 → total 8.00 (tax 0.66, margin 51%·4.10) → **Card**
+  → "Charge on terminal" (ADR-006 stub) → Confirm paid → receipt #63145CFC; drawer
+  unchanged at 207.50 (card excluded from drawer) ✓
+- (f) Cash in 50.00 ("Float") → 257.50 + movement "+ Float +50.00"; cash out 20.00
+  ("Personal") → 237.50 + movement "− Personal −20.00" ✓
+- (g) X-report: Card 8.00 / Cash 7.50 / total 15.50; expected cash on hand
+  200+7.50+50−20 = **237.50** ✓
+- (h) Close shift (as Jun) → **PinPrompt "Close shift — PIN required"** → 1234 →
+  counted 227.50 → **Z-report: Expected 237.50, Counted 227.50, Variance (Short)
+  −SGD 10.00 (red)** ✓ — **M4 exit test**
+- (i) post-close: register-locked banner returns (FR-200 re-lock); closed-shift row
+  "Short SGD 10.00 · expected SGD 237.50" → detail screen with persisted Z-report ✓
+- (j) Insights: KPI Today (net 30.28 / COGS 13.80 / GP 16.48 / ONM 58.18% / 2
+  discounted / 7 units / 3 tx / 10.09 avg / 2.33 UPT) ✓; Extended KPIs (54.43% GM,
+  119.42% markup, 0.01× turnover, 36500d DOH, 58.3% sell-through, 0.02× GMROI,
+  100% fill) ✓; P&L (gross 33.00, GM 19.20, ONM 58.18% = 19.20/33.00) ✓; Velocity/ABC
+  (croissant A/Fast 53% → cheddar C cum 100% >95%) ✓; stockout (croissant 9 @ 5.0/day
+  → 1d red; cheddar 20 @ 2.0/day → 10d) ✓; expense entry (Staff Payroll 100) → P&L
+  row + ONM −244.85% ✓; sales-history search "Jun" → exactly 1 row ✓; CSV sheet
+  (176 chars, correct headers/values) → Android share sheet ✓
+- (k) Settings as Jun: edit store name → Save → **PinPrompt "Store settings — PIN
+  required"** → 1234 → "Store settings updated." (gate re-applies on the second
+  save — single-action semantics) ✓
+- (l) Stock adjustment as Jun: Adjust → dialog (preview ungated) → qty 2 + "Counting
+  correction" → Confirm → **nested PinPrompt over the dialog** → 1234 → ledger row
+  "Adjustment +2 · Counting correction" (stock 9 → 11) ✓
+
+### Bugs found + fixed (this milestone)
+1. **Launch crash on upgraded installs** — an existing v3 DB lacked the M4 tables
+   and the migration path only ran at seed. Fixed with a self-healing bootstrap
+   (`ENSURE_M4_SQL` + `ensureDefaultUsers` on every `getDb()`); device-verified.
+2. **npm 10 peer-auto-install** — `npm install` was silently re-linking
+   reanimated/worklets 0.10.3 from the parent workspace, crashing launch. Fixed
+   with `.npmrc` `legacy-peer-deps=true` + restored lockfile + `npm ci`. (The APK
+   still autolinks the parent's `libreanimated.so`/`libworklets.so` — harmless,
+   verified running; do not "fix".)
+3. **Raw string in `<View>` (RN warning)** — the P&L "Operating Costs" /
+   "Inventory Asset Position" section labels were rendered as bare strings in a
+   View (dev warning + text styles silently ignored). Fixed with `<Text>`; the
+   intended uppercase micro styling now actually applies. Device-verified (warning
+   gone, headers styled).
+4. **Store settings unreachable (M4 regression)** — the M3 "Change" button on the
+   Shift-tab Store card was dropped in the M4 rewrite, leaving `app/settings.tsx`
+   with no navigation entry point. Restored button + style; verified
+   (Store card → Store settings).
+
+### FR touched
+FR-200…FR-204 → full. FR-400 → partial (payment-method split is per-shift via
+X/Z-report, not a daily dashboard tile — see FR-COVERAGE caveat). FR-401 → full.
+FR-403 → full (documented approximations for turnover/GMROI averages + snapshot
+rates). FR-500 → full (stricter on cashier close-shift). FR-501 → partial
+(refunds + stocktake-apply gates await the M6 actions). DEV-003/DEV-005 resolved.
+
+### Open items
+- Refunds (line-level, FR-110/FR-111) + stocktake apply flow → M6; Z-report
+  `refundsMinor` already reserved (= 0 for now).
+- Daily/period payment-method split tile for the Insights dashboard (query exists:
+  `getShiftSalesByMethod`).
+- Sync of the closed-shift record (outbox op) → M5 with the rest of FR-502.
+- Standing regression: `npx tsc --noEmit` (0 errors) + `npx jest`
+  (145 tests, 13 suites) green.
