@@ -3,7 +3,7 @@
  * All app reads go through local SQLite (offline-first rule 1).
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import {
   createProduct,
   createCategory,
@@ -12,11 +12,12 @@ import {
   listCategories,
   listProducts,
   lowStockCount,
+  reorderCandidates,
   updateProduct,
   type ProductInput,
 } from '../repositories/productRepository';
-import { appendLedgerRow, addCostLayer } from '../repositories/stockRepository';
-import type { Category, Outlet, ProductWithStock } from '../types';
+import { listPOs, type POSummary } from '../repositories/poRepository';
+import type { Category, Outlet, ProductWithStock, ReorderCandidate } from '../types';
 
 export function useOutlet() {
   const [outlet, setOutlet] = useState<Outlet | null>(null);
@@ -29,15 +30,35 @@ export function useOutlet() {
   return { outlet, reload: load };
 }
 
+/**
+ * Module-level low-stock count shared across every useProducts instance.
+ * The tab-bar badge lives in TabLayout, whose own hook instance never
+ * reloads; sharing the count means any instance's reload (a sale on Sell,
+ * the focus-refresh on Inventory) updates the badge immediately.
+ * (M3 — found on-device: in-screen counter showed 2, tab badge still 1.)
+ */
+let sharedLowStock = 0;
+const lowStockListeners = new Set<() => void>();
+function commitLowStock(n: number) {
+  sharedLowStock = n;
+  lowStockListeners.forEach((l) => l());
+}
+function subscribeLowStock(l: () => void) {
+  lowStockListeners.add(l);
+  return () => {
+    lowStockListeners.delete(l);
+  };
+}
+
 export function useProducts() {
   const [products, setProducts] = useState<ProductWithStock[] | null>(null);
-  const [lowStock, setLowStock] = useState(0);
   const [search, setSearch] = useState('');
+  const lowStock = useSyncExternalStore(subscribeLowStock, () => sharedLowStock);
 
   const reload = useCallback(async (q = search) => {
     const [list, low] = await Promise.all([listProducts(q), lowStockCount()]);
     setProducts(list);
-    setLowStock(low);
+    commitLowStock(low);
   }, [search]);
 
   useEffect(() => {
@@ -81,25 +102,26 @@ export function useCategories() {
   return { categories, reload, addCategory };
 }
 
-/**
- * Stock-in (receiving) — appends an immutable ledger row + FIFO cost layer.
- * Used by PO receive (M3) and manual stock adjustments.
- */
-export async function receiveStock(
-  productId: string,
-  qty: number,
-  unitCostMinor: number,
-  refType: string,
-  refId: string,
-): Promise<void> {
-  const row = await appendLedgerRow({
-    productId,
-    type: 'receive_po',
-    qtyDelta: qty,
-    unitCostMinor,
-    refType,
-    refId,
-  });
-  await addCostLayer(productId, unitCostMinor, qty, refType, refId);
-  void row;
+/** FR-308: low-stock products with Min/Max suggested reorder qty (Restock flow). */
+export function useReorder() {
+  const [candidates, setCandidates] = useState<ReorderCandidate[] | null>(null);
+  const reload = useCallback(async () => {
+    setCandidates(await reorderCandidates());
+  }, []);
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+  return { candidates, reload };
+}
+
+/** FR-306: the outlet's purchase orders (newest first). */
+export function usePurchaseOrders() {
+  const [orders, setOrders] = useState<POSummary[] | null>(null);
+  const reload = useCallback(async () => {
+    setOrders(await listPOs());
+  }, []);
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+  return { orders, reload };
 }

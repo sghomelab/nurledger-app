@@ -5,9 +5,16 @@
 
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { getDb } from '../db/database';
-import { stockStatus } from '../lib/stock';
+import { reorderSuggestion, stockStatus } from '../lib/stock';
 import { uuidv4 } from '../lib/ids';
-import type { Category, Product, ProductWithStock, UnitType, VelocityClass } from '../types';
+import type {
+  Category,
+  Product,
+  ProductWithStock,
+  ReorderCandidate,
+  UnitType,
+  VelocityClass,
+} from '../types';
 
 const PRODUCT_COLS = `
   p.id, p.outlet_id AS outletId, p.sku, p.name, p.category_id AS categoryId,
@@ -62,6 +69,46 @@ export async function lowStockCount(): Promise<number> {
       WHERE p.active = 1 AND COALESCE(sv.qty, 0) <= p.min_qty`,
   );
   return row ? row.n : 0;
+}
+
+/**
+ * FR-308: products below their reorder point, each with the Min/Max suggested
+ * qty (max − on-hand). Feeds the "Restock → Create PO" flow.
+ */
+export async function reorderCandidates(): Promise<ReorderCandidate[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{
+    id: string;
+    sku: string;
+    name: string;
+    category_id: string | null;
+    cost_minor: number;
+    price_minor: number;
+    min_qty: number;
+    max_qty: number;
+    velocity_class: string | null;
+    stockQty: number;
+  }>(
+    `SELECT p.id, p.sku, p.name, p.category_id, p.cost_minor, p.price_minor,
+            p.min_qty, p.max_qty, p.velocity_class,
+            COALESCE(sv.qty, 0) AS stockQty
+       FROM product p LEFT JOIN stock_view sv ON sv.product_id = p.id
+       WHERE p.active = 1 AND COALESCE(sv.qty, 0) < p.min_qty
+       ORDER BY p.name COLLATE NOCASE`,
+  );
+  return rows.map((r) => ({
+    productId: r.id,
+    sku: r.sku,
+    name: r.name,
+    categoryId: r.category_id,
+    stockQty: r.stockQty,
+    minQty: r.min_qty,
+    maxQty: r.max_qty,
+    costMinor: r.cost_minor,
+    priceMinor: r.price_minor,
+    suggestedQty: reorderSuggestion(r.stockQty, r.min_qty, r.max_qty),
+    velocityClass: (r.velocity_class as VelocityClass | null) ?? null,
+  }));
 }
 
 export async function getProduct(id: string): Promise<ProductWithStock | null> {

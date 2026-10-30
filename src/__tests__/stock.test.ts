@@ -2,10 +2,12 @@ import {
   applyConsumption,
   consumeFifo,
   daysUntil,
+  expiryUrgency,
   fefoRank,
   projectStock,
   reorderSuggestion,
   stockStatus,
+  summarizeRadar,
   type LayerInput,
 } from '../lib/stock';
 
@@ -98,5 +100,38 @@ describe('reorder & expiry helpers (FR-308, FR-307)', () => {
     expect(daysUntil('2026-10-30', now)).toBe(0);
     expect(daysUntil('2026-10-31', now)).toBe(1);
     expect(daysUntil('2026-10-29', now)).toBe(-1);
+  });
+});
+
+describe('expiry urgency & radar summary (M3, FR-307, prototype §5)', () => {
+  it('bands by days-left: expired / critical / soon / ok (defaults 7d / 30d)', () => {
+    expect(expiryUrgency(-1)).toBe('expired');
+    expect(expiryUrgency(0)).toBe('critical'); // today
+    expect(expiryUrgency(3)).toBe('critical');
+    expect(expiryUrgency(7)).toBe('critical'); // boundary
+    expect(expiryUrgency(8)).toBe('soon');
+    expect(expiryUrgency(30)).toBe('soon'); // boundary
+    expect(expiryUrgency(31)).toBe('ok');
+  });
+
+  it('honours custom thresholds', () => {
+    expect(expiryUrgency(5, { criticalDays: 3, soonDays: 10 })).toBe('soon');
+    expect(expiryUrgency(2, { criticalDays: 3, soonDays: 10 })).toBe('critical');
+  });
+
+  it('summarizes Expiring / Expired / Other + expired-waste qty', () => {
+    const entries = [
+      { qtyRemaining: 4, urgency: 'expired' as const },
+      { qtyRemaining: 6, urgency: 'expired' as const },
+      { qtyRemaining: 10, urgency: 'critical' as const },
+      { qtyRemaining: 8, urgency: 'soon' as const },
+      { qtyRemaining: 100, urgency: 'ok' as const },
+    ];
+    const s = summarizeRadar(entries);
+    expect(s.expiredQty).toBe(10); // 4 + 6
+    expect(s.expiredWasteQty).toBe(10);
+    expect(s.expiringQty).toBe(18); // critical 10 + soon 8
+    expect(s.otherQty).toBe(100);
+    expect(s.batchCount).toBe(5);
   });
 });

@@ -7,9 +7,25 @@
 
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { getDb } from '../db/database';
-import { applyConsumption, consumeFifo, type LayerInput } from '../lib/stock';
+import {
+  applyConsumption,
+  consumeFifo,
+  daysUntil,
+  expiryUrgency,
+  fefoRank,
+  summarizeRadar,
+  type LayerInput,
+} from '../lib/stock';
 import { uuidv4 } from '../lib/ids';
-import type { CostLayer, Lot, StockLedgerRow, StockMoveType } from '../types';
+import type {
+  BatchWithQty,
+  CostLayer,
+  ExpiryRadarEntry,
+  ExpiryRadarSummary,
+  Lot,
+  StockLedgerRow,
+  StockMoveType,
+} from '../types';
 
 export async function stockOf(productId: string): Promise<number> {
   const db = await getDb();
@@ -36,6 +52,8 @@ export interface LedgerWrite {
   cogsMinor?: number | null;
   refType: string;
   refId: string;
+  /** Human reason (adjustments/waste/expiry) — M3, FR-305/FR-313. */
+  reason?: string | null;
   deviceId?: string | null;
 }
 
@@ -48,11 +66,11 @@ export async function appendLedgerRow(w: LedgerWrite): Promise<StockLedgerRow> {
   await db.runAsync(
     `INSERT INTO stock_ledger
       (id, outlet_id, product_id, lot_id, type, qty_delta, qty_g_delta, unit_cost_minor,
-       cogs_minor, ref_type, ref_id, device_id, sync_op_id, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)`,
+       cogs_minor, ref_type, ref_id, reason, device_id, sync_op_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id, await outletId(), w.productId, w.lotId ?? null, w.type, w.qtyDelta,
-      w.unitCostMinor ?? null, w.cogsMinor ?? null, w.refType, w.refId,
+      w.unitCostMinor ?? null, w.cogsMinor ?? null, w.refType, w.refId, w.reason ?? null,
       w.deviceId ?? null, opId, now,
     ],
   );
@@ -68,6 +86,7 @@ export async function appendLedgerRow(w: LedgerWrite): Promise<StockLedgerRow> {
     cogsMinor: w.cogsMinor ?? null,
     refType: w.refType,
     refId: w.refId,
+    reason: w.reason ?? null,
     deviceId: w.deviceId ?? null,
     syncOpId: opId,
     createdAt: now,
@@ -189,24 +208,61 @@ export async function ledgerHistory(productId: string, limit = 10): Promise<Stoc
     `SELECT id, outlet_id AS outletId, product_id AS productId, lot_id AS lotId, type,
             qty_delta AS qtyDelta, qty_g_delta AS qtyGDelta,
             unit_cost_minor AS unitCostMinor, cogs_minor AS cogsMinor,
-            ref_type AS refType, ref_id AS refId, device_id AS deviceId,
-            sync_op_id AS syncOpId, created_at AS createdAt, created_by AS createdBy
+            ref_type AS refType, ref_id AS refId, reason,
+            device_id AS deviceId, sync_op_id AS syncOpId,
+            created_at AS createdAt, created_by AS createdBy
        FROM stock_ledger WHERE product_id = ?
       ORDER BY created_at DESC, rowid DESC LIMIT ?`,
     [productId, limit],
   );
 }
 
+/** FEFO-first lot id for a product (best-effort; cost layers carry no lot). In-tx. */
+async function firstFefoLotIdInTx(db: SQLiteDatabase, productId: string): Promise<string | null> {
+  const row = await db.getFirstAsync<{ id: string }>(
+    `SELECT id FROM lot WHERE product_id = ?
+      ORDER BY (expiry_date IS NULL), expiry_date, received_at, id LIMIT 1`,
+    [productId],
+  );
+  return row?.id ?? null;
+}
+
 /**
- * Apply a sale's stock movement INSIDE the caller's transaction (M2, FR-321,
- * ADR-002/003): consume FIFO cost layers and append an immutable 'sale'
- * stock-ledger row (qty_delta negative). The caller (saleRepository.completeSale)
- * owns the surrounding transaction + outbox. Throws on oversell so the whole
- * sale rolls back atomically — stock is never partially decremented.
+ * Apply a SIGNED stock movement INSIDE the caller's transaction (M3, FR-316,
+ * ADR-002/003). This is the single in-transaction writer for stock:
  *
- * stock_ledger is still written ONLY from this module (module-map rule).
+ *  - `qtyDelta > 0` (stock-in: PO receive, adjustment-in): create a FIFO cost
+ *    layer at the incoming cost + an immutable positive `stock_ledger` row.
+ *  - `qtyDelta < 0` (stock-out: sale, adjustment-out, waste, expiry loss):
+ *    consume FIFO cost layers (oldest first) + an immutable negative ledger row
+ *    carrying the realized COGS (FR-321).
+ *
+ * The caller owns the surrounding transaction + outbox. Returns `short` true when
+ * a stock-out exceeded available layers; the caller decides whether to throw
+ * (sales throw → full rollback; adjustments may clamp).
+ *
+ * `stock_ledger` is still written ONLY from this module (module-map rule).
  */
-export interface SaleMoveResult {
+export interface StockMoveInput {
+  productId: string;
+  /** Signed base-unit delta: >0 in, <0 out, 0 = no-op. */
+  qtyDelta: number;
+  type: StockMoveType;
+  /** Unit cost (minor) for stock-in; ignored on stock-out (FIFO derives it). */
+  unitCostMinor?: number | null;
+  /** Specific lot (waste/expiry loss); defaults to the FEFO-first lot on out. */
+  lotId?: string | null;
+  /** Human reason (adjustments/waste/expiry) — stored on the ledger row. */
+  reason?: string | null;
+  refType: string;
+  refId: string;
+  /** Where to point the new cost layer (stock-in). Default { type:'move', id: refId }.
+   *  PO receive passes { type:'lot', id: lotId } so the FEFO radar can join it. */
+  costLayerRef?: { type: string; id: string } | null;
+  deviceId?: string | null;
+}
+
+export interface StockMoveResult {
   cogsMinor: number;
   unitCostMinor: number | null;
   lotId: string | null;
@@ -214,28 +270,57 @@ export interface SaleMoveResult {
   shortageQty: number;
 }
 
-export async function applySaleInTx(
+export async function applyStockMoveInTx(
   db: SQLiteDatabase,
-  input: { productId: string; qty: number; refId: string; deviceId?: string | null },
-): Promise<SaleMoveResult> {
+  input: StockMoveInput,
+): Promise<StockMoveResult> {
   const outletRow = await db.getFirstAsync<{ id: string }>('SELECT id FROM outlet LIMIT 1');
   if (!outletRow) throw new Error('No outlet — DB not seeded');
+  const now = Date.now();
+  const { productId } = input;
 
+  if (input.qtyDelta === 0) {
+    return { cogsMinor: 0, unitCostMinor: null, lotId: input.lotId ?? null, short: false, shortageQty: 0 };
+  }
+
+  if (input.qtyDelta > 0) {
+    // STOCK IN: new FIFO cost layer + positive immutable ledger row.
+    const qty = input.qtyDelta;
+    let unitCost = input.unitCostMinor ?? null;
+    if (unitCost == null) {
+      const p = await db.getFirstAsync<{ cost_minor: number }>(
+        'SELECT cost_minor FROM product WHERE id = ?',
+        [productId],
+      );
+      unitCost = p ? p.cost_minor : 0;
+    }
+    const lotId = input.lotId ?? (await firstFefoLotIdInTx(db, productId));
+    const layerRef = input.costLayerRef ?? { type: 'move', id: input.refId };
+    await db.runAsync(
+      `INSERT INTO cost_layer (id, outlet_id, product_id, unit_cost_minor, qty_remaining, ref_type, ref_id, received_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [uuidv4(), outletRow.id, productId, unitCost, qty, layerRef.type, layerRef.id, now],
+    );
+    await db.runAsync(
+      `INSERT INTO stock_ledger
+         (id, outlet_id, product_id, lot_id, type, qty_delta, unit_cost_minor, cogs_minor,
+          ref_type, ref_id, reason, device_id, sync_op_id, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?)`,
+      [uuidv4(), outletRow.id, productId, lotId, input.type, qty, unitCost,
+       input.refType, input.refId, input.reason ?? null, input.deviceId ?? null, uuidv4(), now],
+    );
+    return { cogsMinor: 0, unitCostMinor: unitCost, lotId, short: false, shortageQty: 0 };
+  }
+
+  // STOCK OUT: consume FIFO cost layers (oldest first) + negative ledger row.
+  const qty = -input.qtyDelta;
   const layers = await db.getAllAsync<LayerInput>(
     `SELECT id, unit_cost_minor AS unitCostMinor, qty_remaining AS qtyRemaining, received_at AS receivedAt
        FROM cost_layer WHERE product_id = ?`,
-    [input.productId],
+    [productId],
   );
-  const result = consumeFifo(layers, input.qty);
-
-  // FEFO first lot for sale-line traceability (best-effort; layers carry no lot).
-  const lotRow = await db.getFirstAsync<{ id: string }>(
-    `SELECT id FROM lot WHERE product_id = ?
-      ORDER BY (expiry_date IS NULL), expiry_date, received_at, id LIMIT 1`,
-    [input.productId],
-  );
-  const lotId = lotRow?.id ?? null;
-
+  const result = consumeFifo(layers, qty);
+  const lotId = input.lotId ?? (await firstFefoLotIdInTx(db, productId));
   if (!result.short) {
     const remaining = applyConsumption(layers, result);
     for (const c of result.consumed) {
@@ -243,17 +328,15 @@ export async function applySaleInTx(
       await db.runAsync('UPDATE cost_layer SET qty_remaining = ? WHERE id = ?', [newQty, c.layerId]);
     }
   }
-
   const unitCostMinor = result.consumed[0]?.unitCostMinor ?? null;
   await db.runAsync(
     `INSERT INTO stock_ledger
        (id, outlet_id, product_id, lot_id, type, qty_delta, unit_cost_minor, cogs_minor,
-        ref_type, ref_id, device_id, sync_op_id, created_at)
-     VALUES (?, ?, ?, ?, 'sale', ?, ?, ?, 'sale', ?, ?, ?, ?)`,
-    [uuidv4(), outletRow.id, input.productId, lotId, -input.qty, unitCostMinor,
-     result.cogsMinor, input.refId, input.deviceId ?? null, uuidv4(), Date.now()],
+        ref_type, ref_id, reason, device_id, sync_op_id, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [uuidv4(), outletRow.id, productId, lotId, input.type, -qty, unitCostMinor,
+     result.cogsMinor, input.refType, input.refId, input.reason ?? null, input.deviceId ?? null, uuidv4(), now],
   );
-
   return {
     cogsMinor: result.cogsMinor,
     unitCostMinor,
@@ -261,6 +344,78 @@ export async function applySaleInTx(
     short: result.short,
     shortageQty: result.shortageQty,
   };
+}
+
+/**
+ * Standalone stock move (its own transaction) for UI callers — stock adjustments,
+ * waste, expiry loss. The in-tx variant is used when the move must join a larger
+ * transaction (PO receive, sale commit).
+ */
+export async function applyStockMove(input: StockMoveInput): Promise<StockMoveResult> {
+  const db = await getDb();
+  const box: { r?: StockMoveResult } = {};
+  await db.withTransactionAsync(async () => {
+    box.r = await applyStockMoveInTx(db, input);
+  });
+  if (!box.r) throw new Error('Stock move did not complete');
+  return box.r;
+}
+
+/**
+ * Sale-specific alias (M2 contract): consume `qty` + append an immutable 'sale'
+ * ledger row. completeSale throws on `short` → the whole sale rolls back, so
+ * stock is never partially decremented.
+ */
+export type SaleMoveResult = StockMoveResult;
+
+export async function applySaleInTx(
+  db: SQLiteDatabase,
+  input: { productId: string; qty: number; refId: string; deviceId?: string | null },
+): Promise<SaleMoveResult> {
+  return applyStockMoveInTx(db, {
+    productId: input.productId,
+    qtyDelta: -input.qty,
+    type: 'sale',
+    refType: 'sale',
+    refId: input.refId,
+    deviceId: input.deviceId ?? null,
+  });
+}
+
+/**
+ * All lots/batches with their remaining sellable qty (from the linked FIFO cost
+ * layer), for the FEFO Expiry Radar (FR-307). A batch with no linked layer
+ * (fully consumed) shows 0.
+ */
+export async function batchesWithQty(): Promise<BatchWithQty[]> {
+  const db = await getDb();
+  return await db.getAllAsync<BatchWithQty>(
+    `SELECT l.id, l.product_id AS productId, p.sku, p.name AS productName,
+            l.lot_code AS lotCode, l.expiry_date AS expiryDate, l.received_at AS receivedAt,
+            COALESCE(cl.qty_remaining, 0) AS qtyRemaining
+       FROM lot l
+       JOIN product p ON p.id = l.product_id
+       LEFT JOIN cost_layer cl ON cl.ref_type = 'lot' AND cl.ref_id = l.id
+       ORDER BY (l.expiry_date IS NULL), l.expiry_date, l.received_at, l.id`,
+  );
+}
+
+/**
+ * FEFO Expiry Radar (FR-307): batches ranked earliest-expiry-first with a
+ * computed urgency band + an Expiring/Expired/Other summary (prototype §5).
+ */
+export async function expiryRadar(
+  now: Date = new Date(),
+): Promise<{ entries: ExpiryRadarEntry[]; summary: ExpiryRadarSummary }> {
+  const batches = await batchesWithQty();
+  const entries: ExpiryRadarEntry[] = batches
+    .map((b) => {
+      const daysLeft = b.expiryDate ? daysUntil(b.expiryDate, now) : Number.POSITIVE_INFINITY;
+      return { ...b, daysLeft, urgency: expiryUrgency(daysLeft) };
+    })
+    .filter((b) => b.qtyRemaining > 0); // only batches that still hold stock
+  const ranked = fefoRank(entries);
+  return { entries: ranked, summary: summarizeRadar(ranked) };
 }
 
 export type { SQLiteDatabase };

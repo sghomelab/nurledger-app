@@ -7,7 +7,7 @@
  */
 
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
-import { MIGRATE_V1_TO_V2_SQL, SCHEMA_SQL, SCHEMA_VERSION } from './schema';
+import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, SCHEMA_SQL, SCHEMA_VERSION } from './schema';
 import { runSeed, isSeeded } from './seed';
 
 const DB_NAME = 'nurledger.db';
@@ -41,12 +41,17 @@ export async function getDb(): Promise<SQLiteDatabase> {
           await runSeed(database);
         });
       } else if (current < SCHEMA_VERSION) {
-        // Forward migrations, one step per version bump (idempotent DDL).
+        // Forward migrations, one step per version bump.
         await database.withTransactionAsync(async () => {
           if (current < 2) {
             await database.execAsync(MIGRATE_V1_TO_V2_SQL); // M2: cart persistence
           }
-          // Future: if (current < 3) { ... }
+          if (current < 3) {
+            // M3: reason column (ADD COLUMN is not idempotent → guard it).
+            if (!(await hasColumn(database, 'stock_ledger', 'reason'))) {
+              await database.execAsync(MIGRATE_V2_TO_V3_SQL);
+            }
+          }
           await database.runAsync('INSERT OR REPLACE INTO schema_meta (id, v) VALUES (1, ?)', [
             SCHEMA_VERSION,
           ]);
@@ -68,4 +73,10 @@ export async function getDb(): Promise<SQLiteDatabase> {
 export async function isSeededAsync(): Promise<boolean> {
   const d = await getDb();
   return isSeeded(d);
+}
+
+/** Does `table` already have a column named `column`? (SQLite has no ADD COLUMN IF NOT EXISTS.) */
+async function hasColumn(db: SQLiteDatabase, table: string, column: string): Promise<boolean> {
+  const rows = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+  return rows.some((r) => r.name === column);
 }

@@ -67,11 +67,12 @@ export async function runSeed(db: SQLiteDatabase): Promise<void> {
       [uuidv4(), outletId, productId, lotId, p.stock, p.costMinor, uuidv4(), ts],
     );
 
-    // Opening FIFO cost layer at the prototype cost (ADR-003)
+    // Opening FIFO cost layer at the prototype cost (ADR-003). Linked to the lot
+    // (ref_type='lot') so the M3 FEFO Expiry Radar can show per-batch remaining qty.
     await db.runAsync(
       `INSERT INTO cost_layer (id, outlet_id, product_id, unit_cost_minor, qty_remaining, ref_type, ref_id, received_at)
-       VALUES (?, ?, ?, ?, ?, 'seed', 'seed-v1', ?)`,
-      [uuidv4(), outletId, productId, p.costMinor, p.stock, ts],
+       VALUES (?, ?, ?, ?, ?, 'lot', ?, ?)`,
+      [uuidv4(), outletId, productId, p.costMinor, p.stock, lotId, ts],
     );
   }
 

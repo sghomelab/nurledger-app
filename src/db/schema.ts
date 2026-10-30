@@ -3,7 +3,7 @@
  * Bump SCHEMA_VERSION and add a migration step in database.ts when changing existing tables.
  */
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /**
  * M2: active-cart persistence (NFR-3 — every cart mutation is written to SQLite
@@ -110,6 +110,7 @@ CREATE TABLE IF NOT EXISTS stock_ledger (
   cogs_minor INTEGER,
   ref_type TEXT,
   ref_id TEXT,
+  reason TEXT,
   device_id TEXT,
   sync_op_id TEXT UNIQUE,
   created_at INTEGER NOT NULL,
@@ -293,3 +294,11 @@ ${CART_TABLES_SQL}
 
 /** v1 → v2 (M2): add the cart-persistence tables. Idempotent. */
 export const MIGRATE_V1_TO_V2_SQL = CART_TABLES_SQL;
+
+/**
+ * v2 → v3 (M3): record a human reason on stock movements (adjustments, waste,
+ * expiry loss — FR-305/FR-313), for the M4 shrinkage/audit trail. `ALTER TABLE …
+ * ADD COLUMN` is not idempotent, so the bootstrap guards its execution by
+ * checking the column exists first (see database.ts).
+ */
+export const MIGRATE_V2_TO_V3_SQL = 'ALTER TABLE stock_ledger ADD COLUMN reason TEXT;';

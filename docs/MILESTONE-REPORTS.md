@@ -52,3 +52,78 @@ FR-101, FR-102, FR-105, FR-107, FR-108, FR-109 (on-screen), FR-302, FR-321, FR-5
 - ESC/POS print + re-print (FR-109) → M5.
 - "10 sales offline → reconnect → sync exactly once": offline recording + idempotency key proven here; the reconnect drain + server-side dedup is M5.
 - M1 add-10-products force-kill walkthrough is implicitly covered by this run (seed persistence + force-kill survival on the same AVD).
+
+## M3 — Inventory & Expiry (2026-10-30)
+
+**What changed**
+- **Product detail (FR-300 surface):** `app/inventory/[id].tsx` — mobile idiom for the prototype's 17-column desktop table: list row + rich detail (barcode, category, unit, cost, price, **margin %**, min/max, velocity, lot batch + expiry, status, last updated, ledger last-5) with quick actions **Adjust** (reason required) · **Restock** (→PO prefill) · **Edit** · **Deactivate/Reactivate**.
+- **Stock adjustments (FR-316):** `AdjustStockDialog` — reason **required**; `stockRepository.applyStockMoveInTx` is now the single in-transaction stock writer (inbound adds a FIFO `cost_layer` at the given cost, outbound consumes FIFO; `applySaleInTx` delegates to it). Writes an immutable `adjustment` ledger row with `reason` — schema v3 adds `stock_ledger.reason` via a guarded `ALTER TABLE` migration (`hasColumn` check).
+- **Purchase orders (FR-306):** `app/po/*` — list (empty state + FAB), create (vendor + lines; carton lines via `cartonsToBase`), detail with **Receive** (confirm dialog). `poRepository.receivePO` = one transaction: one `lot` + one **lot-linked** `cost_layer` (`ref_type='lot'`) per line + `receive_po` ledger rows + PO status/dates. `planReceive` skips fully-received lines (idempotent re-receive = no-op).
+- **FEFO Expiry Radar (FR-307):** `app/(tabs)/expiry.tsx` — 4 summary cards (Expired waste / Expiring / Other / Batches) + FEFO-ranked batch rows with urgency bands (expired/critical rose, soon amber, ok green). `stockRepository.expiryRadar` joins lot→cost_layer (`ref_type='lot'`) for per-batch remaining qty; `expiryUrgency`/`summarizeRadar` pure + tested.
+- **Reorder → PO (FR-308):** `productRepository.reorderCandidates` (on-hand < min → suggest max − on-hand), `useReorder`, Restock quick action deep-links `/po/new?product=&qty=` (product + Min/Max qty prefilled).
+- **Carton break (FR-318/FR-322):** PO lines for carton products show a `Cartons (×N)` input, stored as base units; `useCart` scan resolves `carton_barcode` → adds `cartonSize` base units.
+- **Data layer:** schema v3 + guarded migration; `src/lib/po.ts` pure module (`po.test.ts`, 6 tests); expiry urgency/summary tests in `stock.test.ts` (3); seed links each opening cost layer to its lot (verified on-device 11/11).
+- **Bug found + fixed by the on-device test:** the PO form's cost/expiry inputs were controlled with snap-formatting (cost re-formats to 2 decimals, expiry all-or-nothing), so backspace couldn't clear them — replaced with per-line raw-text draft buffers that parse live and normalize on blur.
+
+**Exit test — "receive PO in batches, sell until low-stock badge fires, expiry view ranks FEFO correctly" (real `cs-test` AVD)**
+
+Run on `cs-test` (Android emulator, headless), app against local Metro. DB pulled + queried
+via `adb` root + `python3 sqlite3` after each step.
+
+1. **PO create + receive in batches (FR-306).** New PO "Test Wholesale SG", 1 line: Barista Oat
+   Milk 1L, qty 12 @ SGD 2.35 (≠ seeded 2.10, to prove layers use PO cost), lot `PO-TEST-01`,
+   exp 2026-11-10 → total SGD 28.20. Created → DRAFT, NET30, ORD 12 / RCVD 0. **Receive PO** →
+   confirm → UI: RECV'D chip, RCVD 12, "Fully received".
+   DB after receive:
+   - `purchase_order`: status `received`, `net30`, total 2820
+   - `po_line`: 12/12 @ **235**, lot `PO-TEST-01`, exp 2026-11-10
+   - new `lot` row for `PO-TEST-01`
+   - oat-milk `cost_layer`: `(210, 24, ref_type='lot')` + `(235, 12, ref_type='lot')` — both lot-linked
+   - stock projection 24+12 = **36**
+   - two `receive_po` ledger rows with correct lot attribution (`BT-2611O` +24@210, `PO-TEST-01` +12@235)
+2. **FEFO radar ranks correctly (FR-307).** After receive, Expiry tab: Expiring 138 → **150**,
+   Batches 11 → **12**. New batch ranked exactly right — "Barista Oat Milk 1L · lot PO-TEST-01 ·
+   exp 2026-11-10 · 11d (amber) · 12" between Cold Brew (11-04, 5d rose) and Greek Yogurt (11-12, 13d).
+3. **Carton break (FR-318/FR-322).** All seeded products have `carton_size=1`; via the Edit form set
+   Sparkling Mineral Water Lime 500ml to **carton size 12 + carton barcode `4000000000010`**
+   (DB: `carton_size=12`, `carton_barcode='4000000000010'`). On Sell, typed the **carton** barcode +
+   Enter → cart line qty **12** base units ("12 items", line total 12 × 2.25 = SGD 27.00).
+4. **Low-stock badge fires (FR-305).** Cleared cart, sold 5× French Butter Croissant (14 → 9 < min 10):
+   CHARGE → cash tender SGD 20.00 → change **SGD 2.50** → receipt #0B42BF69 (5 × 3.50 = 17.50,
+   tax 9% inclusive = 1.44, FIFO margin preview 66% / SGD 11.50 before payment). After the sale the
+   Inventory tab's "Low Stock Only **2**" counter and the **tab-bar badge 1 → 2** both updated
+   (sourdough already low + croissant now low). DB: `sale` ledger row −5, cogs 600, lot `BK-261029`;
+   croissant projection 9.
+5. **Adjustment round-trip (FR-316).** Product detail → **Adjust** → dialog: On hand 78 → 78,
+   Add/Remove, qty 2 → projected **80**. **Required-reason gate verified:** with qty=2 and empty
+   reason the Confirm button stayed disabled (pixel-checked pale vs. solid indigo); after typing
+   "cycle count" it enabled. Confirmed.
+   DB after apply:
+   - `stock_ledger`: `('adjustment', +2, 75, reason='cycle count', lot BT-2704L)` — immutable row, FEFO lot attributed
+   - new FIFO layer `(75, 2, ref_type='move')` at product cost
+   - water stock projection 78+2 = **80**
+6. **Product detail (FR-300 surface).** Full column set rendered: SKU, barcode, carton barcode +
+   "1 carton = 12 units", category, unit, velocity, min/max, margin 67%, last updated; FEFO batch
+   card (BT-2704L · exp 2027-04-15 · 167d · qty); recent movements; quick actions Adjust/Restock/
+   Edit/Deactivate.
+
+**Bugs found + fixed by the on-device test (2 beyond the PO-form draft-buffer fix above):**
+- **Stale data on focus:** product detail (and the Inventory/Expiry tabs) loaded only on mount;
+  tab screens stay mounted, so an Edit saved to the DB while the detail card showed stale values
+  (carton fields still "—" / "1 carton = 1 units"), and the low-stock badge lagged a sale. Fixed
+  with `useFocusEffect` reloads in `app/inventory/[id].tsx`, `app/(tabs)/inventory.tsx`,
+  `app/(tabs)/expiry.tsx`.
+- **Stale tab-bar badge:** the badge reads `useProducts().lowStock` in `TabLayout` — a separate hook
+  instance that never reloads (in-screen counter showed 2, badge still 1). Fixed by making the
+  low-stock count a module-level store shared by every `useProducts` instance
+  (`useSyncExternalStore` in `src/hooks/useAppData.ts`); any instance's reload (a sale's post-charge
+  refresh, the tab focus-refresh) updates the badge immediately — verified: badge = 2 right after
+  boot and without visiting Inventory.
+
+**FR touched**
+FR-305, FR-306 (print/share → M6), FR-307, FR-308, FR-316, FR-318, FR-319, FR-322, FR-300 surface. Deferred → M6: FR-304 stocktake UI, FR-317 labels, FR-320 margin UI (DEV-005). Adjustment PIN → M4. See `docs/FR-COVERAGE.md` + `docs/SPEC-DEVIATION.md`.
+
+**Open items**
+- Stocktake UI (FR-304), label printing (FR-317), margin-compression UI (FR-320), PO print/share → M6 (DEV-005).
+- Adjustment PIN-gating → M4 (roles).
+- Standing regression: `npx tsc --noEmit` (0 errors) + `npx jest` (58 tests) green.

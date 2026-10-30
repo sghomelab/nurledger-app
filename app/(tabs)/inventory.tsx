@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { FlatList, Pressable, Switch, TextInput, View, Text, StyleSheet, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useProducts, useOutlet } from '../../src/hooks/useAppData';
@@ -10,9 +10,11 @@ import { formatMoney } from '../../src/lib/money';
 import type { ProductWithStock } from '../../src/types';
 
 /**
- * Tab 2 — Inventory & Pricing (M1: product master + local CRUD, prototype §4).
- * M3 adds: stock adjustments w/ reason, reorder suggestions, PO, stocktake,
- * pack/case-break + dual barcodes (schema already in place).
+ * Tab 2 — Inventory & Pricing (prototype §4).
+ * M1: product master + local CRUD. M3 (this milestone): product detail with
+ * full columns + status + quick actions (Adjust w/ reason, Restock→PO, Edit,
+ * Deactivate), reorder suggestions, PO create/receive in batches, carton
+ * break (FR-318/FR-322). Stocktake (FR-304) + label printing (FR-317) → M6.
  */
 export default function InventoryTab() {
   const router = useRouter();
@@ -20,10 +22,26 @@ export default function InventoryTab() {
   const { outlet } = useOutlet();
   const [lowOnly, setLowOnly] = useState(false);
 
+  // Refresh stock + the low-stock badge on every tab focus: the tab stays
+  // mounted while Sell/Expiry/PO screens sit on top, so the badge must track
+  // sales, PO receives and adjustments (FR-305 — found on-device).
+  useFocusEffect(
+    useCallback(() => {
+      void reload();
+    }, [reload]),
+  );
+
   const list = products?.filter((p) => (lowOnly ? p.status === 'low_stock' || p.status === 'depleted' || p.status === 'sold_out' : true)) ?? null;
 
   return (
     <View style={styles.wrap}>
+      {/* PO entry point (M3, FR-306) */}
+      <Pressable style={styles.poRow} onPress={() => router.push('/po')}>
+        <Ionicons name="business-outline" size={18} color={colors.primary} />
+        <Text style={styles.poText}>Purchase Orders</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.slate400} />
+      </Pressable>
+
       {/* Search (prototype: header search) */}
       <View style={styles.searchRow}>
         <View style={styles.searchBox}>
@@ -113,6 +131,13 @@ function ProductRow({ product, currency, onPress }: { product: ProductWithStock;
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: colors.slate50 },
+  poRow: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+    marginHorizontal: spacing.lg, marginTop: spacing.sm,
+    backgroundColor: colors.primarySoft, borderRadius: radius.control,
+    paddingHorizontal: spacing.md, paddingVertical: 12,
+  },
+  poText: { flex: 1, fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.primary },
   searchRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   searchBox: {
     flexDirection: 'row',

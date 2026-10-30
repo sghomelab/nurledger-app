@@ -124,13 +124,14 @@ export function useCart() {
   );
 
   const addProduct = useCallback(
-    async (p: ProductWithStock) => {
+    async (p: ProductWithStock, qty = 1) => {
+      if (qty < 1) throw new Error('Quantity must be at least 1');
       if (p.stockQty <= 0) throw new Error(`${p.name} is out of stock`);
       await mutate((cur) => {
         const existing = cur.find((l) => l.productId === p.id);
         if (existing) {
-          if (existing.qty + 1 > p.stockQty) throw new Error(`Only ${p.stockQty} × ${p.name} in stock`);
-          return cur.map((l) => (l.key === existing.key ? { ...l, qty: l.qty + 1 } : l));
+          if (existing.qty + qty > p.stockQty) throw new Error(`Only ${p.stockQty} × ${p.name} in stock`);
+          return cur.map((l) => (l.key === existing.key ? { ...l, qty: l.qty + qty } : l));
         }
         const line: CartLine = {
           key: uuidv4(),
@@ -138,7 +139,7 @@ export function useCart() {
           sku: p.sku,
           name: p.name,
           unitPriceMinor: p.priceMinor,
-          qty: 1,
+          qty,
           taxCategory: p.taxCategory,
           discountMinor: 0,
           cogsMinor: 0,
@@ -154,9 +155,13 @@ export function useCart() {
 
   const addByBarcode = useCallback(
     async (barcode: string) => {
-      const product = await findByBarcode(barcode.trim());
-      if (!product) throw new Error(`No product for barcode "${barcode.trim()}"`);
-      await addProduct(product);
+      const code = barcode.trim();
+      const product = await findByBarcode(code);
+      if (!product) throw new Error(`No product for barcode "${code}"`);
+      // FR-318/FR-322: scanning the CARTON barcode sells a whole carton (cartonSize
+      // base units); scanning the unit barcode sells 1 base unit.
+      const qty = product.cartonBarcode === code ? product.cartonSize : 1;
+      await addProduct(product, qty);
     },
     [addProduct],
   );

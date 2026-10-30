@@ -28,28 +28,22 @@ export default function RootLayout() {
     <>
       <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.slate50 } }}>
-        {/* Product form screens live outside the (tabs) group — header + back button. */}
-        <Stack.Screen
-          name="inventory/new"
-          options={{
-            headerShown: true,
-            title: 'New product',
-            headerStyle: { backgroundColor: colors.slate50 },
-            headerTitleStyle: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate900 },
-            headerTintColor: colors.slate900,
-          }}
-        />
-        <Stack.Screen
-          name="inventory/[id]"
-          options={{
-            headerShown: true,
-            title: 'Edit product',
-            headerStyle: { backgroundColor: colors.slate50 },
-            headerTitleStyle: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate900 },
-            headerTintColor: colors.slate900,
-          }}
-        />
+        {/* Non-tab screens live outside the (tabs) group — header + back button. */}
+        <Stack.Screen name="inventory/new" options={{ ...headerOptions, title: 'New product' }} />
+        <Stack.Screen name="inventory/[id]" options={{ ...headerOptions, title: 'Product' }} />
+        <Stack.Screen name="inventory/edit" options={{ ...headerOptions, title: 'Edit product' }} />
+        <Stack.Screen name="po" options={{ ...headerOptions, title: 'Purchase Orders' }} />
+        <Stack.Screen name="po/new" options={{ ...headerOptions, title: 'New PO' }} />
+        <Stack.Screen name="po/[id]" options={{ ...headerOptions, title: 'PO' }} />
       </Stack>
     </>
   );
 }
+
+/** Shared header style for stack screens outside the tab group. */
+const headerOptions = {
+  headerShown: true,
+  headerStyle: { backgroundColor: colors.slate50 },
+  headerTitleStyle: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate900 },
+  headerTintColor: colors.slate900,
+} as const;

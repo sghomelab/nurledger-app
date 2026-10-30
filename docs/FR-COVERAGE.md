@@ -57,8 +57,35 @@ same transaction as the stock decrement. *On-device force-kill walkthrough: see 
 
 **Standing regression:** `npx tsc --noEmit` (0 errors) + `npx jest` (49 tests) green.
 
-## M3 — Inventory & Expiry
-FR-304 (stocktake), FR-305 (alerts UI), FR-306 (PO + receive), FR-307 (Expiry Radar UI), FR-317 (labels), FR-320 (margin compression).
+## M3 — Inventory & Expiry (done)
+
+Inventory detail + quick actions, stock adjustments with required reason, purchase orders with
+in-batch receiving, the FEFO Expiry Radar, reorder→PO flow, and carton break. The `stock_ledger`
+remains the single source of truth — every movement is one immutable row (schema v3 adds `reason`).
+
+| FR | Requirement | Status | Files / tests |
+|----|-------------|--------|---------------|
+| FR-305 | Low-stock alerts (on-hand ≤ min → badge/list) | ✅ | Low-Stock-Only toggle + Low Stock chips + amber Inventory-tab badge (`useProducts.lowStock`); badge verified on-device (BAK-SOUR-01) |
+| FR-306 | PO create (manual + from reorder suggestion) + receive flow (batches → stock + cost) | ✅ (print/share → M6) | `src/lib/po.ts` (pure: `poTotalCostMinor`/`remainingToReceive`/`isFullyReceived`/`planReceive`/`cartonsToBase`), `poRepository` (`createPO`/`getPO`/`listPOs`/`receivePO` in-tx), `app/po/index.tsx` · `new.tsx` · `[id].tsx`; `po.test.ts` |
+| FR-307 | Lot/expiry tracking + FEFO + "expiring soon" list | ✅ | `app/(tabs)/expiry.tsx` (summary cards + FEFO-ranked rows + rose/amber urgency), `stockRepository.expiryRadar`, `lib/stock.ts` (`expiryUrgency`/`summarizeRadar`/`fefoRank`); stock-outs are lot-attributed via `lot_id` (FEFO lot) on the ledger row |
+| FR-308 | Reorder suggestions Min/Max → PO prefill | ✅ | `reorderSuggestion` (M1) + `productRepository.reorderCandidates` + `useReorder`; Restock quick action opens `/po/new?product=&qty=` with the Min/Max qty prefilled |
+| FR-316 | Every stock movement = immutable ledger row (sale/refund/receive_po/adjustment/waste/expiry_loss) | ✅ | schema v3 `stock_ledger.reason` (guarded `ALTER TABLE` migration); `applyStockMoveInTx` single in-tx writer (`applySaleInTx` delegates); `AdjustStockDialog` (reason **required**); `stockRepository.applyStockMove` standalone wrapper |
+| FR-318 | Pack/case-break: receiving cartons adds N base units | ✅ | `cartonsToBase` + test; PO line for a carton product shows `Cartons (×N)` and stores base units — ledger is always base units |
+| FR-319 | FIFO cost layers from PO receive / adjustment (lot-linked) | ✅ | `receivePO` creates one `lot` + one `cost_layer (ref_type='lot', ref_id=lot.id)` per line; `applyStockMoveInTx` adds a layer for inbound adjustments; seed's opening layers lot-linked (verified on-device 11/11); FEFO radar joins layers→lots |
+| FR-322 | Dual barcodes: carton barcode sells N base units | ✅ | `useCart` scan resolves `carton_barcode` → adds `cartonSize` base units; product form carries carton size + carton barcode (schema since M1) |
+
+**Product detail (FR-300 surface):** ✅ `app/inventory/[id].tsx` — mobile idiom for the
+prototype's 17-column desktop table: list row (name/SKU/stock/status) + rich detail (barcode,
+category, unit, cost, price, **margin %**, min/max, velocity, lot batch + expiry, status, last
+updated, ledger last-5) with quick actions **Adjust** (reason required) · **Restock** (→PO) ·
+**Edit** · **Deactivate/Reactivate**.
+
+**Deferred (logged in `SPEC-DEVIATION.md` DEV-005):** FR-304 stocktake UI (schema
+`stocktake`/`stocktake_count` already in place), FR-317 label printing, FR-320 margin-compression
+suggestion UI, FR-306 print/share (PDF/WhatsApp) → **M6**. Adjustment PIN-gating → **M4**
+(DEV-003 pattern: action functional now, gate bolted on with roles).
+
+**Standing regression:** `npx tsc --noEmit` (0 errors) + `npx jest` (58 tests) green.
 
 ## M4 — Shifts & Back office
 FR-200…FR-204, FR-400, FR-401, FR-402 (done), dashboard KPIs, CSV exports.

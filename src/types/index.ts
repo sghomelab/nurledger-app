@@ -101,6 +101,8 @@ export interface StockLedgerRow {
   syncOpId: string | null;
   createdAt: number;
   createdBy: string | null;
+  /** Human reason for adjustments/waste/expiry (M3, FR-305/FR-313); null for sales/receives. */
+  reason: string | null;
 }
 
 /** FIFO costing cursor (ADR-003). qty_remaining is the only mutable field. */
@@ -223,4 +225,96 @@ export interface SaleLine {
 export interface CompletedSale extends Sale {
   lines: SaleLine[];
   payments: PaymentAllocation[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// M3 — Inventory & Expiry (FR-306/FR-305/FR-313/FR-318/FR-322/FR-307)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type POStatus = 'draft' | 'pending' | 'received' | 'cancelled';
+
+/** FR-306: a purchase order to a vendor, Net-30 terms by default. */
+export interface PurchaseOrder {
+  id: string;
+  outletId: string;
+  supplierName: string;
+  status: POStatus;
+  terms: string;
+  totalCostMinor: number;
+  createdAt: number;
+  receivedAt: number | null;
+  lines: POLine[];
+}
+
+export interface POLine {
+  id: string;
+  poId: string;
+  productId: string;
+  qtyOrdered: number;
+  qtyReceived: number;
+  unitCostMinor: number;
+  lotCode: string | null;
+  expiryDate: string | null;
+}
+
+/** A PO line as entered on the create form (base units; FR-306). */
+export interface POLineInput {
+  productId: string;
+  sku: string;
+  name: string;
+  qtyOrdered: number;
+  unitCostMinor: number;
+  lotCode: string | null;
+  expiryDate: string | null;
+}
+
+/**
+ * A lot/batch with its remaining sellable qty (from its FIFO cost layer),
+ * for the FEFO Expiry Radar (FR-307). `qtyRemaining` = the cost layer's
+ * `qty_remaining` (0 when the batch is fully sold/consumed).
+ */
+export interface BatchWithQty {
+  /** The lot id (identity for FEFO ranking + ledger traceability). */
+  id: string;
+  productId: string;
+  sku: string;
+  productName: string;
+  lotCode: string;
+  expiryDate: string | null;
+  receivedAt: number;
+  qtyRemaining: number;
+}
+
+export type ExpiryUrgency = 'expired' | 'critical' | 'soon' | 'ok';
+
+/** A radar row with a computed urgency band (FEFO-ordered). */
+export interface ExpiryRadarEntry extends BatchWithQty {
+  /** Calendar days until expiry (0 = today, <0 = expired). Infinity = no date. */
+  daysLeft: number;
+  urgency: ExpiryUrgency;
+}
+
+/** Expiring / Expired / Other breakdown + expired-waste qty (prototype §5). */
+export interface ExpiryRadarSummary {
+  expiredQty: number;
+  expiringQty: number;
+  otherQty: number;
+  /** Qty on hand in expired lots (the "expired waste" figure, M3). */
+  expiredWasteQty: number;
+  batchCount: number;
+}
+
+/** A product whose on-hand < min, with the Min/Max suggested qty (FR-308). */
+export interface ReorderCandidate {
+  productId: string;
+  sku: string;
+  name: string;
+  categoryId: string | null;
+  stockQty: number;
+  minQty: number;
+  maxQty: number;
+  costMinor: number;
+  priceMinor: number;
+  suggestedQty: number;
+  velocityClass: VelocityClass | null;
 }

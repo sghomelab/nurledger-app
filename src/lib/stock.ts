@@ -1,7 +1,9 @@
 /**
  * Pure stock & costing math (FR-316, FR-319, FR-321, ADR-002/003).
- * Kept dependency-free so it is unit-testable in node.
+ * Kept dependency-free (type-only import) so it is unit-testable in node.
  */
+
+import type { ExpiryRadarSummary, ExpiryUrgency } from '../types';
 
 export interface LayerInput {
   id: string;
@@ -118,4 +120,49 @@ export function daysUntil(expiryDate: string, now: Date = new Date()): number {
   const expMidnight = new Date(y, m - 1, d).getTime();
   const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   return Math.round((expMidnight - nowMidnight) / 86_400_000);
+}
+
+/** Default FEFO urgency windows (calendar days). FR-307 / prototype §5. */
+export const EXPIRY_THRESHOLDS = { criticalDays: 7, soonDays: 30 } as const;
+
+export interface ExpiryThresholds {
+  /** Expired-or-within-this-many-days → 'critical' (rose). */
+  criticalDays: number;
+  /** Within this many days → 'soon' (amber). */
+  soonDays: number;
+}
+
+/**
+ * Urgency band from days-until-expiry. FR-307 / prototype §5:
+ * expired (rose) · critical (≤ criticalDays, rose) · soon (≤ soonDays, amber) · ok.
+ */
+export function expiryUrgency(
+  daysLeft: number,
+  th: ExpiryThresholds = EXPIRY_THRESHOLDS,
+): ExpiryUrgency {
+  if (daysLeft < 0) return 'expired';
+  if (daysLeft <= th.criticalDays) return 'critical';
+  if (daysLeft <= th.soonDays) return 'soon';
+  return 'ok';
+}
+
+/** Expiring / Expired / Other breakdown + expired-waste qty (prototype §5). */
+export function summarizeRadar(
+  entries: Array<{ qtyRemaining: number; urgency: ExpiryUrgency }>,
+): ExpiryRadarSummary {
+  let expiredQty = 0;
+  let expiringQty = 0;
+  let otherQty = 0;
+  for (const e of entries) {
+    if (e.urgency === 'expired') expiredQty += e.qtyRemaining;
+    else if (e.urgency === 'critical' || e.urgency === 'soon') expiringQty += e.qtyRemaining;
+    else otherQty += e.qtyRemaining;
+  }
+  return {
+    expiredQty,
+    expiringQty,
+    otherQty,
+    expiredWasteQty: expiredQty,
+    batchCount: entries.length,
+  };
 }
