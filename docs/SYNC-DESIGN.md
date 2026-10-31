@@ -301,7 +301,7 @@ These are **pure local logic** (no cloud) and ship regardless of sync state:
   renames would need the name-invariant re-checked (ADR-011).
 
 ## 10. Schema bundle versions + the upgrade path (M6)
-The BYO bundle (`src/lib/cloud/schemaSql.ts`, `CLOUD_SCHEMA_VERSION = 3`) is:
+The BYO bundle (`src/lib/cloud/schemaSql.ts`, `CLOUD_SCHEMA_VERSION = 4`) is:
 - **cumulative** — each version's bundle contains everything earlier versions
   had, so the *current* bundle is always the one to paste;
 - **idempotent** — `IF NOT EXISTS` / `OR REPLACE` / `DROP POLICY IF EXISTS`;
@@ -314,6 +314,7 @@ The BYO bundle (`src/lib/cloud/schemaSql.ts`, `CLOUD_SCHEMA_VERSION = 3`) is:
 | v1 | M5 | `outlet`, `org_member` + `is_member`, `product`, `product_audit`, `sale`, `sale_line`, `payment`, `stock_ledger` (+`stock_view`), `apply_sale`/`apply_ledger`/`apply_product`, RLS |
 | v2 | M5→M6 | `refund`, `refund_line`, `apply_refund` (refund sync surface, §3.1) |
 | v3 | M6 | `category` + RLS + `apply_category` (§3.5) |
+| v4 | Post-M6 (PR-2026-11, CR-02) | server-stamped `synced_at timestamptz` on every synced table + each RPC sets it to `now()` on write — delta cursors query `synced_at`, not `updated_at` (the client-timestamped LWW key, which stranded offline sales; see CODE-REVIEW CR-02) |
 
 **Version detection.** `cloud_schema_meta` is `version int PRIMARY KEY` — one
 row per applied version. `schemaVersion()` returns the **max** version row
@@ -341,3 +342,39 @@ detects the old bundle and shows the updated script.
    (2,3)`): reconnect → wizard showed the **upgrade** step ("it runs schema
    v1, but this app needs v3") → re-ran the v3 bundle → check passed →
    sign-in → link → Connected → sync resumed, data intact, meta rows restored.
+
+## 11. Beyond Supabase — the tiered plan (roadmap, 2026-10-31)
+
+**The seam already exists** (§1.2): the sync engine talks only to
+`CloudAdapter` (`src/lib/cloud/types.ts`: `ping` / `schemaVersion` /
+`signUp` / `signIn` / `signOut` / `provisionStore` / `pushOps` /
+`pullDeltas`), and the outbox / idempotency / LWW / cursor rules in
+`src/lib/sync.ts` are provider-agnostic. A new backend = a new adapter
+module; nothing else changes.
+
+**What is actually Supabase-specific today (three things):**
+1. `createSupabaseAdapter` (`src/lib/cloud/supabaseAdapter.ts`) — transport is
+   the **PostgREST REST API** (push = `rpc(apply_*)` calls, pull = REST
+   selects), and owner auth is **GoTrue** (`/auth/v1/*` via `@supabase/auth-js`).
+2. The provisioning bundle (§10) — plain **Postgres DDL** + RLS + plpgsql
+   functions: it runs on *any* Postgres, not only Supabase's.
+3. Wizard UX copy — the "create a FREE Supabase project (supabase.com)" flow
+   (`app/cloud-setup.tsx`). The URL field itself accepts any host
+   (no `.supabase.co` enforcement in code).
+
+**Tiers, in order of fit:**
+
+| Tier | Backend | What it takes | Verdict |
+|---|---|---|---|
+| **T1** | **Self-hosted Supabase stack** — Postgres + PostgREST + GoTrue, all open source (docker-compose) | Wizard gains a "Self-hosted" mode (second URL set + docs with the compose file). The adapter is **unchanged** — it speaks exactly that API surface; the reachability probe already hits GoTrue's `/auth/v1/health` path; the §10 SQL bundle runs as-is. | **Best ROI.** Covers privacy-maximalist and IT-savvy owners with near-zero app risk. |
+| **T2** | Any managed/self-hosted **Postgres + PostgREST** (Neon, RDS, Fly, homelab) without GoTrue | New `postgrestAdapter`: plain fetch + JWT (PostgREST's service-role equivalent) for push/pull; owner auth becomes a **hashed-credential RPC** in the bundle (a `v5` schema addition) since there is no GoTrue. | Real work, moderate value — stores that already run Postgres on their own infra. |
+| **T3a** | **LAN P2P, no cloud** — one device as hub on the shop network | New `lanAdapter` (hub = store-and-forward relay over local HTTP). The design already supports it: every device keeps its own outbox and the LWW/cursor rules are per-tenant, not per-server. Discovery + hub-offline handling is the work. | For shops that refuse any cloud. |
+| **T3b** | **File-based sync** — export the SQLite/JSON snapshot to a shared drive/S3 | Small, on top of the existing export plumbing. | Backup story only (file-level LWW, no delta merge) — not a live multi-device story. |
+| — | Generic SaaS / arbitrary REST | — | **Non-goal** — no value for this user base. |
+
+**Current decision:** v1 ships **BYO Supabase.com** (ADR-010 / DEV-006) —
+zero infrastructure to operate, free tier covers a single shop. Nothing in
+this section blocks the release; it is the roadmap for "sync beyond
+Supabase" demand. **T1 is the natural v2 candidate** if it is ever requested;
+implementing any tier is additive (a new adapter + optional wizard mode) and
+can never regress the shipped path.
