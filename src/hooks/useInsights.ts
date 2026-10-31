@@ -30,6 +30,7 @@ import {
   getFirstSaleAt,
   getInventoryValuation,
   getOpexTotals,
+  getPeriodSalesByMethod,
   getPeriodTotals,
   getProductSalesInPeriod,
   getPoFillUnits,
@@ -39,12 +40,15 @@ import {
   type SalesHistoryEntry,
 } from '../repositories/insightsRepository';
 import { getOutlet } from '../repositories/outletRepository';
+import type { SalesByMethod } from '../lib/shift';
 
 export interface InsightsData {
   period: PeriodId;
   fromMs: number;
   days: number;
   kpis: Kpis;
+  /** FR-400: Σ payment.amount_minor by method for the period (zero keys omitted). */
+  salesByMethod: SalesByMethod;
   abcRows: VelocityAbcRow[];
   stockoutRows: StockoutRow[];
 }
@@ -71,7 +75,7 @@ export function useInsights(initialPeriod: PeriodId = 'today'): UseInsights {
   const load = useCallback(
     async (p: PeriodId, q: string) => {
       const fromMs = periodStartMs(p);
-      const [totals, opex, inventory, prodSales, stock, firstSaleAt, receiptsUnits, adjustmentLossMinor, expiredValueMinor, poFill] =
+      const [totals, opex, inventory, prodSales, stock, firstSaleAt, receiptsUnits, adjustmentLossMinor, expiredValueMinor, poFill, salesByMethod] =
         await Promise.all([
           getPeriodTotals(fromMs),
           getOpexTotals(fromMs),
@@ -83,6 +87,7 @@ export function useInsights(initialPeriod: PeriodId = 'today'): UseInsights {
           getShrinkageValueMinor(fromMs),
           getExpiredInventoryValueMinor(new Date().toLocaleDateString('en-CA')),
           getPoFillUnits(fromMs),
+          getPeriodSalesByMethod(fromMs),
         ]);
 
       const kpis = computeKpis({
@@ -122,7 +127,7 @@ export function useInsights(initialPeriod: PeriodId = 'today'): UseInsights {
       const abcRows = computeVelocityAbc(abcInputs, days);
       const stockoutRows = computeStockout(abcInputs, days);
 
-      setData({ period: p, fromMs, days, kpis, abcRows, stockoutRows });
+      setData({ period: p, fromMs, days, kpis, salesByMethod, abcRows, stockoutRows });
       setExpenses(await listExpenses(fromMs));
       setSalesHistory(await getSalesHistory(fromMs, q));
     },

@@ -8,6 +8,7 @@
 import { getDb } from '../db/database';
 import { roundDivide } from '../lib/money';
 import { refundNetShareMinor, type OpexTotals, type PeriodTotals } from '../lib/kpi';
+import type { SalesByMethod } from '../lib/shift';
 
 /**
  * FR-403: the period's headline sales aggregates (sale headers are
@@ -120,6 +121,29 @@ export async function getPeriodTotals(fromMs: number): Promise<Omit<PeriodTotals
     refundedUnits,
     refundedCogsMinor,
   };
+}
+
+/**
+ * FR-400: payment-method split for the period — Σ payment.amount_minor per
+ * method over completed sales with created_at >= fromMs. Same attribution as
+ * `getShiftSalesByMethod` (payment rows of completed sales), but keyed on the
+ * sale's timestamp instead of a shift_id — for the Insights "Payment Mix"
+ * tile (Today / Current period / All Time).
+ */
+export async function getPeriodSalesByMethod(fromMs: number): Promise<SalesByMethod> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<{ method: string; total: number }>(
+    `SELECT p.method AS method, COALESCE(SUM(p.amount_minor), 0) AS total
+     FROM payment p JOIN sale s ON s.id = p.sale_id
+     WHERE s.status = 'completed' AND s.created_at >= ?
+     GROUP BY p.method`,
+    [fromMs],
+  );
+  const out: SalesByMethod = {};
+  for (const r of rows) {
+    if (r.total > 0) out[r.method] = r.total;
+  }
+  return out;
 }
 
 /** Timestamp of the first completed sale (lifetime velocity denominator), or null. */

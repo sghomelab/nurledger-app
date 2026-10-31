@@ -232,6 +232,9 @@ from the top of this list and your shrinkage drops.
 - **KPI cards** — revenue (net), COGS, gross profit, operating net margin,
   discounted items, units, transactions, average basket, UPT — for **Today**,
   the **current period** or **all time**.
+- **Payment Mix** — how the money came in: sales by payment method (cash,
+  card, QR…) for the selected period, with each method's share of the total.
+  Switch periods and it updates with them.
 - **Extended KPIs** — mark-up %, inventory turnover, days on hand, sell-through,
   GMROI, shrinkage, stockout rate, expiry waste, fill rate.
 - **Top sellers** — by revenue share, with velocity/ABC class.

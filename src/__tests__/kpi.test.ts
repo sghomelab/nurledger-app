@@ -9,6 +9,7 @@ import {
   computeVelocityAbc,
   lifetimeDays,
   opexTotalMinor,
+  paymentMix,
   periodDays,
   periodStartMs,
   refundNetShareMinor,
@@ -161,6 +162,42 @@ describe('refundNetShareMinor (CR-09)', () => {
   it('zero refund or zero pre-tax base → 0', () => {
     expect(refundNetShareMinor(0, 87_180, 95_000)).toBe(0);
     expect(refundNetShareMinor(95_000, 0, 0)).toBe(0);
+  });
+});
+
+describe('paymentMix (FR-400 payment-method split)', () => {
+  it('computes each method share of the total (integer money, float %)', () => {
+    const rows = paymentMix({ cash: 60_000, card: 30_000, qr: 10_000 });
+    // Sorted by amount desc.
+    expect(rows.map((r) => r.method)).toEqual(['cash', 'card', 'qr']);
+    expect(rows[0]?.method).toBe('cash');
+    expect(rows[0]?.amountMinor).toBe(60_000);
+    expect(rows[0]?.sharePct).toBe(60);
+    expect(rows[1]?.sharePct).toBeCloseTo(30, 10);
+    expect(rows[2]?.sharePct).toBeCloseTo(10, 10);
+    // Shares sum to 100 (within float rounding).
+    expect(rows.reduce((s, r) => s + r.sharePct, 0)).toBeCloseTo(100, 10);
+  });
+
+  it('omits zero-amount methods and never divides by zero', () => {
+    expect(paymentMix({})).toEqual([]);
+    expect(paymentMix({ cash: 0, card: 0 })).toEqual([]);
+    // Only the positive method survives; it is 100% of what is there.
+    expect(paymentMix({ cash: 0, card: 5_000 })).toEqual([
+      { method: 'card', amountMinor: 5_000, sharePct: 100 },
+    ]);
+  });
+
+  it('keeps insertion order on ties (stable sort by amount desc)', () => {
+    const rows = paymentMix({ qr: 10_000, card: 10_000, cash: 20_000 });
+    expect(rows.map((r) => r.method)).toEqual(['cash', 'qr', 'card']);
+  });
+
+  it('rounds shares to the display value without touching the integer amount', () => {
+    // 1/3 each → 33.333…%; amounts stay exact integers.
+    const rows = paymentMix({ cash: 10_000, card: 10_000, qr: 10_000 });
+    expect(rows.every((r) => Number.isInteger(r.amountMinor))).toBe(true);
+    rows.forEach((r) => expect(r.sharePct.toFixed(1)).toBe('33.3'));
   });
 });
 

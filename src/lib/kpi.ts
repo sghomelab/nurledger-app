@@ -17,6 +17,7 @@
  */
 
 import { roundDivide } from './money';
+import type { SalesByMethod } from './shift';
 
 export type PeriodId = 'today' | 'period' | 'all';
 
@@ -107,6 +108,32 @@ export interface PeriodTotals {
  */
 export function refundNetShareMinor(refundMinor: number, netMinor: number, preTaxMinor: number): number {
   return roundDivide(refundMinor * netMinor, preTaxMinor);
+}
+
+/**
+ * FR-400 payment-method split (the Insights "Payment Mix" tile). Methods with
+ * a positive amount, sorted by amount descending (ties keep insertion order),
+ * each carrying its share of the period total. Money stays integer minor
+ * units end to end (ADR-004) — only `sharePct` is a float, and display-only.
+ */
+export interface PaymentMixRow {
+  method: string;
+  amountMinor: number;
+  /** 0–100, display only. */
+  sharePct: number;
+}
+
+export function paymentMix(salesByMethod: SalesByMethod): PaymentMixRow[] {
+  const total = Object.values(salesByMethod).reduce((sum, v) => sum + v, 0);
+  if (total <= 0) return [];
+  return Object.entries(salesByMethod)
+    .filter(([, v]) => v > 0)
+    .map(([method, amountMinor]) => ({
+      method,
+      amountMinor,
+      sharePct: (amountMinor / total) * 100,
+    }))
+    .sort((a, b) => b.amountMinor - a.amountMinor);
 }
 
 /** Operating expenses by type (prototype: Staff Payroll / Maintenance / Other). */

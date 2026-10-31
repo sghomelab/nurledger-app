@@ -776,3 +776,43 @@ Post-fix figures matched independently computed expectations on both TODAY
   `npx jest` **388/388 (26 suites)** (up from 316/23 at the review baseline).
 - All fixes live-verified on the emulator (CR-06 weighed PO receipt, CR-07
   stocktake-on-short, CR-09 insights refunds) against the real device DB.
+
+## Post-M6 — Insights: payment-method split tile (2026-10-31)
+
+Closes the last ⚠️ partial FR — **FR-400 → full** (the "payment-method split"
+caveat in `docs/FR-COVERAGE.md` is resolved).
+
+### What shipped
+- **Query** — `getPeriodSalesByMethod(fromMs)` in `insightsRepository.ts`:
+  Σ `payment.amount_minor` grouped by method over completed sales with
+  `created_at >= fromMs`. Same attribution as the per-shift
+  `getShiftSalesByMethod` (X/Z-report "sales by method"), keyed on the
+  sale's timestamp instead of a shift_id so it works for Today / Current
+  period / All Time.
+- **Pure helper** — `paymentMix(salesByMethod)` in `kpi.ts`: positive methods
+  sorted by amount desc (stable on ties), each with its display share %.
+  Money stays integer end to end (ADR-004) — only the percentage is float.
+- **UI** — a "Payment Mix" card on the Insights tab (below the KPI sub-grid):
+  per-method label (locale data via `paymentMethodsFor(outlet.locale)` —
+  e.g. "PayNow QR" in en-SG), share %, amount, and a proportional bar, with a
+  strong Total row. Empty period → "No sales in this period."
+- **Tests** — 4 new unit tests in `kpi.test.ts` (shares sum to 100, zero
+  amounts omitted / no div-by-zero, stable ties, integer amounts preserved).
+  Gates: tsc 0 errors, jest **392/392 (26 suites)**.
+- **Not i18n'd** — the Insights tab is outside the M6 i18n sweep (tabs,
+  sell, inventory, settings, dialogs); the tile follows the tab's convention
+  with English chrome. Method names are business-locale data and were never
+  in the dictionaries.
+
+### Live verification (cs-test AVD, emulator-5554 — every figure recomputed
+independently from the pulled device DB)
+- **Today:** Cash 87.4% · SGD 45.13 / PayNow QR 12.6% · SGD 6.50 / Total
+  SGD 51.63 — exact match (tile total equals Σ `sale.total_minor` for the
+  day).
+- **Current period:** Cash 84.7% · SGD 80.13 / Card 8.5% · SGD 8.00 / PayNow
+  QR 6.9% · SGD 6.50 / Total SGD 94.63 — exact match.
+- **All Time:** identical to Current period (all sales landed this month) —
+  exact match.
+- Locale labels ("PayNow QR"), amount-desc ordering, and period switching
+  verified on screen; the surrounding KPI cards still show the CR-09
+  figures (net 28.96 today / 59.24 all-time, COGS 25.35) — no regression.

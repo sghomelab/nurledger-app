@@ -14,7 +14,8 @@ import {
   buildVelocityAbcCsv,
   type SalesHistoryCsvRow,
 } from '../../src/lib/csv';
-import { periodStartMs, type PeriodId } from '../../src/lib/kpi';
+import { periodStartMs, paymentMix, type PeriodId } from '../../src/lib/kpi';
+import { paymentMethodsFor } from '../../src/lib/payment';
 import { EXPENSE_TYPE_LABELS, type ExpenseType } from '../../src/repositories/expenseRepository';
 import { formatMoney, parseMoneyToMinor } from '../../src/lib/money';
 import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
@@ -57,6 +58,13 @@ export default function InsightsTab() {
 
   const currency = outlet?.currency ?? 'SGD';
   const k = ins.data?.kpis;
+
+  // FR-400 — payment-method split for the selected period (pure; the
+  // method labels are locale data from the outlet's locale engine).
+  const mix = ins.data ? paymentMix(ins.data.salesByMethod) : [];
+  const mixLabel = (id: string) =>
+    paymentMethodsFor(outlet?.locale).find((m) => m.id === id)?.label ?? id;
+  const mixTotalMinor = mix.reduce((sum, m) => sum + m.amountMinor, 0);
 
   const setPeriod = useCallback(
     (p: PeriodKey) => {
@@ -130,6 +138,35 @@ export default function InsightsTab() {
             <SubStat label="Avg basket" value={formatMoney(k.avgBasketMinor, currency)} />
             <SubStat label="Units / txn" value={k.upt.toFixed(2)} />
           </View>
+
+          {/* Payment Mix (FR-400 — period-scoped sales by payment method) */}
+          <Card style={styles.card}>
+            <View style={styles.cardHead}>
+              <Text style={styles.cardTitle}>Payment Mix</Text>
+            </View>
+            {mix.length === 0 ? (
+              <Text style={styles.empty}>No sales in this period.</Text>
+            ) : (
+              <>
+                {mix.map((m) => (
+                  <View key={m.method} style={styles.mixRow}>
+                    <View style={styles.mixTop}>
+                      <Text style={styles.mixLabel}>{mixLabel(m.method)}</Text>
+                      <View style={styles.mixFigures}>
+                        <NumberText style={styles.mixShare}>{m.sharePct.toFixed(1)}%</NumberText>
+                        <NumberText style={styles.mixAmount}>{formatMoney(m.amountMinor, currency)}</NumberText>
+                      </View>
+                    </View>
+                    <View style={styles.mixTrack}>
+                      <View style={[styles.mixFill, { width: `${m.sharePct}%` }]} />
+                    </View>
+                  </View>
+                ))}
+                <View style={styles.divider} />
+                <PRow label="Total" value={formatMoney(mixTotalMinor, currency)} strong />
+              </>
+            )}
+          </Card>
 
           {/* Extended KPIs (research doc §4 full list — FR-403) */}
           <Card style={styles.card}>
@@ -465,6 +502,14 @@ const styles = StyleSheet.create({
   subStat: { flex: 1, backgroundColor: colors.slate100, borderRadius: radius.chip, alignItems: 'center', paddingVertical: spacing.sm },
   subStatValue: { fontFamily: fonts.monoSemiBold, fontSize: typography.body, color: colors.slate900 },
   subStatLabel: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate500, marginTop: 2 },
+  mixRow: { gap: 4 },
+  mixTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  mixLabel: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate900 },
+  mixFigures: { flexDirection: 'row', gap: spacing.md },
+  mixShare: { fontFamily: fonts.mono, fontSize: typography.micro, color: colors.slate500, width: 44, textAlign: 'right' },
+  mixAmount: { fontFamily: fonts.mono, fontSize: typography.caption, color: colors.slate900, width: 84, textAlign: 'right' },
+  mixTrack: { height: 6, borderRadius: 3, backgroundColor: colors.slate100, overflow: 'hidden' },
+  mixFill: { height: '100%', borderRadius: 3, backgroundColor: colors.primary },
   kpiMiniGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   kpiMini: { width: '30%', alignItems: 'center', gap: 2, backgroundColor: colors.slate50, borderRadius: radius.chip, paddingVertical: spacing.sm, paddingHorizontal: spacing.xs },
   kpiMiniValue: { fontFamily: fonts.monoSemiBold, fontSize: typography.caption + 1, color: colors.slate900 },
