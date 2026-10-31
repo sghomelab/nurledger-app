@@ -67,8 +67,11 @@ export interface ProductDeltaRow {
   description: string | null;
   active: boolean;
   createdAt: number;
+  /** LWW conflict key — the client's edit time (epoch ms). */
   updatedAt: number;
   updatedByDevice: string | null;
+  /** Server-stamped receipt time (v4) — the delta-cursor field. */
+  syncedAt: number;
 }
 
 export interface SaleDeltaRow {
@@ -85,7 +88,8 @@ export interface SaleDeltaRow {
   totalMinor: number;
   cogsMinor: number;
   createdAt: number;
-  updatedAt: number;
+  /** Server-stamped receipt time (v4) — the delta-cursor field. */
+  syncedAt: number;
 }
 
 export interface SaleLineDeltaRow {
@@ -130,7 +134,8 @@ export interface LedgerDeltaRow {
   reason: string | null;
   deviceId: string | null;
   createdAt: number;
-  updatedAt: number;
+  /** Server-stamped receipt time (v4) — the delta-cursor field. */
+  syncedAt: number;
 }
 
 /** M6 (FR-110): refund deltas (append-only, uuid = client UUID). */
@@ -145,7 +150,8 @@ export interface RefundDeltaRow {
   restock: boolean;
   amountMinor: number;
   createdAt: number;
-  updatedAt: number;
+  /** Server-stamped receipt time (v4) — the delta-cursor field. */
+  syncedAt: number;
 }
 
 export interface RefundLineDeltaRow {
@@ -165,12 +171,15 @@ export interface CategoryDeltaRow {
   id: string;
   name: string;
   createdAt: number;
+  /** LWW conflict key — the client's edit time (epoch ms). */
   updatedAt: number;
   updatedByDevice: string | null;
+  /** Server-stamped receipt time (v4) — the delta-cursor field. */
+  syncedAt: number;
 }
 
 export interface TableCursors {
-  /** epoch ms per table; 0 = "pull everything". */
+  /** epoch ms per table (max `synced_at` pulled); 0 = "pull everything". */
   product: number;
   sale: number;
   ledger: number;
@@ -187,8 +196,8 @@ export interface SyncPullResult {
   ledger: LedgerDeltaRow[];
   refunds: RefundDeltaRow[];
   refundLines: RefundLineDeltaRow[];
-  /** Max updatedAt observed per table (for cursor advancement). */
-  maxUpdatedAt: TableCursors;
+  /** Max synced_at observed per table (for cursor advancement). */
+  maxSyncedAt: TableCursors;
 }
 
 /**

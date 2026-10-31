@@ -227,12 +227,15 @@ export function applyUnionDelta<R extends { id: string }>(
 }
 
 /**
- * Advance a per-table delta cursor to the max `updatedAt` observed.
- * Never rewinds (a stale pull must not lose rows).
+ * Advance a per-table delta cursor to the max `syncedAt` observed (v4: the
+ * server-stamped receipt time — client `updatedAt` is the LWW key on
+ * product/category and must NOT drive cursors; a backdated client time is
+ * exactly how offline rows got stranded, PR-2026-11 / CR-02). Never rewinds
+ * (a stale pull must not lose rows).
  */
-export function advanceCursor(current: number, rows: Array<{ updatedAt: number }>): number {
+export function advanceCursor(current: number, rows: Array<{ syncedAt: number }>): number {
   let max = current;
-  for (const r of rows) if (r.updatedAt > max) max = r.updatedAt;
+  for (const r of rows) if (r.syncedAt > max) max = r.syncedAt;
   return max;
 }
 

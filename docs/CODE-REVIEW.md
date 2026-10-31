@@ -15,23 +15,23 @@ However, an exhaustive audit beyond the unit test coverage reveals critical edge
 
 ### Summary Matrix of Findings
 
-| ID | Severity | Category | File & Line | Summary |
-|---|---|---|---|---|
-| **CR-01** | **Critical** | Accounting / Invariants | `src/lib/sale.ts:113` | Exclusive tax is omitted from `saleTotals.totalMinor`, causing under-collection of funds and broken receipt math. |
-| **CR-02** | **Critical** | Sync / Distributed State | `src/lib/cloud/schemaSql.ts:262, 294, 316, 340, 363` | Cloud RPCs set `updated_at` to client `created_at` instead of server `now()`, silently stranding offline sales from peer delta pulls. |
-| **CR-03** | **Critical** | Sync / Reliability | `src/hooks/useSync.ts:297-299, 319-321` | Pull transaction throws unhandled exception on out-of-order refund references, creating an unrecoverable permanent sync loop. |
-| **CR-04** | **High** | Sync / Schema Constraints | `src/hooks/useSync.ts:159-170, 214` | Ephemeral category remap causes foreign key failures (`product.category_id`) on subsequent product pull batches. |
-| **CR-05** | **High** | Sync / Concurrency | `src/hooks/useSync.ts:194-208` | Product pull uses `ON CONFLICT (id)` which crashes SQLite on natural key collision `(outlet_id, sku)`. |
-| **CR-06** | **High** | Inventory / Invariants | `src/repositories/poRepository.ts:180-189` | Receiving PO for weighed items passes `qtyDelta` instead of `qtyGDelta`, leaving on-hand gram inventory at zero. |
-| **CR-07** | **High** | Inventory / Invariants | `src/repositories/stockRepository.ts:360-377`<br>`src/repositories/stocktakeRepository.ts:234-245` | Negative stock adjustments on shortage bypass FIFO layer updates while committing ledger decrements, permanently de-syncing cost layers. |
-| **CR-08** | **High** | Cash Drawer / Shifts | `src/repositories/shiftRepository.ts:226-236`<br>`src/lib/shift.ts:31-33` | Drawer expected balance ignores refunds, falsely penalizing cashiers with shortages; refunds misattributed across shifts. |
-| **CR-09** | **Medium** | Analytics / P&L | `src/repositories/insightsRepository.ts:17-25`<br>`src/lib/kpi.ts:8-13` | Insights and P&L aggregates completely omit refunds, overstating net revenue, units sold, and gross margin. |
-| **CR-10** | **Medium** | Tax / Calculations | `src/lib/sale.ts:104-106` | Order discount proration across mixed tax lines uses unadjusted line gross instead of post-line-discount balance. |
-| **CR-11** | **Medium** | Sync / Scalability | `src/lib/cloud/supabaseAdapter.ts:235-239`<br>`src/lib/sync.ts:46-52` | Delta queries lack deterministic ordering and pagination, causing cursor skips and permanent data omission when batch size > 1,000. |
-| **CR-12** | **Medium** | Atomicity / Outbox | `src/repositories/productRepository.ts:200-215, 223-241, 345-349` | Master data mutations and outbox enqueues run outside database transactions, risking un-synced local mutations on crash. |
-| **CR-13** | **Medium** | Data Integrity | `src/repositories/productRepository.ts:300-303, 321-322` | CSV import deletes SKU from lookup map on match, causing duplicate SKUs in the same CSV to fail with unique constraint crashes. |
-| **CR-14** | **Low** | Domain Invariants | `src/repositories/saleRepository.ts:38-45` | `completeSale` lacks payment coverage validation, allowing underpaid or unbacked sales at the repository level. |
-| **CR-15** | **Low** | UI / Authentication | `src/components/PinPrompt.tsx:64-70` | PIN prompt auto-submits only on 4 digits, locking out valid 5-digit and 6-digit manager PINs supported by `PIN_REGEX`. |
+| ID | Severity | Category | File & Line | Summary | Status |
+|---|---|---|---|---|---|
+| **CR-01** | **Critical** | Accounting / Invariants | `src/lib/sale.ts:113` | Exclusive tax is omitted from `saleTotals.totalMinor`, causing under-collection of funds and broken receipt math. | ✅ Fixed (PR-2026-11) |
+| **CR-02** | **Critical** | Sync / Distributed State | `src/lib/cloud/schemaSql.ts:262, 294, 316, 340, 363` | Cloud RPCs set `updated_at` to client `created_at` instead of server `now()`, silently stranding offline sales from peer delta pulls. | ✅ Fixed (PR-2026-11, via `synced_at` — see note) |
+| **CR-03** | **Critical** | Sync / Reliability | `src/hooks/useSync.ts:297-299, 319-321` | Pull transaction throws unhandled exception on out-of-order refund references, creating an unrecoverable permanent sync loop. | ✅ Fixed (PR-2026-11) |
+| **CR-04** | **High** | Sync / Schema Constraints | `src/hooks/useSync.ts:159-170, 214` | Ephemeral category remap causes foreign key failures (`product.category_id`) on subsequent product pull batches. | ⏳ Pending (Phase 2) |
+| **CR-05** | **High** | Sync / Concurrency | `src/hooks/useSync.ts:194-208` | Product pull uses `ON CONFLICT (id)` which crashes SQLite on natural key collision `(outlet_id, sku)`. | ⏳ Pending (Phase 2) |
+| **CR-06** | **High** | Inventory / Invariants | `src/repositories/poRepository.ts:180-189` | Receiving PO for weighed items passes `qtyDelta` instead of `qtyGDelta`, leaving on-hand gram inventory at zero. | ⏳ Pending (Phase 2) |
+| **CR-07** | **High** | Inventory / Invariants | `src/repositories/stockRepository.ts:360-377`<br>`src/repositories/stocktakeRepository.ts:234-245` | Negative stock adjustments on shortage bypass FIFO layer updates while committing ledger decrements, permanently de-syncing cost layers. | ⏳ Pending (Phase 2) |
+| **CR-08** | **High** | Cash Drawer / Shifts | `src/repositories/shiftRepository.ts:226-236`<br>`src/lib/shift.ts:31-33` | Drawer expected balance ignores refunds, falsely penalizing cashiers with shortages; refunds misattributed across shifts. | ⏳ Pending (Phase 2) |
+| **CR-09** | **Medium** | Analytics / P&L | `src/repositories/insightsRepository.ts:17-25`<br>`src/lib/kpi.ts:8-13` | Insights and P&L aggregates completely omit refunds, overstating net revenue, units sold, and gross margin. | ⏳ Pending (Phase 3) |
+| **CR-10** | **Medium** | Tax / Calculations | `src/lib/sale.ts:104-106` | Order discount proration across mixed tax lines uses unadjusted line gross instead of post-line-discount balance. | ✅ Fixed (PR-2026-11) |
+| **CR-11** | **Medium** | Sync / Scalability | `src/lib/cloud/supabaseAdapter.ts:235-239`<br>`src/lib/sync.ts:46-52` | Delta queries lack deterministic ordering and pagination, causing cursor skips and permanent data omission when batch size > 1,000. | ✅ Fixed (PR-2026-11) |
+| **CR-12** | **Medium** | Atomicity / Outbox | `src/repositories/productRepository.ts:200-215, 223-241, 345-349` | Master data mutations and outbox enqueues run outside database transactions, risking un-synced local mutations on crash. | ⏳ Pending (Phase 3) |
+| **CR-13** | **Medium** | Data Integrity | `src/repositories/productRepository.ts:300-303, 321-322` | CSV import deletes SKU from lookup map on match, causing duplicate SKUs in the same CSV to fail with unique constraint crashes. | ⏳ Pending (Phase 3) |
+| **CR-14** | **Low** | Domain Invariants | `src/repositories/saleRepository.ts:38-45` | `completeSale` lacks payment coverage validation, allowing underpaid or unbacked sales at the repository level. | ⏳ Pending (Phase 3) |
+| **CR-15** | **Low** | UI / Authentication | `src/components/PinPrompt.tsx:64-70` | PIN prompt auto-submits only on 4 digits, locking out valid 5-digit and 6-digit manager PINs supported by `PIN_REGEX`. | ⏳ Pending (Phase 3) |
 
 ---
 
@@ -40,6 +40,7 @@ However, an exhaustive audit beyond the unit test coverage reveals critical edge
 ### CR-01: Exclusive Tax Omitted from Sale Total
 - **File & Line:** `src/lib/sale.ts:113`
 - **Severity:** Critical
+- **Status:** ✅ Fixed (PR-2026-11, Phase 1). `computeTotals` now adds `tax.taxMinor` on top of the base when `tax.mode === 'exclusive'`; inclusive mode unchanged (regression-guarded). 6 new tests in `sale.test.ts`.
 - **Description:**  
   In `computeTotals()`, `totalMinor` is calculated as:
   ```typescript
@@ -133,6 +134,7 @@ However, an exhaustive audit beyond the unit test coverage reveals critical edge
 ### CR-10: Order-Level Discount Proration Distorts Tax Base Across Mixed Tax Buckets
 - **File & Line:** `src/lib/sale.ts:104-106`
 - **Severity:** Medium
+- **Status:** ✅ Fixed (PR-2026-11, Phase 1). Proration base changed from pre-discount gross to post-line-discount net (`roundDivide(order * afterLine, grossAfterLineDiscount)`); a fully line-discounted line now takes no order-discount share. 2 new tests in `sale.test.ts`.
 - **Description:**  
   In `computeTotals()`:
   ```typescript
@@ -159,6 +161,7 @@ However, an exhaustive audit beyond the unit test coverage reveals critical edge
 ### CR-02: Backdated `updated_at` Causes Silent Peer Data Loss on Delta Pulls
 - **File & Line:** `src/lib/cloud/schemaSql.ts:262, 294, 316, 340, 363`
 - **Severity:** Critical
+- **Status:** ✅ Fixed (PR-2026-11, Phase 1) — **with a design deviation from the literal suggestion.** Instead of `updated_at = now()` at all five sites, schema v4 adds a server-stamped `synced_at timestamptz NOT NULL DEFAULT now()` column to all five synced tables, stamped `now()` on every RPC write, and **delta cursors now ride on `synced_at` exclusively** (client types, `advanceCursor`, and the adapter's pull queries all switched; `updated_at` on append-only tables is also server-stamped). Reason: on `product`/`category`, `updated_at` IS the LWW conflict key — server-stamping it would let a late offline push beat a newer edit (concrete wrong-winner trace). The same backdating defect existed in the `apply_product`/`apply_category` LWW write sites the review did not cite; v4 fixes those too (they stamp `synced_at` only, keeping `updated_at = in_updated`). Live-verified on local Supabase: backdated push → `created_at` backdated / `updated_at`+`synced_at` = server now; idempotent replay → `duplicate`; stale LWW push → `kept` (row untouched); a pull with a cursor past the backdate finds the row. 4 structural bundle guards in `cloudSchema.test.ts` + 3 cursor tests in `sync.test.ts`.
 - **Description:**  
   In the Supabase schema functions (`apply_sale`, `apply_ledger`, and `apply_refund`):
   ```sql
@@ -192,6 +195,7 @@ However, an exhaustive audit beyond the unit test coverage reveals critical edge
 ### CR-03: Missing Sale/Refund Resolution Causes Permanent Sync Lockup
 - **File & Line:** `src/hooks/useSync.ts:297-299, 319-321`
 - **Severity:** Critical
+- **Status:** ✅ Fixed (PR-2026-11, Phase 1). All FOUR child-row loops (sale lines, payments, refunds, refund lines — the review cited two) now skip-and-collect rows whose parent is missing instead of throwing inside the transaction; the skipped list is surfaced as a one-tick sync banner diagnostic + `console.warn`. Skip is strictly better than the old throw: server FKs + atomic pull + `synced_at` cursors make missing parents unreachable except for true server orphans, and the throw caused a permanent, unrecoverable sync lockup.
 - **Description:**  
   During local pull ingestion in `useSync.ts`:
   ```typescript
@@ -265,6 +269,7 @@ However, an exhaustive audit beyond the unit test coverage reveals critical edge
 ### CR-11: Unbounded Delta Pulls Lack Pagination and Deterministic Sorting
 - **File & Line:** `src/lib/cloud/supabaseAdapter.ts:235-239`, `src/lib/sync.ts:46-52`
 - **Severity:** Medium
+- **Status:** ✅ Fixed (PR-2026-11, Phase 1; shipped with CR-02 because it was required by the v4 upgrade). Every delta query is now ordered `(synced_at, id)` and paged to exhaustion via `pullAllPages` (page size 500 < PostgREST's 1,000-row cap; hard stop at 100 pages = 50,000 rows, which surfaces as a retryable sync error instead of silent truncation). The one-time full re-pull forced by the v4 `synced_at` backfill is therefore safe even for large backlogs.
 - **Description:**  
   In `SupabaseCloudAdapter.pullDeltas()`:
   ```typescript

@@ -74,7 +74,8 @@ function isoSince(ms: number): string {
 
 /**
  * Bundle-upgrade hint (v1 → v2 added the refund tables + apply_refund;
- * v2 → v3 added the category table + apply_category). A store that has not
+ * v2 → v3 added the category table + apply_category; v3 → v4 added the
+ * server-stamped synced_at delta-cursor column). A store that has not
  * re-run the newer bundle gets Postgres "does not exist" errors — surface an
  * actionable message instead of a cryptic one.
  */
@@ -99,6 +100,41 @@ function normTs(v: unknown): number {
   if (typeof v === 'number') return v;
   const t = Date.parse(String(v));
   return Number.isFinite(t) ? t : 0;
+}
+
+/**
+ * Pull pagination (PR-2026-11 / CR-02+CR-11). PostgREST enforces a default
+ * 1,000-row page cap; an UNORDERED, UNPAGINATED delta query silently returns
+ * an arbitrary subset, and advancing the cursor to the max of that subset
+ * skips every omitted row with an earlier timestamp — permanent data loss.
+ * So: every delta query is ordered (synced_at, id) and paged to exhaustion.
+ * The page size stays below the server cap; the page count is a runaway guard
+ * (50,000 rows is far beyond a shop's backlog — hitting it means retry).
+ */
+const PULL_PAGE_SIZE = 500;
+const PULL_MAX_PAGES = 100;
+
+type PagedQuery = (from: number, to: number) => Promise<{ data: unknown[] | null; error: { message: string } | null }>;
+
+async function pullAllPages<T>(
+  query: PagedQuery,
+  label: string,
+  map: (r: Record<string, unknown>) => T,
+  hintOnUpgrade = false,
+): Promise<T[]> {
+  const out: T[] = [];
+  for (let page = 0; page < PULL_MAX_PAGES; page++) {
+    const from = page * PULL_PAGE_SIZE;
+    const res = await query(from, from + PULL_PAGE_SIZE - 1);
+    if (res.error) {
+      const msg = res.error.message;
+      throw new Error(hintOnUpgrade ? withUpgradeHint(label, msg) : `${label}: ${msg}`);
+    }
+    const rows = res.data ?? [];
+    for (const r of rows) out.push(map(r as Record<string, unknown>));
+    if (rows.length < PULL_PAGE_SIZE) return out; // final page
+  }
+  throw new Error(`${label}: exceeded ${PULL_MAX_PAGES * PULL_PAGE_SIZE}-row page cap — retry sync`);
 }
 
 export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
@@ -231,24 +267,30 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
       // same millisecond as the cursor must be re-fetched next pull. Both apply
       // modes (union / LWW) are idempotent, so re-reading the boundary row is
       // always a no-op.
-      const [categoriesRes, productsRes, salesRes, ledgerRes, refundsRes] = await Promise.all([
-        c.from('category').select('*').eq('outlet_id', cfg.outletId).gte('updated_at', isoSince(cursors.category)),
-        c.from('product').select('*').eq('outlet_id', cfg.outletId).gte('updated_at', isoSince(cursors.product)),
-        c.from('sale').select('*').eq('outlet_id', cfg.outletId).gte('updated_at', isoSince(cursors.sale)),
-        c.from('stock_ledger').select('*').eq('outlet_id', cfg.outletId).gte('updated_at', isoSince(cursors.ledger)),
-        c.from('refund').select('*').eq('outlet_id', cfg.outletId).gte('updated_at', isoSince(cursors.refund)),
-      ]);
-      if (categoriesRes.error) throw new Error(withUpgradeHint('pull categories', categoriesRes.error.message));
-      if (productsRes.error) throw new Error(`pull products: ${productsRes.error.message}`);
-      if (salesRes.error) throw new Error(`pull sales: ${salesRes.error.message}`);
-      if (ledgerRes.error) throw new Error(`pull ledger: ${ledgerRes.error.message}`);
-      if (refundsRes.error) throw new Error(withUpgradeHint('pull refunds', refundsRes.error.message));
+      //
+      // v4 (PR-2026-11 / CR-02): cursors ride on `synced_at` — the SERVER's
+      // receipt time, stamped by the RPCs on every write. The old bundle
+      // stamped `updated_at` with the CLIENT's created/edited time, so an
+      // offline batch pushed after peers' cursors had passed its creation
+      // time was never pulled again (silent peer data loss).
+      const tableQuery = (table: string, cursorMs: number): PagedQuery => (from, to) =>
+        Promise.resolve(
+          c.from(table)
+            .select('*')
+            .eq('outlet_id', cfg.outletId)
+            .gte('synced_at', isoSince(cursorMs))
+            .order('synced_at', { ascending: true })
+            .order('id', { ascending: true })
+            .range(from, to),
+        );
 
-      const categories = (categoriesRes.data ?? []).map(mapCategory);
-      const products = (productsRes.data ?? []).map(mapProduct);
-      const sales = (salesRes.data ?? []).map(mapSale);
-      const ledger = (ledgerRes.data ?? []).map(mapLedger);
-      const refunds = (refundsRes.data ?? []).map(mapRefund);
+      const [categories, products, sales, ledger, refunds] = await Promise.all([
+        pullAllPages(tableQuery('category', cursors.category), 'pull categories', mapCategory, true),
+        pullAllPages(tableQuery('product', cursors.product), 'pull products', mapProduct),
+        pullAllPages(tableQuery('sale', cursors.sale), 'pull sales', mapSale),
+        pullAllPages(tableQuery('stock_ledger', cursors.ledger), 'pull ledger', mapLedger),
+        pullAllPages(tableQuery('refund', cursors.refund), 'pull refunds', mapRefund, true),
+      ]);
 
       // Lines + payments ride on the pulled sales (they carry no updated_at).
       const saleUuids = sales.map((s) => s.uuid);
@@ -278,8 +320,8 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
         refundLines = refundLines.concat((rlRes.data ?? []).map(mapRefundLine));
       }
 
-      const max = (rows: Array<{ updatedAt: number }>): number =>
-        rows.reduce((m, r) => Math.max(m, r.updatedAt), 0);
+      const max = (rows: Array<{ syncedAt: number }>): number =>
+        rows.reduce((m, r) => Math.max(m, r.syncedAt), 0);
 
       return {
         categories,
@@ -290,7 +332,7 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
         ledger,
         refunds,
         refundLines,
-        maxUpdatedAt: {
+        maxSyncedAt: {
           category: max(categories),
           product: max(products),
           sale: max(sales),
@@ -311,6 +353,7 @@ function mapCategory(r: Record<string, unknown>): CategoryDeltaRow {
     createdAt: normTs(r.created_at),
     updatedAt: normTs(r.updated_at),
     updatedByDevice: r.updated_by_device == null ? null : String(r.updated_by_device),
+    syncedAt: normTs(r.synced_at),
   };
 }
 
@@ -337,6 +380,7 @@ function mapProduct(r: Record<string, unknown>): ProductDeltaRow {
     createdAt: normTs(r.created_at),
     updatedAt: normTs(r.updated_at),
     updatedByDevice: r.updated_by_device == null ? null : String(r.updated_by_device),
+    syncedAt: normTs(r.synced_at),
   };
 }
 
@@ -355,7 +399,7 @@ function mapSale(r: Record<string, unknown>): SaleDeltaRow {
     totalMinor: normInt(r.total_minor) ?? 0,
     cogsMinor: normInt(r.cogs_minor) ?? 0,
     createdAt: normTs(r.created_at),
-    updatedAt: normTs(r.updated_at),
+    syncedAt: normTs(r.synced_at),
   };
 }
 
@@ -404,7 +448,7 @@ function mapLedger(r: Record<string, unknown>): LedgerDeltaRow {
     reason: r.reason == null ? null : String(r.reason),
     deviceId: r.device_id == null ? null : String(r.device_id),
     createdAt: normTs(r.created_at),
-    updatedAt: normTs(r.updated_at),
+    syncedAt: normTs(r.synced_at),
   };
 }
 
@@ -420,7 +464,7 @@ function mapRefund(r: Record<string, unknown>): RefundDeltaRow {
     restock: normBool(r.restock),
     amountMinor: normInt(r.amount_minor) ?? 0,
     createdAt: normTs(r.created_at),
-    updatedAt: normTs(r.updated_at),
+    syncedAt: normTs(r.synced_at),
   };
 }
 

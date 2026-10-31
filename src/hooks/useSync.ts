@@ -135,12 +135,25 @@ async function drainBatch(cfg: CloudConfig): Promise<number> {
   return prepared.length;
 }
 
-/** Apply pulled deltas to the local DB (one transaction). */
-async function applyPullLocally(pull: SyncPullResult): Promise<void> {
+/**
+ * Apply pulled deltas to the local DB (one transaction).
+ *
+ * Returns the pulled rows that were SKIPPED because their parent record is
+ * missing locally (CR-03, PR-2026-11). The old code THREW inside the
+ * transaction on such a row: the whole pull rolled back, the cursors never
+ * advanced, and every subsequent tick re-pulled the same batch and hit the
+ * same row — a permanent, unrecoverable sync lockup. The parent of a pulled
+ * child row can only be missing when the server itself holds an orphan (the
+ * outbox is FIFO and the server's FKs normally prevent this), so the correct
+ * response is to skip the child, keep the batch moving, and surface a
+ * visible diagnostic — never to wedge the engine.
+ */
+async function applyPullLocally(pull: SyncPullResult): Promise<{ skipped: string[] }> {
   const db = await getDb();
   const outletRow = await db.getFirstAsync<{ id: string }>('SELECT id FROM outlet LIMIT 1');
   if (!outletRow) throw new Error('No outlet — DB not seeded');
   const outletId = outletRow.id;
+  const skipped: string[] = [];
   await db.withTransactionAsync(async () => {
     // --- categories FIRST (M6, schema v3) — LWW by id, same rules as products.
     // Pulled before products so a product's category_id FK can never dangle:
@@ -251,9 +264,10 @@ async function applyPullLocally(pull: SyncPullResult): Promise<void> {
     for (const l of pull.saleLines) {
       const saleId = saleIdByUuid.get(l.saleUuid);
       if (!saleId) {
-        // Integrity surprise: a pulled line whose sale is absent locally.
-        // Fail loudly rather than write an orphan (the FK would reject it).
-        throw new Error(`Pulled sale_line ${l.id} references unknown sale uuid ${l.saleUuid}`);
+        // CR-03: parent sale absent locally — skip (an FK would reject an
+        // orphan) and keep the batch moving; the lockup came from throwing.
+        skipped.push(`sale_line ${l.id} → sale ${l.saleUuid}`);
+        continue;
       }
       await db.runAsync(
         `INSERT INTO sale_line (id, sale_id, product_id, lot_id, qty, qty_g, unit_price_minor,
@@ -269,7 +283,8 @@ async function applyPullLocally(pull: SyncPullResult): Promise<void> {
     for (const p of pull.payments) {
       const saleId = saleIdByUuid.get(p.saleUuid);
       if (!saleId) {
-        throw new Error(`Pulled payment ${p.id} references unknown sale uuid ${p.saleUuid}`);
+        skipped.push(`payment ${p.id} → sale ${p.saleUuid}`);
+        continue;
       }
       await db.runAsync(
         `INSERT INTO payment (id, sale_id, method, amount_minor, reference, created_at)
@@ -295,7 +310,10 @@ async function applyPullLocally(pull: SyncPullResult): Promise<void> {
     for (const rf of pull.refunds) {
       const saleId = saleIdByUuid.get(rf.saleUuid);
       if (!saleId) {
-        throw new Error(`Pulled refund ${rf.uuid} references unknown sale uuid ${rf.saleUuid}`);
+        // CR-03: was `throw` — a refund whose sale hadn't landed rolled back
+        // the whole pull and wedged every later tick on the same row.
+        skipped.push(`refund ${rf.uuid} → sale ${rf.saleUuid}`);
+        continue;
       }
       await db.runAsync(
         `INSERT INTO refund (id, uuid, sale_id, reason_code, restock, amount_minor, pin_verified_by, created_at)
@@ -317,7 +335,8 @@ async function applyPullLocally(pull: SyncPullResult): Promise<void> {
     for (const rl of pull.refundLines) {
       const refundId = refundIdByUuid.get(rl.refundUuid);
       if (!refundId) {
-        throw new Error(`Pulled refund_line ${rl.id} references unknown refund uuid ${rl.refundUuid}`);
+        skipped.push(`refund_line ${rl.id} → refund ${rl.refundUuid}`);
+        continue;
       }
       await db.runAsync(
         `INSERT INTO refund_line (id, refund_id, sale_line_id, product_id, qty, qty_g, amount_minor, restock)
@@ -343,6 +362,7 @@ async function applyPullLocally(pull: SyncPullResult): Promise<void> {
       );
     }
   });
+  return { skipped };
 }
 
 /** One full sync tick. Deduped across hook instances (in-flight guard). */
@@ -375,7 +395,7 @@ function syncTick(): Promise<void> {
         refund: await getCursor('refund'),
       };
       const pull = await adapter().pullDeltas(cfg, cursors);
-      await applyPullLocally(pull);
+      const { skipped } = await applyPullLocally(pull);
       await setCursor('category', advanceCursor(cursors.category, pull.categories));
       await setCursor('product', advanceCursor(cursors.product, pull.products));
       await setCursor('sale', advanceCursor(cursors.sale, pull.sales));
@@ -383,6 +403,16 @@ function syncTick(): Promise<void> {
       await setCursor('refund', advanceCursor(cursors.refund, pull.refunds));
 
       await clearSyncError();
+      if (skipped.length > 0) {
+        // CR-03: surface the skips in the sync banner (a missing parent is a
+        // data-integrity surprise the owner should see, not a silent no-op).
+        // Recorded AFTER clearSyncError so this tick's success doesn't wipe it;
+        // the next clean tick clears it. Full details in the app log.
+        console.warn(`[sync] skipped ${skipped.length} pulled row(s) with missing parent: ${skipped.join('; ')}`);
+        await recordSyncError(
+          `Skipped ${skipped.length} pulled record(s) — their parent (sale/refund) is missing on the server. Check your data or re-run the setup SQL.`,
+        );
+      }
       const now = Date.now();
       await setLastSyncedAt(now);
     })().catch(async (e) => {

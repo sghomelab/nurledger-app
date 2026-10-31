@@ -19,9 +19,18 @@
  *
  * Timestamps in RPC payloads are EPOCH MILLISECONDS (JSON numbers/strings),
  * converted with `to_timestamp(x/1000.0)`.
+ *
+ * **v4 — `synced_at` (PR-2026-11, CR-02):** every synced table carries a
+ * server-stamped `synced_at timestamptz` (set to `now()` on every RPC write).
+ * Delta-pull cursors query `synced_at`, NOT `updated_at`. The split exists
+ * because product/category `updated_at` is the LWW CONFLICT KEY (client edit
+ * time — server-stamping it would let a late offline push overwrite a newer
+ * edit). The old bundle stamped `updated_at` with the CLIENT's created/edited
+ * time on append-only inserts, which stranded offline rows whose creation
+ * time fell behind peers' already-advanced cursors — silent data loss.
  */
 
-export const CLOUD_SCHEMA_VERSION = 3;
+export const CLOUD_SCHEMA_VERSION = 4;
 
 export const CLOUD_SCHEMA_SQL = `
 -- =============================================================
@@ -33,6 +42,22 @@ CREATE TABLE IF NOT EXISTS public.cloud_schema_meta (
   applied_at timestamptz NOT NULL DEFAULT now()
 );
 INSERT INTO public.cloud_schema_meta (version) VALUES (${CLOUD_SCHEMA_VERSION}) ON CONFLICT DO NOTHING;
+
+-- v4 upgrade (no-op on a fresh v4 deploy): add the server-stamped delta
+-- cursor column to every synced table. Existing rows backfill with the
+-- upgrade time — every device re-pulls once after the upgrade; both apply
+-- modes (union / LWW) are idempotent, so the re-pull is harmless (it
+-- converges any state the backdated-timestamp bug had stranded).
+ALTER TABLE public.category     ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.product      ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.sale         ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.stock_ledger ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.refund       ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
+CREATE INDEX IF NOT EXISTS idx_category_outlet_synced ON public.category (outlet_id, synced_at);
+CREATE INDEX IF NOT EXISTS idx_product_outlet_synced  ON public.product (outlet_id, synced_at);
+CREATE INDEX IF NOT EXISTS idx_sale_outlet_synced     ON public.sale (outlet_id, synced_at);
+CREATE INDEX IF NOT EXISTS idx_ledger_outlet_synced   ON public.stock_ledger (outlet_id, synced_at);
+CREATE INDEX IF NOT EXISTS idx_refund_outlet_synced   ON public.refund (outlet_id, synced_at);
 
 -- ------------------------------------------------------------------
 -- Tenant: outlet + membership (single outlet per BYO project, ADR-007)
@@ -78,9 +103,11 @@ CREATE TABLE IF NOT EXISTS public.category (
   name text NOT NULL,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
-  updated_by_device text
+  updated_by_device text,
+  synced_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_category_outlet_updated ON public.category (outlet_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_category_outlet_synced ON public.category (outlet_id, synced_at);
 
 -- ------------------------------------------------------------------
 -- Products (LWW via apply_product; NO direct UPDATE/DELETE)
@@ -107,8 +134,10 @@ CREATE TABLE IF NOT EXISTS public.product (
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   updated_by_device text,
+  synced_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (outlet_id, sku)
 );
+CREATE INDEX IF NOT EXISTS idx_product_outlet_synced ON public.product (outlet_id, synced_at);
 
 CREATE TABLE IF NOT EXISTS public.product_audit (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -139,9 +168,11 @@ CREATE TABLE IF NOT EXISTS public.sale (
   total_minor bigint NOT NULL,
   cogs_minor bigint NOT NULL DEFAULT 0,
   created_at timestamptz NOT NULL,
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  synced_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_sale_outlet_updated ON public.sale (outlet_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_sale_outlet_synced ON public.sale (outlet_id, synced_at);
 
 CREATE TABLE IF NOT EXISTS public.sale_line (
   id text PRIMARY KEY,
@@ -192,9 +223,11 @@ CREATE TABLE IF NOT EXISTS public.stock_ledger (
   device_id text,
   created_by text,
   created_at timestamptz NOT NULL,
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  synced_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_ledger_outlet_product ON public.stock_ledger (outlet_id, product_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_ledger_outlet_synced ON public.stock_ledger (outlet_id, synced_at);
 
 -- Server-recomputed stock projection (never stored in place).
 CREATE OR REPLACE VIEW public.stock_view AS
@@ -221,9 +254,11 @@ CREATE TABLE IF NOT EXISTS public.refund (
   restock boolean NOT NULL DEFAULT true,
   amount_minor bigint NOT NULL,
   created_at timestamptz NOT NULL,
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  synced_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_refund_outlet_updated ON public.refund (outlet_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_refund_outlet_synced ON public.refund (outlet_id, synced_at);
 
 CREATE TABLE IF NOT EXISTS public.refund_line (
   id text PRIMARY KEY,
@@ -255,11 +290,11 @@ BEGIN
   IF NOT public.is_member(outlet_id) THEN RAISE EXCEPTION 'not a member of this outlet'; END IF;
 
   INSERT INTO public.sale (uuid, id, outlet_id, device_id, cashier_id, shift_id, status,
-    subtotal_minor, discount_minor, tax_minor, total_minor, cogs_minor, created_at, updated_at)
+    subtotal_minor, discount_minor, tax_minor, total_minor, cogs_minor, created_at, updated_at, synced_at)
   VALUES (sale_uuid, p->>'id', outlet_id, p->>'device_id', p->>'cashier_id', p->>'shift_id',
     coalesce(p->>'status', 'completed'),
     (p->>'subtotal_minor')::bigint, (p->>'discount_minor')::bigint, (p->>'tax_minor')::bigint,
-    (p->>'total_minor')::bigint, (p->>'cogs_minor')::bigint, created_t, created_t)
+    (p->>'total_minor')::bigint, (p->>'cogs_minor')::bigint, created_t, now(), now())
   ON CONFLICT (uuid) DO NOTHING;
   IF NOT FOUND THEN RETURN 'duplicate'; END IF;   -- idempotency: already applied
 
@@ -285,13 +320,13 @@ BEGIN
 
   FOR r IN SELECT * FROM jsonb_array_elements(coalesce(p->'ledger_rows', '[]'::jsonb)) LOOP
     INSERT INTO public.stock_ledger (sync_op_id, id, outlet_id, product_id, lot_id, type, qty_delta,
-      qty_g_delta, unit_cost_minor, cogs_minor, ref_type, ref_id, reason, device_id, created_by, created_at, updated_at)
+      qty_g_delta, unit_cost_minor, cogs_minor, ref_type, ref_id, reason, device_id, created_by, created_at, updated_at, synced_at)
     VALUES (r.value->>'op_id', r.value->>'id', outlet_id, r.value->>'product_id', r.value->>'lot_id',
       r.value->>'type', (r.value->>'qty_delta')::int, (r.value->>'qty_g_delta')::int,
       (r.value->>'unit_cost_minor')::bigint, (r.value->>'cogs_minor')::bigint,
       r.value->>'ref_type', r.value->>'ref_id', r.value->>'reason', r.value->>'device_id',
       r.value->>'created_by', to_timestamp((r.value->>'created_at')::numeric / 1000.0),
-      to_timestamp((r.value->>'created_at')::numeric / 1000.0))
+      now(), now())
     ON CONFLICT (sync_op_id) DO NOTHING;
   END LOOP;
 
@@ -309,11 +344,11 @@ BEGIN
   IF NOT public.is_member(outlet_id) THEN RAISE EXCEPTION 'not a member of this outlet'; END IF;
 
   INSERT INTO public.stock_ledger (sync_op_id, id, outlet_id, product_id, lot_id, type, qty_delta,
-    qty_g_delta, unit_cost_minor, cogs_minor, ref_type, ref_id, reason, device_id, created_by, created_at, updated_at)
+    qty_g_delta, unit_cost_minor, cogs_minor, ref_type, ref_id, reason, device_id, created_by, created_at, updated_at, synced_at)
   VALUES (p->>'op_id', p->>'id', outlet_id, p->>'product_id', p->>'lot_id', p->>'type',
     (p->>'qty_delta')::int, (p->>'qty_g_delta')::int, (p->>'unit_cost_minor')::bigint,
     (p->>'cogs_minor')::bigint, p->>'ref_type', p->>'ref_id', p->>'reason', p->>'device_id',
-    p->>'created_by', created_t, created_t)
+    p->>'created_by', created_t, now(), now())
   ON CONFLICT (sync_op_id) DO NOTHING;
   IF NOT FOUND THEN RETURN 'duplicate'; END IF;
   RETURN 'applied';
@@ -334,10 +369,10 @@ BEGIN
   IF NOT public.is_member(outlet_id) THEN RAISE EXCEPTION 'not a member of this outlet'; END IF;
 
   INSERT INTO public.refund (uuid, id, sale_uuid, outlet_id, device_id, user_id, reason_code,
-    restock, amount_minor, created_at, updated_at)
+    restock, amount_minor, created_at, updated_at, synced_at)
   VALUES (refund_uuid, p->>'id', p->>'sale_uuid', outlet_id, p->>'device_id', p->>'user_id',
     p->>'reason_code', coalesce((p->>'restock')::boolean, true),
-    (p->>'amount_minor')::bigint, created_t, created_t)
+    (p->>'amount_minor')::bigint, created_t, now(), now())
   ON CONFLICT (uuid) DO NOTHING;
   IF NOT FOUND THEN RETURN 'duplicate'; END IF;   -- idempotency: already applied
 
@@ -354,13 +389,13 @@ BEGIN
   -- stock_view reflects the returned goods (server-recomputed, ADR-002).
   FOR r IN SELECT * FROM jsonb_array_elements(coalesce(p->'ledger_rows', '[]'::jsonb)) LOOP
     INSERT INTO public.stock_ledger (sync_op_id, id, outlet_id, product_id, lot_id, type, qty_delta,
-      qty_g_delta, unit_cost_minor, cogs_minor, ref_type, ref_id, reason, device_id, created_by, created_at, updated_at)
+      qty_g_delta, unit_cost_minor, cogs_minor, ref_type, ref_id, reason, device_id, created_by, created_at, updated_at, synced_at)
     VALUES (r.value->>'op_id', r.value->>'id', outlet_id, r.value->>'product_id', r.value->>'lot_id',
       r.value->>'type', (r.value->>'qty_delta')::int, (r.value->>'qty_g_delta')::int,
       (r.value->>'unit_cost_minor')::bigint, (r.value->>'cogs_minor')::bigint,
       r.value->>'ref_type', r.value->>'ref_id', r.value->>'reason', r.value->>'device_id',
       r.value->>'created_by', to_timestamp((r.value->>'created_at')::numeric / 1000.0),
-      to_timestamp((r.value->>'created_at')::numeric / 1000.0))
+      now(), now())
     ON CONFLICT (sync_op_id) DO NOTHING;
   END LOOP;
 
@@ -386,7 +421,7 @@ BEGIN
     BEGIN
       INSERT INTO public.product (id, outlet_id, sku, name, category_id, unit_type, is_weighed,
         barcode, carton_barcode, carton_size, cost_minor, price_minor, tax_category,
-        min_qty, max_qty, velocity_class, description, active, created_at, updated_at, updated_by_device)
+        min_qty, max_qty, velocity_class, description, active, created_at, updated_at, updated_by_device, synced_at)
       VALUES (prod_id, outlet_id, p->>'sku', p->>'name', p->>'category_id',
         coalesce(p->>'unit_type','each'), coalesce((p->>'is_weighed')::boolean, false),
         p->>'barcode', p->>'carton_barcode', coalesce((p->>'carton_size')::int, 1),
@@ -394,7 +429,7 @@ BEGIN
         coalesce(p->>'tax_category','standard'), coalesce((p->>'min_qty')::int, 0),
         coalesce((p->>'max_qty')::int, 0), p->>'velocity_class', p->>'description',
         coalesce((p->>'active')::boolean, true),
-        to_timestamp((p->>'created_at')::numeric / 1000.0), in_updated, in_device);
+        to_timestamp((p->>'created_at')::numeric / 1000.0), in_updated, in_device, now());
       INSERT INTO public.product_audit (outlet_id, product_id, result, before_json, after_json, changed_by_device, changed_at)
       VALUES (outlet_id, prod_id, 'created', NULL, p, in_device, in_updated);
       RETURN 'created';
@@ -429,7 +464,7 @@ BEGIN
           min_qty = coalesce((p->>'min_qty')::int, 0), max_qty = coalesce((p->>'max_qty')::int, 0),
           velocity_class = p->>'velocity_class', description = p->>'description',
           active = coalesce((p->>'active')::boolean, true),
-          updated_at = in_updated, updated_by_device = in_device
+          updated_at = in_updated, updated_by_device = in_device, synced_at = now()
         WHERE id = e.id;
         RETURN 'updated';
       END IF;
@@ -463,7 +498,7 @@ BEGIN
       min_qty = coalesce((p->>'min_qty')::int, 0), max_qty = coalesce((p->>'max_qty')::int, 0),
       velocity_class = p->>'velocity_class', description = p->>'description',
       active = coalesce((p->>'active')::boolean, true),
-      updated_at = in_updated, updated_by_device = in_device
+      updated_at = in_updated, updated_by_device = in_device, synced_at = now()
     WHERE id = prod_id;
     RETURN 'updated';
   ELSE
@@ -491,9 +526,9 @@ BEGIN
   SELECT * INTO e FROM public.category WHERE id = cat_id;
 
   IF NOT FOUND THEN
-    INSERT INTO public.category (id, outlet_id, name, created_at, updated_at, updated_by_device)
+    INSERT INTO public.category (id, outlet_id, name, created_at, updated_at, updated_by_device, synced_at)
     VALUES (cat_id, outlet_id, p->>'name',
-      to_timestamp((p->>'created_at')::numeric / 1000.0), in_updated, in_device);
+      to_timestamp((p->>'created_at')::numeric / 1000.0), in_updated, in_device, now());
     RETURN 'created';
   END IF;
 
@@ -504,7 +539,7 @@ BEGIN
   IF e.updated_at < in_updated
      OR (e.updated_at = in_updated AND coalesce(e.updated_by_device, '') < in_device) THEN
     UPDATE public.category
-       SET name = p->>'name', updated_at = in_updated, updated_by_device = in_device
+       SET name = p->>'name', updated_at = in_updated, updated_by_device = in_device, synced_at = now()
      WHERE id = cat_id;
     RETURN 'updated';
   ELSE

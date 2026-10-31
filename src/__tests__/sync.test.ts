@@ -170,11 +170,18 @@ describe('sales/ledger = pure union by UUID (stock never client-merged)', () => 
 });
 
 describe('delta cursors', () => {
-  it('advances to the max updatedAt seen', () => {
-    expect(advanceCursor(100, [{ updatedAt: 50 }, { updatedAt: 200 }, { updatedAt: 90 }])).toBe(200);
+  // PR-2026-11 (CR-02): cursors ride on the server-stamped `synced_at`, NOT on
+  // the client's `updatedAt` (the LWW key on product/category). The old cursor
+  // field let a backdated offline batch fall behind peers' cursors and get
+  // stranded forever.
+  it('advances to the max syncedAt seen', () => {
+    expect(advanceCursor(100, [{ syncedAt: 50 }, { syncedAt: 200 }, { syncedAt: 90 }])).toBe(200);
   });
   it('never rewinds on a stale pull', () => {
-    expect(advanceCursor(500, [{ updatedAt: 100 }])).toBe(500);
+    expect(advanceCursor(500, [{ syncedAt: 100 }])).toBe(500);
+  });
+  it('stays put on an empty pull', () => {
+    expect(advanceCursor(42, [])).toBe(42);
   });
 });
 

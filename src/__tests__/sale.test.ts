@@ -83,6 +83,86 @@ describe('computeTotals — inclusive reference locale', () => {
   });
 });
 
+describe('computeTotals — exclusive tax (PR-2026-11, CR-01)', () => {
+  // In EXCLUSIVE mode the tax is a TOP-UP: total = base + tax (the customer
+  // pays both). The old code always charged base only — exclusive outlets
+  // under-collected tax and receipts showed subtotal + tax ≠ total.
+  const vat = flatRateTaxEngine('flat:eu-vat-10-exclusive', 10, 'exclusive');
+
+  it('adds the engine tax on top of the base', () => {
+    const t = computeTotals([line({ qty: 1 })], 0, vat);
+    expect(t.subtotalMinor).toBe(1000);
+    expect(t.taxMinor).toBe(100); // 1000 × 10/100
+    expect(t.totalMinor).toBe(1100); // base + tax
+  });
+
+  it('order discount reduces the base BEFORE the tax is added', () => {
+    const t = computeTotals([line({ qty: 2 })], 500, vat);
+    expect(t.totalMinor).toBe(1500 + 150); // (2000−500) + (1500 × 10%)
+    expect(t.taxMinor).toBe(150);
+  });
+
+  it('per-line discount reduces the base before tax', () => {
+    const t = computeTotals([line({ discountMinor: 200 })], 0, vat);
+    expect(t.taxMinor).toBe(80); // 800 × 10%
+    expect(t.totalMinor).toBe(880);
+  });
+
+  it('receipt math stays coherent: subtotal − discounts + tax = total', () => {
+    const t = computeTotals(
+      [line({ key: 'a', taxCategory: 'standard' }), line({ key: 'b', taxCategory: 'reduced' })],
+      300,
+      vat,
+    );
+    expect(t.subtotalMinor - t.discountMinor + t.taxMinor).toBe(t.totalMinor);
+  });
+
+  it('a clamped-to-zero base collects no tax and no total', () => {
+    const t = computeTotals([line({ qty: 2 })], 5000, vat);
+    expect(t.totalMinor).toBe(0);
+    expect(t.taxMinor).toBe(0);
+  });
+
+  it('inclusive mode is UNCHANGED (regression guard): tax stays inside the total', () => {
+    const t = computeTotals([line({ qty: 1 })], 0, gst);
+    expect(t.totalMinor).toBe(1000); // NOT 1000 + tax
+    expect(t.taxMinor).toBe(83); // 1000 × 9/109 = 82.57 → 83
+  });
+});
+
+describe('computeTotals — order-discount proration (PR-2026-11, CR-10)', () => {
+  const vat = flatRateTaxEngine('flat:eu-vat-10-exclusive', 10, 'exclusive');
+
+  it('a fully line-discounted line takes NO order-discount share', () => {
+    // Line A: 1000 with a 1000 line discount (net 0). Line B: 1000.
+    // Order discount 200 must land entirely on line B (the only net remaining).
+    // Old proration (by pre-discount gross) split it 100/100 and clamped A's
+    // share to zero — so B kept 100 of its base as "taxable" that the order
+    // discount never actually deducted.
+    const t = computeTotals(
+      [line({ key: 'a', discountMinor: 1000 }), line({ key: 'b' })],
+      200,
+      vat,
+    );
+    expect(t.subtotalMinor).toBe(2000);
+    expect(t.lineDiscountMinor).toBe(1000);
+    expect(t.totalMinor).toBe(800 + 80); // base 800 + 10%
+    expect(t.taxMinor).toBe(80); // taxable = 800 (NOT 900)
+  });
+
+  it('with no line discounts, proration is unchanged (gross-weighted)', () => {
+    // 1000 + 3000, order discount 400 → shares 100 / 300 exactly.
+    const t = computeTotals(
+      [line({ key: 'a' }), line({ key: 'b', unitPriceMinor: 3000 })],
+      400,
+      vat,
+    );
+    // taxable = (1000−100) + (3000−300) = 3600
+    expect(t.taxMinor).toBe(360);
+    expect(t.totalMinor).toBe(3600 + 360);
+  });
+});
+
 describe('allocateCogs — cumulative FIFO across a product\u2019s lines (FR-321)', () => {
   const layers: LayerInput[] = [
     { id: 'L1', unitCostMinor: 50, qtyRemaining: 1000, receivedAt: 1 },

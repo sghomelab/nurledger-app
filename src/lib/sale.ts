@@ -81,9 +81,12 @@ export interface SaleTotals {
  * Live cart totals (M2). Order of operations:
  *   1. subtotal = Σ qty × unitPrice (gross; tax-inclusive for the reference locale)
  *   2. per-line discounts reduce the base
- *   3. order discount clamped to the discounted gross, allocated pro-rata per line
+ *   3. order discount clamped to the post-line-discount gross, allocated
+ *      pro-rata per line by POST-line-discount net amount (a fully line-
+ *      discounted line takes no order-discount share — CR-10)
  *   4. tax = TaxEngine over the per-category post-discount amounts
- *   5. total = gross − discounts (customer pays this; tax is a portion of it, inclusive)
+ *   5. total = base − order discounts; in EXCLUSIVE tax mode the engine's
+ *      tax is ADDED on top (tax is not a portion of the total — CR-01)
  *   6. cogs = Σ projected line COGS (FIFO) → live margin
  */
 export function computeTotals(
@@ -101,7 +104,13 @@ export function computeTotals(
   for (const l of lines) {
     const lineGross = l.unitPriceMinor * l.qty;
     const afterLine = Math.max(0, lineGross - Math.max(0, l.discountMinor));
-    const orderShare = subtotalMinor > 0 ? roundDivide(order * lineGross, subtotalMinor) : 0;
+    // PR-2026-11 (CR-10): prorate by post-line-discount net amounts. Prorating
+    // by pre-discount gross (the old base) assigned order-discount shares to
+    // lines whose own discount had already removed their net — the shares were
+    // then clamped to zero and the order discount was NOT fully deducted from
+    // the remaining lines' taxable base.
+    const orderShare =
+      grossAfterLineDiscount > 0 ? roundDivide(order * afterLine, grossAfterLineDiscount) : 0;
     const taxable = Math.max(0, afterLine - orderShare);
     byCategory.set(l.taxCategory, (byCategory.get(l.taxCategory) ?? 0) + taxable);
   }
@@ -110,7 +119,11 @@ export function computeTotals(
     categories: [...byCategory.entries()].map(([category, amountMinor]) => ({ category, amountMinor })),
   });
 
-  const totalMinor = Math.max(0, grossAfterLineDiscount - order);
+  // PR-2026-11 (CR-01): in exclusive mode the tax is on TOP of the base —
+  // total = base + tax (the customer pays both). Inclusive mode is unchanged:
+  // the base already contains the tax.
+  const baseTotal = Math.max(0, grossAfterLineDiscount - order);
+  const totalMinor = tax.mode === 'exclusive' ? baseTotal + tax.taxMinor : baseTotal;
   const cogsMinor = lines.reduce((s, l) => s + Math.max(0, l.cogsMinor), 0);
   const unitCount = lines.reduce((s, l) => s + l.qty, 0);
 
