@@ -27,8 +27,15 @@ import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens'
  * there is no Nurledger-operated backend and the creator never sees store data.
  *
  *  1. **Connection** — paste the project URL + anon key + service_role key.
- *     "Check" verifies reachability (auth health endpoint) and whether the
- *     schema bundle has been deployed.
+ *     "Check" verifies reachability (auth health endpoint) and the DEPLOYED
+ *     SCHEMA VERSION (`cloud_schema_meta`, max version):
+ *      - not deployed → "deploy" SQL step;
+ *      - deployed but OLDER than this app's bundle → "upgrade" SQL step
+ *        (existing stores re-paste the newer bundle; it is idempotent and
+ *        never touches existing data — without this, an app upgrade would
+ *        strand stores on the old bundle: the sync error says "re-run the
+ *        setup SQL" but the wizard would never offer it);
+ *      - current → straight to the account step.
  *  2. **Run the SQL** — the owner pastes the app's SQL bundle into the
  *     project's SQL Editor (the app cannot run DDL in someone else's project).
  *  3. **Owner account** — self-service sign-up IN THE STORE'S OWN project
@@ -63,6 +70,8 @@ export default function CloudSetupScreen() {
   const [note, setNote] = useState<string | null>(null);
   /** signUp asked for email confirmation → the primary action becomes sign-in. */
   const [awaitingSignIn, setAwaitingSignIn] = useState(false);
+  /** The project runs an OLDER schema bundle → the SQL step is an UPGRADE. */
+  const [upgrading, setUpgrading] = useState(false);
 
   const cfg = useCallback(
     (): CloudConfig => ({
@@ -77,7 +86,7 @@ export default function CloudSetupScreen() {
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
 
-  /** Step 1 → 2/3: reachable? schema deployed? */
+  /** Step 1 → 2/3: reachable? what schema version is deployed? */
   const checkConnection = useCallback(async () => {
     if (!url.trim() || !anonKey.trim() || !serviceKey.trim()) {
       setError('Project URL, anon key and service_role key are all required.');
@@ -88,13 +97,21 @@ export default function CloudSetupScreen() {
     setNote(null);
     try {
       await adapter.ping(cfg());
-      const deployed = await adapter.schemaDeployed(cfg());
-      if (deployed) {
-        setNote('Backend reachable and the Nurledger schema is deployed.');
-        setStep('account');
-      } else {
+      const v = await adapter.schemaVersion(cfg());
+      if (v === null) {
+        setUpgrading(false);
         setNote('Backend reachable — but the schema is not deployed yet.');
         setStep('sql');
+      } else if (v < CLOUD_SCHEMA_VERSION) {
+        setUpgrading(true);
+        setNote(
+          `Backend reachable — it runs schema v${v}, but this app needs v${CLOUD_SCHEMA_VERSION}. Run the updated script below (safe to re-run — it never touches existing data).`,
+        );
+        setStep('sql');
+      } else {
+        setUpgrading(false);
+        setNote('Backend reachable and the Nurledger schema is deployed.');
+        setStep('account');
       }
     } catch (e) {
       fail(e);
@@ -108,13 +125,15 @@ export default function CloudSetupScreen() {
     setBusy(true);
     setError(null);
     try {
-      const deployed = await adapter.schemaDeployed(cfg());
-      if (deployed) {
+      const v = await adapter.schemaVersion(cfg());
+      if (v !== null && v >= CLOUD_SCHEMA_VERSION) {
         setNote(null);
         setStep('account');
       } else {
         setError(
-          'Schema still not detected. Make sure the SQL Editor query finished without errors, then check again.',
+          v === null
+            ? 'Schema still not detected. Make sure the SQL Editor query finished without errors, then check again.'
+            : `Still on schema v${v} — the script below adds v${CLOUD_SCHEMA_VERSION}. Make sure the SQL Editor query finished without errors, then check again.`,
         );
       }
     } catch (e) {
@@ -325,8 +344,17 @@ export default function CloudSetupScreen() {
         {step === 'sql' && (
           <Card>
             <Text style={styles.cardTitle}>
-              Run the setup SQL (schema v{CLOUD_SCHEMA_VERSION})
+              {upgrading
+                ? `Run the updated setup SQL (schema v${CLOUD_SCHEMA_VERSION} — upgrade)`
+                : `Run the setup SQL (schema v${CLOUD_SCHEMA_VERSION})`}
             </Text>
+            {upgrading && (
+              <Text style={styles.hint}>
+                Your project already runs an older version of the setup. This updated
+                script adds the new tables and rules — re-running it is safe and it
+                NEVER touches your existing data.
+              </Text>
+            )}
             <Text style={styles.hint}>
               1. Open your project → <Text style={styles.link}>SQL Editor</Text> → New query.
               2. Paste this bundle and press Run. 3. Come back and check.

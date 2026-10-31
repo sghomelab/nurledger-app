@@ -116,14 +116,20 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
       }
     },
 
-    async schemaDeployed(cfg) {
+    async schemaVersion(cfg) {
       const c = serviceClientFor(cfg);
-      const { data, error } = await c.from('cloud_schema_meta').select('version').limit(1);
+      const { data, error } = await c
+        .from('cloud_schema_meta')
+        .select('version')
+        .order('version', { ascending: false })
+        .limit(1);
       if (error) {
         // PGRST205 "Could not find the table" → schema not deployed yet.
-        return false;
+        return null;
       }
-      return Array.isArray(data) && data.length > 0;
+      const row = Array.isArray(data) ? data[0] : undefined;
+      const v = row ? Number((row as { version: unknown }).version) : NaN;
+      return Number.isFinite(v) ? v : null;
     },
 
     async signUp(cfg, email, password) {

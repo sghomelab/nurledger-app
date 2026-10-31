@@ -200,11 +200,14 @@ export interface CloudAdapter {
   /** Reachability + auth sanity. Throws on hard failure. */
   ping(cfg: CloudConfig): Promise<boolean>;
   /**
-   * True when the BYO schema bundle has been deployed to this project
-   * (checked with the service key; tables must exist). Drives the setup
-   * wizard's "run the SQL" step validation.
+   * The version of the BYO schema bundle deployed in this project (checked
+   * with the service key against `cloud_schema_meta`: the max version row),
+   * or null if the schema is not deployed at all. Drives the setup wizard:
+   * null → "deploy" step, version < CLOUD_SCHEMA_VERSION → "upgrade" step
+   * (existing stores must re-paste the newer bundle — idempotent, never
+   * touches data), otherwise → straight to the account step.
    */
-  schemaDeployed(cfg: CloudConfig): Promise<boolean>;
+  schemaVersion(cfg: CloudConfig): Promise<number | null>;
   /**
    * Owner self-service signup (FR-505, BYO: in the store's own project).
    * `needsConfirm` = true when email confirmation is on and pending.
