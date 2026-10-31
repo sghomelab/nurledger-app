@@ -12,7 +12,9 @@ import {
   isValidPin,
   PIN_MAX_LENGTH,
   PIN_MIN_LENGTH,
+  pinEntryOutcome,
   verifyPin,
+  type PinEntryOutcome,
 } from '../lib/pin';
 
 describe('sha256Hex (FIPS 180-2 known-answer tests)', () => {
@@ -91,5 +93,64 @@ describe('createPinHash / verifyPin', () => {
     expect(verifyPin('', '1234')).toBe(false);
     expect(verifyPin('garbage', '1234')).toBe(false);
     expect(verifyPin(createPinHash('1234'), '123')).toBe(false);
+  });
+});
+
+describe('pinEntryOutcome (CR-15 — progressive 4–8 digit matching)', () => {
+  /** Simulate pressing `digits` one at a time against users holding `targets`. */
+  function press(digits: string, targets: string[]) {
+    const out: Array<PinEntryOutcome['kind']> = [];
+    let current = '';
+    for (const d of digits) {
+      current += d;
+      const r = pinEntryOutcome(current, (cand) => targets.includes(cand));
+      out.push(r.kind);
+      if (r.kind !== 'keep-entering') break; // modal stops on match / failure
+    }
+    return out;
+  }
+
+  it('a 4-digit PIN unlocks the moment it is complete', () => {
+    expect(press('1234', ['1234'])).toEqual(['keep-entering', 'keep-entering', 'keep-entering', 'matched']);
+  });
+
+  it('a 5-digit PIN is NOT cut off at 4 — it keeps entering, then matches', () => {
+    expect(press('12345', ['12345'])).toEqual([
+      'keep-entering', 'keep-entering', 'keep-entering', 'keep-entering', 'matched',
+    ]);
+  });
+
+  it('a 6-digit PIN matches at 6', () => {
+    expect(press('123456', ['123456'])).toEqual([
+      'keep-entering', 'keep-entering', 'keep-entering', 'keep-entering', 'keep-entering', 'matched',
+    ]);
+  });
+
+  it('an 8-digit (max) PIN matches at 8', () => {
+    expect(press('12345678', ['12345678'])).toEqual([
+      'keep-entering', 'keep-entering', 'keep-entering', 'keep-entering',
+      'keep-entering', 'keep-entering', 'keep-entering', 'matched',
+    ]);
+  });
+
+  it('a wrong PIN only fails DEFINITELY at the maximum length', () => {
+    // No user holds 1234/5678/etc; only an 8-digit no-match is terminal.
+    expect(press('87654321', ['11111111'])).toEqual([
+      'keep-entering', 'keep-entering', 'keep-entering', 'keep-entering',
+      'keep-entering', 'keep-entering', 'keep-entering', 'definite-failure',
+    ]);
+  });
+
+  it('a shorter user PIN wins progressively (4-digit user unlocks before a 5-digit one)', () => {
+    // Two users: "1234" and "12345". Typing "1234" unlocks the 4-digit user.
+    expect(press('1234', ['1234', '12345'])).toEqual([
+      'keep-entering', 'keep-entering', 'keep-entering', 'matched',
+    ]);
+  });
+
+  it('fewer than 4 digits is always keep-entering (not yet a PIN)', () => {
+    expect(pinEntryOutcome('1', () => false)).toEqual({ kind: 'keep-entering' });
+    expect(pinEntryOutcome('12', () => false)).toEqual({ kind: 'keep-entering' });
+    expect(pinEntryOutcome('123', () => false)).toEqual({ kind: 'keep-entering' });
   });
 });

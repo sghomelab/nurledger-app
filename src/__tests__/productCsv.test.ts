@@ -7,6 +7,7 @@
 
 import {
   parseProductsCsv,
+  planProductImport,
   PRODUCT_CSV_HEADER,
   serializeProductsToCsv,
   splitCsv,
@@ -301,5 +302,56 @@ describe('parseProductsCsv — row validation', () => {
   it('two-decimal currency: truncates to cents on export, parses 1-2 dp', () => {
     const r = parseProductsCsv('sku,name,price\nA,One,12.5', C);
     expect(r.rows[0]!.row).toMatchObject({ priceMinor: 1250 });
+  });
+});
+
+describe('planProductImport (CR-13 — duplicate SKU in one batch)', () => {
+  const existing = [
+    { sku: 'MILK', id: 'p-milk' },
+    { sku: 'bread', id: 'p-bread' }, // stored lowercase, must match case-insensitively
+  ];
+
+  it('updates an existing product by SKU (case-insensitive)', () => {
+    const d = planProductImport([{ sku: 'MILK' }], existing);
+    expect(d).toEqual([{ action: 'update', id: 'p-milk' }]);
+    expect(planProductImport([{ sku: 'BREAD' }], existing)).toEqual([
+      { action: 'update', id: 'p-bread' },
+    ]);
+  });
+
+  it('creates a new product with a fresh id', () => {
+    const d = planProductImport([{ sku: 'JAM' }], existing);
+    expect(d).toHaveLength(1);
+    expect(d[0]!.action).toBe('create');
+    if (d[0]!.action === 'create') expect(typeof d[0]!.id).toBe('string');
+  });
+
+  it('a NEW SKU repeated in the same batch creates once, then updates the SAME id', () => {
+    const d = planProductImport([{ sku: 'JAM' }, { sku: 'jam' }, { sku: 'Jam' }], existing);
+    expect(d).toHaveLength(3);
+    expect(d[0]!.action).toBe('create');
+    expect(d[1]!.action).toBe('update');
+    expect(d[2]!.action).toBe('update');
+    const firstId = d[0]!.action === 'create' ? d[0]!.id : '';
+    expect(d[1]!.action === 'update' && d[1]!.id).toBe(firstId);
+    expect(d[2]!.action === 'update' && d[2]!.id).toBe(firstId);
+  });
+
+  it('an EXISTING SKU repeated in the same batch updates the same product every time', () => {
+    const d = planProductImport([{ sku: 'MILK' }, { sku: 'milk' }], existing);
+    expect(d).toEqual([
+      { action: 'update', id: 'p-milk' },
+      { action: 'update', id: 'p-milk' },
+    ]);
+  });
+
+  it('mixed batch: existing, new, and a duplicate of the new one', () => {
+    const d = planProductImport(
+      [{ sku: 'MILK' }, { sku: 'JAM' }, { sku: 'jAM' }, { sku: 'TEA' }],
+      existing,
+    );
+    expect(d.map((x) => x.action)).toEqual(['update', 'create', 'update', 'create']);
+    const jamId = d[1]!.action === 'create' ? d[1]!.id : '';
+    expect(d[2]!.action === 'update' && d[2]!.id).toBe(jamId);
   });
 });

@@ -39,6 +39,38 @@ export function createPinHash(pin: string): string {
   return hashPin(pin, randomSaltHex());
 }
 
+/**
+ * CR-15 — the entry decision after one more digit is pressed. PINs are
+ * 4–8 digits (PIN_MIN_LENGTH..PIN_MAX_LENGTH) and the prompt uses PROGRESSIVE
+ * matching: as soon as the entered digits match a user's PIN, we're done —
+ * so 4-, 5-, 6-, … 8-digit PINs all unlock the moment they are complete.
+ *
+ *  - `matched`            — the digits verify (at ANY valid length).
+ *  - `keep-entering`      — not a match yet, but the PIN could still be
+ *                           longer (or isn't long enough to be a PIN yet).
+ *  - `definite-failure`   — no match at the MAXIMUM length; the PIN can't
+ *                           get any longer, so show the error and reset.
+ *
+ * Pure: `matches` is a caller-supplied (candidate → boolean) predicate so
+ * this module stays free of the AppUser/roles dependency (PinPrompt passes
+ * one over its unlockers).
+ */
+export type PinEntryOutcome =
+  | { kind: 'matched' }
+  | { kind: 'keep-entering' }
+  | { kind: 'definite-failure' };
+
+export function pinEntryOutcome(
+  next: string,
+  matches: (candidate: string) => boolean,
+): PinEntryOutcome {
+  if (!isValidPin(next)) return { kind: 'keep-entering' };
+  if (matches(next)) return { kind: 'matched' };
+  return next.length === PIN_MAX_LENGTH
+    ? { kind: 'definite-failure' }
+    : { kind: 'keep-entering' };
+}
+
 /** Constant-time-ish compare of a PIN against a stored hash (null/invalid → false). */
 export function verifyPin(stored: string | null, pin: string): boolean {
   if (!stored || !isValidPin(pin)) return false;

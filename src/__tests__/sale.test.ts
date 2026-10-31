@@ -1,4 +1,4 @@
-import { allocateCogs, computeTotals } from '../lib/sale';
+import { allocateCogs, computeTotals, paymentCoversTotal } from '../lib/sale';
 import { flatRateTaxEngine } from '../lib/tax';
 import { consumeFifo, type LayerInput } from '../lib/stock';
 import type { CartLine } from '../types';
@@ -192,5 +192,34 @@ describe('allocateCogs — cumulative FIFO across a product\u2019s lines (FR-321
     const r = allocateCogs([], [{ qty: 5 }], 'LOT');
     expect(r).toHaveLength(1);
     expect(r[0]).toMatchObject({ cogsMinor: 0, unitCostMinor: null, lotId: null, short: true, shortageQty: 5 });
+  });
+});
+
+describe('paymentCoversTotal (CR-14)', () => {
+  it('exact coverage → covered', () => {
+    expect(paymentCoversTotal([{ amountMinor: 5000 }], 5000)).toBe(true);
+  });
+
+  it('overpayment (cash rounded up) → covered', () => {
+    expect(paymentCoversTotal([{ amountMinor: 5200 }], 5000)).toBe(true);
+  });
+
+  it('split payments that exactly cover → covered', () => {
+    expect(paymentCoversTotal([
+      { amountMinor: 3000 },
+      { amountMinor: 2000 },
+    ], 5000)).toBe(true);
+  });
+
+  it('partial payment → NOT covered', () => {
+    expect(paymentCoversTotal([{ amountMinor: 4999 }], 5000)).toBe(false);
+  });
+
+  it('zero payments on a non-empty sale → NOT covered', () => {
+    expect(paymentCoversTotal([], 5000)).toBe(false);
+  });
+
+  it('zero payments on a zero-total (fully discounted) sale → covered', () => {
+    expect(paymentCoversTotal([], 0)).toBe(true);
   });
 });

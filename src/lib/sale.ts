@@ -62,6 +62,21 @@ export function allocateCogs(
   });
 }
 
+/**
+ * CR-14 — payment coverage: true when the payments fully cover the total.
+ * Overpayment (cash rounded up) is allowed; zero and partial payments are
+ * NOT. The register UI enforces this for humans; `completeSale` enforces it
+ * for every caller — the repository is the domain boundary, so a programmatic
+ * caller can never commit a 'completed' sale that wasn't fully paid.
+ */
+export function paymentCoversTotal(
+  payments: Array<{ amountMinor: number }>,
+  totalMinor: number,
+): boolean {
+  const paid = payments.reduce((sum, p) => sum + p.amountMinor, 0);
+  return paid >= totalMinor;
+}
+
 export interface SaleTotals {
   subtotalMinor: number;
   lineDiscountMinor: number;

@@ -5,13 +5,18 @@
  *
  * Two documented bases (they differ by the tax amount, which is expected):
  *  - KPI CARDS follow the research doc §4 formulas on a NET basis:
- *      Net sales  = gross − discounts − VAT (returns 0 until M6 — no refunds yet)
- *      Gross profit = net sales − COGS
+ *      Net sales  = gross − discounts − VAT − refunds (VAT-excl. share, CR-09)
+ *      Gross profit = net sales − COGS (COGS net of the restocked-refund
+ *      reversal, CR-09 — restocked units re-entered the FIFO layers at the
+ *      sale-time cost, so reversing them keeps the P&L consistent)
  *  - THE P&L follows the prototype structure on a GROSS (money-in) basis:
- *      Total Gross Sales = Σ sale.total_minor (what the till actually took in)
+ *      Total Gross Sales = Σ sale.total_minor − Σ refunds (money in minus
+ *      money back, CR-09)
  *      Operating Net Margin % = (Gross Margin − Operating Costs) / Total Gross Sales
  * Both bases are labeled in the UI; this comment is the source of truth.
  */
+
+import { roundDivide } from './money';
 
 export type PeriodId = 'today' | 'period' | 'all';
 
@@ -73,6 +78,35 @@ export interface PeriodTotals {
   cogsMinor: number;
   /** sale_lines that carried a discount (line-level or order-level share). */
   discountedItems: number;
+  // CR-09 — refunds CREATED in the period (scoped by refund.created_at, the
+  // moment the money came back — not the parent sale's date). Deducted from
+  // the KPIs in computeKpis.
+  /** Count of refund headers created in the period. */
+  refundCount: number;
+  /** Σ refund.amount_minor (tax-inclusive — money back to the customer). */
+  refundMinor: number;
+  /** VAT-exclusive share of the refunds (same basis as netSales; per-refund
+   *  proration via refundNetShareMinor). */
+  refundNetMinor: number;
+  /** Units returned (weighed lines count 0/1 by grams, rounded, like sale
+   *  units). */
+  refundedUnits: number;
+  /** Sale-time COGS of RESTOCKED refund lines only (the FIFO reversal). */
+  refundedCogsMinor: number;
+}
+
+/**
+ * CR-09 — the VAT-exclusive share of a tax-inclusive refund, on the
+ * KPI-card's net basis (subtotal − discount − tax). A refund refunds a share
+ * of what the customer actually paid (incl. tax); the net basis excludes VAT,
+ * so only the ex-tax share is deducted. Prorated by the PARENT SALE's own
+ * net/pre-tax ratio:
+ *   share = refundMinor × (subtotal − discount − tax) / (subtotal − discount)
+ * Exact for inclusive tax (the reference locale); integer roundDivide
+ * throughout (ADR-004). `preTaxMinor` = 0 → 0 (a zero-total sale refunds 0).
+ */
+export function refundNetShareMinor(refundMinor: number, netMinor: number, preTaxMinor: number): number {
+  return roundDivide(refundMinor * netMinor, preTaxMinor);
 }
 
 /** Operating expenses by type (prototype: Staff Payroll / Maintenance / Other). */
@@ -169,21 +203,37 @@ export interface KpiExtrasInput {
 
 /** Compute every M4 KPI + P&L figure from period aggregates. */
 export function computeKpis(input: KpiInput): Kpis {
-  const { transactions, unitsSold, subtotalMinor, discountMinor, taxMinor, grossTotalMinor, cogsMinor, discountedItems } = input;
+  const {
+    transactions, unitsSold, subtotalMinor, discountMinor, taxMinor, grossTotalMinor,
+    cogsMinor, discountedItems, refundMinor, refundNetMinor, refundedUnits, refundedCogsMinor,
+  } = input;
   const opex = opexTotalMinor(input.opex);
   const ex = input.extras;
 
+  // CR-09 — refunds created in the period reduce true net performance on both
+  // bases: money back (gross), the VAT-excl. revenue share (net), the FIFO
+  // COGS of restocked units, and the units that came back. (Transaction count
+  // stays the count of completed sales — a refunded sale still happened;
+  // per-product ABC/velocity is intentionally NOT refund-adjusted: it ranks
+  // demand, and returns are a small flow for a small shop.)
+  // Clamped at 0 like the other net figures: a refund of a PRIOR period's sale
+  // landing in this period must not produce negative COGS (which would show
+  // as phantom profit) — it simply deducts what this period's activity has.
+  const netCogsMinor = Math.max(0, cogsMinor - refundedCogsMinor);
+  const netUnitsSold = Math.max(0, unitsSold - refundedUnits);
+  const netGrossSalesMinor = Math.max(0, grossTotalMinor - refundMinor);
+
   // Net basis (research doc)
-  const netSalesMinor = Math.max(0, subtotalMinor - discountMinor - taxMinor);
-  const grossProfitMinor = netSalesMinor - cogsMinor;
+  const netSalesMinor = Math.max(0, subtotalMinor - discountMinor - taxMinor - refundNetMinor);
+  const grossProfitMinor = netSalesMinor - netCogsMinor;
   const avgBasketMinor = transactions > 0 ? Math.round(netSalesMinor / transactions) : 0;
-  const upt = transactions > 0 ? Math.round((unitsSold / transactions) * 100) / 100 : 0;
+  const upt = transactions > 0 ? Math.round((netUnitsSold / transactions) * 100) / 100 : 0;
   const grossMarginPct = netSalesMinor > 0 ? Math.round((grossProfitMinor / netSalesMinor) * 10000) / 100 : 0;
   const operatingNetMinor = grossProfitMinor - opex;
 
-  // P&L basis (prototype: money in)
-  const grossSalesMinor = grossTotalMinor;
-  const plGrossMarginMinor = grossSalesMinor - cogsMinor;
+  // P&L basis (prototype: money in, minus money back)
+  const grossSalesMinor = netGrossSalesMinor;
+  const plGrossMarginMinor = grossSalesMinor - netCogsMinor;
   const plOpexNetMinor = plGrossMarginMinor - opex;
   const opNetMarginPct = grossSalesMinor > 0 ? Math.round((plOpexNetMinor / grossSalesMinor) * 10000) / 100 : 0;
 
@@ -191,10 +241,10 @@ export function computeKpis(input: KpiInput): Kpis {
   // (documented approximation — small shops don't carry hourly inventory
   // snapshots; this keeps turnover/GMROI a stable ratio-of-averages-free KPI).
   const avgInvCostMinor = input.inventory.atCostMinor;
-  const markupPct = cogsMinor > 0 ? Math.round((grossProfitMinor / cogsMinor) * 10000) / 100 : 0;
-  const inventoryTurnover = avgInvCostMinor > 0 ? Math.round((cogsMinor / avgInvCostMinor) * 100) / 100 : 0;
+  const markupPct = netCogsMinor > 0 ? Math.round((grossProfitMinor / netCogsMinor) * 10000) / 100 : 0;
+  const inventoryTurnover = avgInvCostMinor > 0 ? Math.round((netCogsMinor / avgInvCostMinor) * 100) / 100 : 0;
   const daysOnHand = inventoryTurnover > 0 ? Math.round((365 / inventoryTurnover) * 10) / 10 : 0;
-  const sellThroughPct = ex.receiptsUnits > 0 ? Math.round((unitsSold / ex.receiptsUnits) * 10000) / 100 : 0;
+  const sellThroughPct = ex.receiptsUnits > 0 ? Math.round((netUnitsSold / ex.receiptsUnits) * 10000) / 100 : 0;
   const gmroi = avgInvCostMinor > 0 ? Math.round((plGrossMarginMinor / avgInvCostMinor) * 100) / 100 : 0;
   const shrinkagePct = grossSalesMinor > 0 ? Math.round((ex.adjustmentLossMinor / grossSalesMinor) * 10000) / 100 : 0;
   const stockoutRatePct = ex.activeSkuCount > 0 ? Math.round((ex.zeroStockSkuCount / ex.activeSkuCount) * 10000) / 100 : 0;
@@ -206,12 +256,12 @@ export function computeKpis(input: KpiInput): Kpis {
     transactions,
     avgBasketMinor,
     upt,
-    cogsMinor,
+    cogsMinor: netCogsMinor,
     grossProfitMinor,
     grossMarginPct,
     opexMinor: opex,
     operatingNetMinor,
-    unitsSold,
+    unitsSold: netUnitsSold,
     discountedItems,
     grossSalesMinor,
     plGrossMarginMinor,

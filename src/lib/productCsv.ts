@@ -16,6 +16,7 @@
 
 import { isZeroDecimal } from './currency';
 import { toCsv, toMajor } from './csv';
+import { uuidv4 } from './ids';
 import type { Product, UnitType, VelocityClass } from '../types';
 
 /** Header columns in canonical export order (import maps by name, so order is free). */
@@ -143,6 +144,42 @@ export interface ParseResult {
   rows: ParsedCsvRow[];
   okCount: number;
   errorCount: number;
+}
+
+/** One row's decision in a product import (CR-13). */
+export type ProductImportDecision =
+  | { action: 'update'; id: string }
+  | { action: 'create'; id: string };
+
+/**
+ * CR-13 — plan a product import: for each row, UPDATE an existing product
+ * (same SKU, case-insensitive) or CREATE a new one (fresh id).
+ *
+ * A SKU is claimed for the WHOLE batch and never released: when a row matches
+ * a product already in the DB — or one created by an EARLIER row of the same
+ * batch — every occurrence updates that one product. The old repository code
+ * deleted the claim on match, so a duplicate SKU in one file fell through to
+ * the insert branch and crashed with `UNIQUE constraint failed:
+ * product.outlet_id, product.sku`, rolling back the ENTIRE import. (The CSV
+ * parser ALSO flags in-file duplicates in its user report; this makes the
+ * repository itself safe for any caller.)
+ *
+ * `existingProducts`: current DB products (their ids are authoritative).
+ * Returns one decision per row, in row order.
+ */
+export function planProductImport(
+  rows: Array<{ sku: string }>,
+  existingProducts: Array<{ sku: string; id: string }>,
+): ProductImportDecision[] {
+  const bySku = new Map(existingProducts.map((p) => [p.sku.toLowerCase(), p.id]));
+  return rows.map((row) => {
+    const key = row.sku.toLowerCase();
+    const id = bySku.get(key);
+    if (id !== undefined) return { action: 'update', id };
+    const newId = uuidv4();
+    bySku.set(key, newId); // claim the SKU for the rest of the batch
+    return { action: 'create', id: newId };
+  });
 }
 
 /**

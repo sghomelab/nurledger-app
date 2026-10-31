@@ -25,13 +25,13 @@ However, an exhaustive audit beyond the unit test coverage reveals critical edge
 | **CR-06** | **High** | Inventory / Invariants | `src/repositories/poRepository.ts:180-189` | Receiving PO for weighed items passes `qtyDelta` instead of `qtyGDelta`, leaving on-hand gram inventory at zero. | ✅ Fixed (Phase 2) |
 | **CR-07** | **High** | Inventory / Invariants | `src/repositories/stockRepository.ts:360-377`<br>`src/repositories/stocktakeRepository.ts:234-245` | Negative stock adjustments on shortage bypass FIFO layer updates while committing ledger decrements, permanently de-syncing cost layers. | ✅ Fixed (Phase 2) |
 | **CR-08** | **High** | Cash Drawer / Shifts | `src/repositories/shiftRepository.ts:226-236`<br>`src/lib/shift.ts:31-33` | Drawer expected balance ignores refunds, falsely penalizing cashiers with shortages; refunds misattributed across shifts. | ✅ Fixed (Phase 2) |
-| **CR-09** | **Medium** | Analytics / P&L | `src/repositories/insightsRepository.ts:17-25`<br>`src/lib/kpi.ts:8-13` | Insights and P&L aggregates completely omit refunds, overstating net revenue, units sold, and gross margin. | ⏳ Pending (Phase 3) |
+| **CR-09** | **Medium** | Analytics / P&L | `src/repositories/insightsRepository.ts:17-25`<br>`src/lib/kpi.ts:8-13` | Insights and P&L aggregates completely omit refunds, overstating net revenue, units sold, and gross margin. | ✅ Fixed (Phase 3) |
 | **CR-10** | **Medium** | Tax / Calculations | `src/lib/sale.ts:104-106` | Order discount proration across mixed tax lines uses unadjusted line gross instead of post-line-discount balance. | ✅ Fixed (PR-2026-11) |
 | **CR-11** | **Medium** | Sync / Scalability | `src/lib/cloud/supabaseAdapter.ts:235-239`<br>`src/lib/sync.ts:46-52` | Delta queries lack deterministic ordering and pagination, causing cursor skips and permanent data omission when batch size > 1,000. | ✅ Fixed (PR-2026-11) |
-| **CR-12** | **Medium** | Atomicity / Outbox | `src/repositories/productRepository.ts:200-215, 223-241, 345-349` | Master data mutations and outbox enqueues run outside database transactions, risking un-synced local mutations on crash. | ⏳ Pending (Phase 3) |
-| **CR-13** | **Medium** | Data Integrity | `src/repositories/productRepository.ts:300-303, 321-322` | CSV import deletes SKU from lookup map on match, causing duplicate SKUs in the same CSV to fail with unique constraint crashes. | ⏳ Pending (Phase 3) |
-| **CR-14** | **Low** | Domain Invariants | `src/repositories/saleRepository.ts:38-45` | `completeSale` lacks payment coverage validation, allowing underpaid or unbacked sales at the repository level. | ⏳ Pending (Phase 3) |
-| **CR-15** | **Low** | UI / Authentication | `src/components/PinPrompt.tsx:64-70` | PIN prompt auto-submits only on 4 digits, locking out valid 5-digit and 6-digit manager PINs supported by `PIN_REGEX`. | ⏳ Pending (Phase 3) |
+| **CR-12** | **Medium** | Atomicity / Outbox | `src/repositories/productRepository.ts:200-215, 223-241, 345-349` | Master data mutations and outbox enqueues run outside database transactions, risking un-synced local mutations on crash. | ✅ Fixed (Phase 3) |
+| **CR-13** | **Medium** | Data Integrity | `src/repositories/productRepository.ts:300-303, 321-322` | CSV import deletes SKU from lookup map on match, causing duplicate SKUs in the same CSV to fail with unique constraint crashes. | ✅ Fixed (Phase 3) |
+| **CR-14** | **Low** | Domain Invariants | `src/repositories/saleRepository.ts:38-45` | `completeSale` lacks payment coverage validation, allowing underpaid or unbacked sales at the repository level. | ✅ Fixed (Phase 3) |
+| **CR-15** | **Low** | UI / Authentication | `src/components/PinPrompt.tsx:64-70` | PIN prompt auto-submits only on 4 digits, locking out valid 5-digit and 6-digit manager PINs supported by `PIN_REGEX`. | ✅ Fixed (Phase 3) |
 
 ---
 
@@ -363,6 +363,7 @@ However, an exhaustive audit beyond the unit test coverage reveals critical edge
     (SELECT COALESCE(SUM(total_minor), 0) FROM sale WHERE status = 'completed' AND created_at >= ?) -
     (SELECT COALESCE(SUM(amount_minor), 0) FROM refund WHERE created_at >= ?) AS net_gross
   ```
+- **Status:** ✅ Fixed (Phase 3). `getPeriodTotals` now sources refund aggregates scoped by `refund.created_at` (when the money came back — not the parent sale's date), and `computeKpis` deducts them on both documented bases: the KPI cards' NET basis subtracts the VAT-exclusive share per refund (pure `refundNetShareMinor`, prorated by the PARENT SALE's own net/pre-tax ratio — exact for inclusive tax, per-refund because a period may mix tax rates), and the P&L's GROSS (money-in) basis subtracts the tax-inclusive amount. COGS is reversed **only for RESTOCKED refund lines** (the goods re-entered the FIFO layers at sale-time cost — proration by line share, grams for weighed lines), and returned units are deducted (weighed lines count 0/1 by rounded grams, same unit semantics as the sale side). Every deduction is clamped at 0 so a prior-period refund landing in the current period can't produce negative COGS / phantom profit. Transaction count intentionally stays the count of completed sales (a refunded sale still happened); per-product ABC/velocity intentionally not refund-adjusted (they rank demand; documented in `kpi.ts`). 12 new tests in `kpi.test.ts` (proration + full/half/non-restocked/prior-period-clamp/zero-refund-regression). SQL shapes verified with a scratch SQLite script (refund-only period clamps to zero; restock-only COGS reversal; gram proration). **Live-verified on the emulator against the real device DB:** TODAY net 28.96 / COGS 11.55 / units 6 / UPT 0.75 and ALL TIME net 59.24 / COGS 25.35 / units 13 / gross profit 33.89 — every figure matches the expected values computed independently from the pulled DB (pre-fix the same screen showed net 47.11 / COGS 14.70 / units 9 / gross 51.63). **Live verification caught one bug the tests could not:** the refund-lines query read `l.qtyG` but selected `rl.qty_g` unaliased — expo-sqlite keys rows by the column name, so the property was silently `undefined` and weighed-refund units fell into the unit-count branch (undercounted 3 → 2, visible as "Total units 7" instead of 6). Fixed with `AS qtyG` and pinned by structural guards in `insightsRepoGuards.test.ts`.
 
 ---
 
@@ -387,6 +388,7 @@ However, an exhaustive audit beyond the unit test coverage reveals critical edge
     await enqueueOpInTx(db, 'product', id);
   });
   ```
+- **Status:** ✅ Fixed (Phase 3). All three mutations — `createProduct`, `updateProduct`, `deactivateProduct` — now perform their row write AND the `enqueueOpInTx` outbox enqueue inside a single `db.withTransactionAsync`; a crash between the two is now impossible (the create-product read-back `getProduct` deliberately stays outside the tx). Transaction semantics are pinned by source-level structural guards in `productRepoGuards.test.ts` (per function: write + enqueue both inside the tx block, write ordered before the enqueue) — jest runs in node without SQLite, so this follows the `cloudSchema.test.ts` guard precedent (CR-02) rather than asserting runtime behavior.
 
 ---
 
@@ -411,6 +413,7 @@ However, an exhaustive audit beyond the unit test coverage reveals critical edge
   SQLite throws `UNIQUE constraint failed: product.outlet_id, product.sku`, rolling back the entire import.
 - **Remediation:**  
   Do not delete entries from `bySku`. Maintain the mapping so that subsequent CSV rows for the same SKU update the existing record.
+- **Status:** ✅ Fixed (Phase 3). The upsert decision is extracted into the pure planner `planProductImport(rows, existingProducts)` in `src/lib/productCsv.ts`: a matched SKU is claimed for the WHOLE batch and never released — a row that matches a product already in the DB **or** one created by an earlier row of the same batch UPDATEs that one product instead of inserting a second row (the old `bySku.delete` line is removed). `importProducts` consumes the plan, one decision per row. The CSV parser ALSO flags in-file duplicate SKUs as row errors in its user report, so the UI path was double-guarded; the planner makes the repository itself safe for any caller. 5 new tests in `productCsv.test.ts` (case-insensitive match, fresh-id create, new-SKU-duplicate-in-batch, existing-SKU-duplicate, mixed batch) + a structural guard asserting `importProducts` uses the planner and contains no `bySku.delete`.
 
 ---
 
@@ -429,6 +432,7 @@ However, an exhaustive audit beyond the unit test coverage reveals critical edge
     throw new Error(`Insufficient payment: paid ${paid}, expected ${totals.totalMinor}`);
   }
   ```
+- **Status:** ✅ Fixed (Phase 3). `completeSale` now validates payment coverage BEFORE its transaction, via the pure helper `paymentCoversTotal(payments, totalMinor)` in `src/lib/sale.ts`: it throws `Insufficient payment: paid ${paid}, expected ${totalMinor}` when the payments sum to less than the total. Overpayment is ALLOWED (cash rounded up), and a zero-total fully-discounted sale with zero payments is covered. The register UI already enforces this for humans; the repository is the domain boundary, so a programmatic caller can no longer commit a `'completed'` sale that is short. 6 new tests in `sale.test.ts` (exact / over / split / partial / zero-payments-nonzero-total / zero-payments-zero-total).
 
 ---
 
@@ -452,6 +456,7 @@ However, an exhaustive audit beyond the unit test coverage reveals critical edge
   Managers configured with valid 5-digit or 6-digit PINs cannot authenticate via the PIN prompt keypad, effectively locking them out of elevated operations (e.g. price overrides, drawer openings, stock write-offs).
 - **Remediation:**  
   Provide an explicit "Enter" / submit button on the keypad or evaluate length dynamically against active user credential policies.
+- **Status:** ✅ Fixed (Phase 3) — **finding stale as written.** No `PIN_REGEX` (4–6 digits) exists in the current code: the prompt already used PROGRESSIVE matching over 4–8 digits (`PIN_MIN_LENGTH=4`, `PIN_MAX_LENGTH=8`), so 5/6-digit manager PINs were never locked out by an auto-submit at 4. The entry decision was nonetheless extracted into the pure helper `pinEntryOutcome(next, matches)` in `src/lib/pin.ts` — `{matched | keep-entering | definite-failure}`, where a no-match is only terminal at the MAXIMUM length — and `PinPrompt.press` now uses it (behavior-identical; the caller supplies the match predicate over its unlockers so the lib stays AppUser/roles-free). The behavior is now pinned by 7 new tests in `pin.test.ts`, including a press-simulation for 4/5/6/8-digit PINs, the multi-user prefix case (a 4-digit user unlocks before a 5-digit one), and the <4-digit always-keep-entering rule.
 
 ---
 

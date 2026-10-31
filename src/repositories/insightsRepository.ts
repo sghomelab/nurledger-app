@@ -6,9 +6,17 @@
  */
 
 import { getDb } from '../db/database';
-import type { OpexTotals, PeriodTotals } from '../lib/kpi';
+import { roundDivide } from '../lib/money';
+import { refundNetShareMinor, type OpexTotals, type PeriodTotals } from '../lib/kpi';
 
-/** FR-403: the period's headline sales aggregates (sale headers are authoritative). */
+/**
+ * FR-403: the period's headline sales aggregates (sale headers are
+ * authoritative). CR-09: refund aggregates are sourced alongside so
+ * `computeKpis` can deduct them — money back (gross basis), the VAT-excl.
+ * revenue share (net basis), the FIFO COGS of restocked units, and the units
+ * that came back. Refunds are period-scoped by `refund.created_at` (when the
+ * money came back), NOT by the parent sale's date.
+ */
 export async function getPeriodTotals(fromMs: number): Promise<Omit<PeriodTotals, 'fromMs'>> {
   const db = await getDb();
   const head = await db.getFirstAsync<{
@@ -45,6 +53,56 @@ export async function getPeriodTotals(fromMs: number): Promise<Omit<PeriodTotals
     [fromMs],
   );
 
+  // CR-09 — refund headers created in the period (money back to customers).
+  const refundHead = await db.getFirstAsync<{ n: number; minor: number }>(
+    'SELECT COUNT(*) AS n, COALESCE(SUM(amount_minor), 0) AS minor FROM refund WHERE created_at >= ?',
+    [fromMs],
+  );
+  // The VAT-excl. share is prorated PER REFUND against its parent sale's own
+  // net/pre-tax ratio (refundNetShareMinor — pure, tested in kpi.test.ts).
+  // Period-level proration would skew when the period mixes tax rates
+  // (e.g. standard + exempt lines).
+  const refundRows = await db.getAllAsync<{ amount: number; preTax: number; net: number }>(
+    `SELECT r.amount_minor AS amount,
+            s.subtotal_minor - s.discount_minor AS preTax,
+            s.subtotal_minor - s.discount_minor - s.tax_minor AS net
+       FROM refund r JOIN sale s ON s.id = r.sale_id
+      WHERE r.created_at >= ?`,
+    [fromMs],
+  );
+  // Returned units + restock COGS reversal, per refund LINE (the line carries
+  // the restock flag; the sale-time COGS lives on the parent sale_line).
+  const refundLines = await db.getAllAsync<{
+    qty: number; qtyG: number | null; lineQty: number; lineQtyG: number | null;
+    cogs: number; restock: number;
+  }>(
+    `SELECT rl.qty, rl.qty_g AS qtyG, sl.qty AS lineQty, sl.qty_g AS lineQtyG,
+            COALESCE(sl.cogs_minor, 0) AS cogs, rl.restock
+       FROM refund_line rl
+       JOIN refund r ON r.id = rl.refund_id
+       JOIN sale_line sl ON sl.id = rl.sale_line_id
+      WHERE r.created_at >= ?`,
+    [fromMs],
+  );
+  let refundedUnits = 0;
+  let refundedCogsMinor = 0;
+  for (const l of refundLines) {
+    // Weighed sale lines count as 1 unit; a refunded weighed line counts 1
+    // only when (rounded) all of its grams came back — same unit semantics as
+    // the sale side.
+    refundedUnits +=
+      l.lineQtyG != null && l.qtyG != null ? roundDivide(l.qtyG, l.lineQtyG) : l.qty;
+    // COGS reverses ONLY when the goods were restocked (they re-entered the
+    // FIFO layers at the sale-time cost — reversing keeps the P&L consistent).
+    // Prorated by the refunded share of the line (grams for weighed lines).
+    if (l.restock === 1) {
+      refundedCogsMinor +=
+        l.lineQtyG != null && l.qtyG != null
+          ? roundDivide(l.cogs * l.qtyG, l.lineQtyG)
+          : roundDivide(l.cogs * l.qty, l.lineQty);
+    }
+  }
+
   return {
     transactions: head?.tx ?? 0,
     unitsSold: unitsRow?.units ?? 0,
@@ -54,6 +112,13 @@ export async function getPeriodTotals(fromMs: number): Promise<Omit<PeriodTotals
     grossTotalMinor: head?.gross ?? 0,
     cogsMinor: head?.cogs ?? 0,
     discountedItems: discRow?.n ?? 0,
+    refundCount: refundHead?.n ?? 0,
+    refundMinor: refundHead?.minor ?? 0,
+    refundNetMinor: refundRows.reduce(
+      (sum, r) => sum + refundNetShareMinor(r.amount, r.net, r.preTax), 0,
+    ),
+    refundedUnits,
+    refundedCogsMinor,
   };
 }
 

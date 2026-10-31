@@ -11,6 +11,7 @@ import {
   opexTotalMinor,
   periodDays,
   periodStartMs,
+  refundNetShareMinor,
   velocityTier,
 } from '../lib/kpi';
 
@@ -29,6 +30,15 @@ const baseTotals = {
   grossTotalMinor: 86_000, // money in
   cogsMinor: 50_000,
   discountedItems: 4,
+};
+
+/** CR-09: zero refunds — every pre-Phase-3 test runs against this. */
+const noRefunds = {
+  refundCount: 0,
+  refundMinor: 0,
+  refundNetMinor: 0,
+  refundedUnits: 0,
+  refundedCogsMinor: 0,
 };
 
 const baseExtras = {
@@ -74,6 +84,7 @@ describe('period boundaries', () => {
 describe('computeKpis (net basis)', () => {
   const k = computeKpis({
     ...baseTotals,
+    ...noRefunds,
     opex: { payrollMinor: 10_000, maintenanceMinor: 2_000, otherMinor: 3_000 },
     inventory: { atCostMinor: 12_000, atRetailMinor: 20_000 },
     extras: baseExtras,
@@ -109,6 +120,7 @@ describe('computeKpis — empty period', () => {
   const k = computeKpis({
     fromMs: 0, transactions: 0, unitsSold: 0, subtotalMinor: 0, discountMinor: 0, taxMinor: 0,
     grossTotalMinor: 0, cogsMinor: 0, discountedItems: 0,
+    ...noRefunds,
     opex: { payrollMinor: 0, maintenanceMinor: 0, otherMinor: 0 },
     inventory: { atCostMinor: 0, atRetailMinor: 0 },
     extras: baseExtras,
@@ -135,9 +147,116 @@ describe('computeKpis — empty period', () => {
   });
 });
 
+describe('refundNetShareMinor (CR-09)', () => {
+  // Inclusive-GST sale: preTax (subtotal − discount) 95000, tax 7820,
+  // net (ex-tax) 87180, total 95000.
+  it('a FULL refund → exactly the sale net (ex-tax) value', () => {
+    expect(refundNetShareMinor(95_000, 87_180, 95_000)).toBe(87_180);
+  });
+
+  it('prorates linearly (half refund → half the net share)', () => {
+    expect(refundNetShareMinor(47_500, 87_180, 95_000)).toBe(43_590);
+  });
+
+  it('zero refund or zero pre-tax base → 0', () => {
+    expect(refundNetShareMinor(0, 87_180, 95_000)).toBe(0);
+    expect(refundNetShareMinor(95_000, 0, 0)).toBe(0);
+  });
+});
+
+describe('computeKpis — refunds (CR-09)', () => {
+  // One consistent inclusive-GST period: subtotal 95000 (tax-incl prices),
+  // tax 7820 → total (money in) 95000; net (ex-tax) = 87180. COGS 50000,
+  // 10 units, 1 transaction, no opex.
+  const refundBase = (refunds: Partial<typeof noRefunds>) => ({
+    fromMs: 0, transactions: 1, unitsSold: 10,
+    subtotalMinor: 95_000, discountMinor: 0, taxMinor: 7_820,
+    grossTotalMinor: 95_000, cogsMinor: 50_000, discountedItems: 0,
+    ...noRefunds, ...refunds,
+    opex: { payrollMinor: 0, maintenanceMinor: 0, otherMinor: 0 },
+    inventory: { atCostMinor: 12_000, atRetailMinor: 20_000 },
+    extras: baseExtras,
+  });
+
+  it('a FULL refund zeroes net performance on both bases', () => {
+    const k = computeKpis(refundBase({
+      refundCount: 1,
+      refundMinor: 95_000,
+      refundNetMinor: refundNetShareMinor(95_000, 87_180, 95_000),
+      refundedUnits: 10,
+      refundedCogsMinor: 50_000, // restocked
+    }));
+    expect(k.netSalesMinor).toBe(0);
+    expect(k.cogsMinor).toBe(0);
+    expect(k.grossProfitMinor).toBe(0);
+    expect(k.unitsSold).toBe(0);
+    expect(k.grossSalesMinor).toBe(0);
+    expect(k.plGrossMarginMinor).toBe(0);
+    expect(k.grossMarginPct).toBe(0);
+    expect(k.opNetMarginPct).toBe(0);
+  });
+
+  it('a HALF refund deducts half on every figure', () => {
+    const k = computeKpis(refundBase({
+      refundCount: 1,
+      refundMinor: 47_500,
+      refundNetMinor: refundNetShareMinor(47_500, 87_180, 95_000), // 43590
+      refundedUnits: 5,
+      refundedCogsMinor: 25_000, // half restocked
+    }));
+    expect(k.netSalesMinor).toBe(87_180 - 43_590); // 43590
+    expect(k.cogsMinor).toBe(25_000);
+    expect(k.grossProfitMinor).toBe(43_590 - 25_000); // 18590
+    expect(k.unitsSold).toBe(5);
+    expect(k.upt).toBe(5); // 5 units / 1 tx
+    expect(k.grossSalesMinor).toBe(47_500);
+    expect(k.plGrossMarginMinor).toBe(47_500 - 25_000); // 22500
+  });
+
+  it('NON-restocked refunds deduct revenue and units but NOT COGS', () => {
+    const k = computeKpis(refundBase({
+      refundCount: 1,
+      refundMinor: 47_500,
+      refundNetMinor: 43_590,
+      refundedUnits: 5,
+      refundedCogsMinor: 0, // the goods were NOT restocked
+    }));
+    expect(k.netSalesMinor).toBe(87_180 - 43_590);
+    expect(k.unitsSold).toBe(5);
+    expect(k.cogsMinor).toBe(50_000); // unchanged
+    expect(k.grossProfitMinor).toBe(43_590 - 50_000); // −6410 (the return lost money)
+  });
+
+  it('a refund of a PRIOR period sale clamps at zero (no phantom profit)', () => {
+    const k = computeKpis({
+      fromMs: 0, transactions: 0, unitsSold: 0, subtotalMinor: 0, discountMinor: 0,
+      taxMinor: 0, grossTotalMinor: 0, cogsMinor: 0, discountedItems: 0,
+      refundCount: 1, refundMinor: 95_000, refundNetMinor: 87_180,
+      refundedUnits: 10, refundedCogsMinor: 50_000,
+      opex: { payrollMinor: 0, maintenanceMinor: 0, otherMinor: 0 },
+      inventory: { atCostMinor: 0, atRetailMinor: 0 },
+      extras: baseExtras,
+    });
+    expect(k.netSalesMinor).toBe(0);
+    expect(k.cogsMinor).toBe(0);
+    expect(k.grossProfitMinor).toBe(0);
+    expect(k.unitsSold).toBe(0);
+    expect(k.grossSalesMinor).toBe(0);
+  });
+
+  it('zero refunds → identical to the pre-Phase-3 figures (regression guard)', () => {
+    const k = computeKpis(refundBase({}));
+    expect(k.netSalesMinor).toBe(87_180);
+    expect(k.cogsMinor).toBe(50_000);
+    expect(k.unitsSold).toBe(10);
+    expect(k.grossSalesMinor).toBe(95_000);
+  });
+});
+
 describe('computeKpis — extended KPIs (research doc §4 / FR-403)', () => {
   const k = computeKpis({
     ...baseTotals,
+    ...noRefunds,
     opex: { payrollMinor: 10_000, maintenanceMinor: 2_000, otherMinor: 3_000 },
     // Closing inventory at cost 12000 (120.00), retail 20000 (200.00).
     inventory: { atCostMinor: 12_000, atRetailMinor: 20_000 },

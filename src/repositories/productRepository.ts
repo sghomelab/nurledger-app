@@ -7,7 +7,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { getDb } from '../db/database';
 import { reorderSuggestion, stockStatus } from '../lib/stock';
 import { uuidv4 } from '../lib/ids';
-import type { ParsedProductRow } from '../lib/productCsv';
+import { planProductImport, type ParsedProductRow } from '../lib/productCsv';
 import { enqueueOpInTx } from './outboxRepository';
 import type {
   Category,
@@ -197,22 +197,27 @@ export async function createProduct(input: ProductInput): Promise<Product> {
   const now = Date.now();
   const outlet = await db.getFirstAsync<{ id: string }>('SELECT id FROM outlet LIMIT 1');
   if (!outlet) throw new Error('No outlet found — DB not seeded');
-  await db.runAsync(
-    `INSERT INTO product
-      (id, outlet_id, sku, name, category_id, unit_type, is_weighed, barcode, carton_barcode,
-       carton_size, supplier_id, cost_minor, price_minor, tax_category, min_qty, max_qty,
-       velocity_class, description, active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id, outlet.id, input.sku, input.name, input.categoryId, input.unitType,
-      input.isWeighed ? 1 : 0, input.barcode, input.cartonBarcode, input.cartonSize,
-      input.supplierId, input.costMinor, input.priceMinor, input.taxCategory, input.minQty,
-      input.maxQty, input.velocityClass, input.description, input.active ? 1 : 0, now, now,
-    ],
-  );
-  // M5 (FR-502): the new product syncs as a product op. op_id = product.id —
-  // the same key the one-time backfill uses, so backfill never double-queues it.
-  await enqueueOpInTx(db, 'product', id);
+  // CR-12: row write + outbox enqueue are ONE transaction — a crash between
+  // them can never leave a local mutation with no outbox op (which would be
+  // silently unsynced).
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `INSERT INTO product
+        (id, outlet_id, sku, name, category_id, unit_type, is_weighed, barcode, carton_barcode,
+         carton_size, supplier_id, cost_minor, price_minor, tax_category, min_qty, max_qty,
+         velocity_class, description, active, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, outlet.id, input.sku, input.name, input.categoryId, input.unitType,
+        input.isWeighed ? 1 : 0, input.barcode, input.cartonBarcode, input.cartonSize,
+        input.supplierId, input.costMinor, input.priceMinor, input.taxCategory, input.minQty,
+        input.maxQty, input.velocityClass, input.description, input.active ? 1 : 0, now, now,
+      ],
+    );
+    // M5 (FR-502): the new product syncs as a product op. op_id = product.id —
+    // the same key the one-time backfill uses, so backfill never double-queues it.
+    await enqueueOpInTx(db, 'product', id);
+  });
   const created = await getProduct(id);
   if (!created) throw new Error('Product insert failed');
   return created;
@@ -220,25 +225,28 @@ export async function createProduct(input: ProductInput): Promise<Product> {
 
 export async function updateProduct(id: string, input: ProductInput): Promise<Product> {
   const db = await getDb();
-  await db.runAsync(
-    `UPDATE product SET
-       sku = ?, name = ?, category_id = ?, unit_type = ?, is_weighed = ?,
-       barcode = ?, carton_barcode = ?, carton_size = ?, supplier_id = ?,
-       cost_minor = ?, price_minor = ?, tax_category = ?, min_qty = ?, max_qty = ?,
-       velocity_class = ?, description = ?, active = ?, updated_at = ?
-     WHERE id = ?`,
-    [
-      input.sku, input.name, input.categoryId, input.unitType, input.isWeighed ? 1 : 0,
-      input.barcode, input.cartonBarcode, input.cartonSize, input.supplierId,
-      input.costMinor, input.priceMinor, input.taxCategory, input.minQty, input.maxQty,
-      input.velocityClass, input.description, input.active ? 1 : 0, Date.now(), id,
-    ],
-  );
-  // M5 (FR-502): each edit is its own op (op_id = fresh client UUID). The
-  // payload is reconstructed from the current row at drain time, and the
-  // server's LWW (updated_at, device tie-break) makes convergent retries safe.
-  // The fresh op id is resolved back to the row via the { productId } hint.
-  await enqueueOpInTx(db, 'product', uuidv4(), JSON.stringify({ productId: id }));
+  // CR-12: row update + outbox enqueue are ONE transaction (see createProduct).
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `UPDATE product SET
+         sku = ?, name = ?, category_id = ?, unit_type = ?, is_weighed = ?,
+         barcode = ?, carton_barcode = ?, carton_size = ?, supplier_id = ?,
+         cost_minor = ?, price_minor = ?, tax_category = ?, min_qty = ?, max_qty = ?,
+         velocity_class = ?, description = ?, active = ?, updated_at = ?
+       WHERE id = ?`,
+      [
+        input.sku, input.name, input.categoryId, input.unitType, input.isWeighed ? 1 : 0,
+        input.barcode, input.cartonBarcode, input.cartonSize, input.supplierId,
+        input.costMinor, input.priceMinor, input.taxCategory, input.minQty, input.maxQty,
+        input.velocityClass, input.description, input.active ? 1 : 0, Date.now(), id,
+      ],
+    );
+    // M5 (FR-502): each edit is its own op (op_id = fresh client UUID). The
+    // payload is reconstructed from the current row at drain time, and the
+    // server's LWW (updated_at, device tie-break) makes convergent retries safe.
+    // The fresh op id is resolved back to the row via the { productId } hint.
+    await enqueueOpInTx(db, 'product', uuidv4(), JSON.stringify({ productId: id }));
+  });
   const updated = await getProduct(id);
   if (!updated) throw new Error(`Product ${id} not found`);
   return updated;
@@ -264,16 +272,22 @@ export async function importProducts(rows: ParsedProductRow[]): Promise<ProductI
   await db.withTransactionAsync(async () => {
     const outlet = await db.getFirstAsync<{ id: string }>('SELECT id FROM outlet LIMIT 1');
     if (!outlet) throw new Error('No outlet found — DB not seeded');
-    const prods = await db.getAllAsync<{ id: string; skuLc: string }>(
-      'SELECT id, lower(sku) AS skuLc FROM product',
+    const prods = await db.getAllAsync<{ id: string; sku: string }>(
+      'SELECT id, sku FROM product',
     );
-    const bySku = new Map(prods.map((p) => [p.skuLc, p.id]));
     const cats = await db.getAllAsync<{ id: string; nameLc: string }>(
       'SELECT id, lower(name) AS nameLc FROM category',
     );
     const catByIdOrName = new Map(cats.map((c) => [c.nameLc, c.id]));
+    // CR-13: the upsert plan is pure (planProductImport) — a matched SKU stays
+    // claimed for the whole batch, so a duplicate row for the same SKU later
+    // in the same file UPDATES the same product instead of inserting a second
+    // row (UNIQUE (outlet_id, sku) → whole-import rollback before the fix).
+    const decisions = planProductImport(rows, prods);
 
-    for (const row of rows) {
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]!;
+      const decision = decisions[i]!;
       let categoryId: string | null = null;
       if (row.categoryName) {
         const key = row.categoryName.toLowerCase();
@@ -297,9 +311,8 @@ export async function importProducts(rows: ParsedProductRow[]): Promise<ProductI
       }
       const now = Date.now();
       const isWeighed = row.unitType === 'kg' ? 1 : 0;
-      const existingId = bySku.get(row.sku.toLowerCase());
-      if (existingId !== undefined) {
-        bySku.delete(row.sku.toLowerCase());
+      if (decision.action === 'update') {
+        const existingId = decision.id;
         await db.runAsync(
           `UPDATE product SET
              name = ?, category_id = ?, unit_type = ?, is_weighed = ?,
@@ -317,8 +330,7 @@ export async function importProducts(rows: ParsedProductRow[]): Promise<ProductI
         report.updated++;
         await enqueueOpInTx(db, 'product', uuidv4(), JSON.stringify({ productId: existingId }));
       } else {
-        const id = uuidv4();
-        bySku.set(row.sku.toLowerCase(), id);
+        const id = decision.id;
         await db.runAsync(
           `INSERT INTO product
              (id, outlet_id, sku, name, category_id, unit_type, is_weighed, barcode, carton_barcode,
@@ -343,10 +355,13 @@ export async function importProducts(rows: ParsedProductRow[]): Promise<ProductI
 /** Soft delete (products are referenced by ledger rows — never hard-delete). */
 export async function deactivateProduct(id: string): Promise<void> {
   const db = await getDb();
-  await db.runAsync('UPDATE product SET active = 0, updated_at = ? WHERE id = ?', [Date.now(), id]);
-  // M5 (FR-502): deactivation syncs too (other devices see the product retire).
-  // Fresh op id + { productId } hint (see updateProduct).
-  await enqueueOpInTx(db, 'product', uuidv4(), JSON.stringify({ productId: id }));
+  // CR-12: deactivation + outbox enqueue are ONE transaction (see createProduct).
+  await db.withTransactionAsync(async () => {
+    await db.runAsync('UPDATE product SET active = 0, updated_at = ? WHERE id = ?', [Date.now(), id]);
+    // M5 (FR-502): deactivation syncs too (other devices see the product retire).
+    // Fresh op id + { productId } hint (see updateProduct).
+    await enqueueOpInTx(db, 'product', uuidv4(), JSON.stringify({ productId: id }));
+  });
 }
 
 export async function listCategories(): Promise<Category[]> {

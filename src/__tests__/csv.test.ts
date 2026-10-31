@@ -26,6 +26,11 @@ const kpis = computeKpis({
   grossTotalMinor: 86_000,
   cogsMinor: 50_000,
   discountedItems: 4,
+  refundCount: 0,
+  refundMinor: 0,
+  refundNetMinor: 0,
+  refundedUnits: 0,
+  refundedCogsMinor: 0,
   opex: { payrollMinor: 10_000, maintenanceMinor: 2_000, otherMinor: 3_000 },
   inventory: { atCostMinor: 12_000, atRetailMinor: 20_000 },
   extras: {

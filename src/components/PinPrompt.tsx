@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { canUnlock, type GateAction } from '../lib/roles';
-import { isValidPin, PIN_MAX_LENGTH, PIN_MIN_LENGTH, verifyPin } from '../lib/pin';
+import { pinEntryOutcome, PIN_MAX_LENGTH, PIN_MIN_LENGTH, verifyPin } from '../lib/pin';
 import { useT } from '../hooks/useT';
 import type { MsgKey } from '../i18n';
 import { colors, fonts, radius, spacing, typography } from '../theme/tokens';
@@ -52,18 +52,19 @@ export function PinPrompt({ visible, action, users, onSuccess, onCancel }: Props
     const next = pin + d;
     setPin(next);
 
-    // Try to match at every valid length (4–8). A failed match does NOT clear
-    // the dots — the PIN may be longer; only a full 8 digits with no match is
-    // a definite failure.
-    if (isValidPin(next)) {
-      const matched = users.find((u) => canUnlock(u) && verifyPin(u.pinHash, next));
-      if (matched) {
-        setPin('');
-        onSuccess();
-      } else if (next.length === PIN_MAX_LENGTH) {
-        setError(t('pin.wrong'));
-        setPin('');
-      }
+    // CR-15: progressive matching at every valid length (4–8) via the pure
+    // pinEntryOutcome helper — a 4/5/6/…-digit PIN unlocks the moment it
+    // matches; only a no-match at the MAXIMUM length is a definite failure.
+    const outcome = pinEntryOutcome(
+      next,
+      (candidate) => unlockers.some((u) => verifyPin(u.pinHash, candidate)),
+    );
+    if (outcome.kind === 'matched') {
+      setPin('');
+      onSuccess();
+    } else if (outcome.kind === 'definite-failure') {
+      setError(t('pin.wrong'));
+      setPin('');
     }
   };
 

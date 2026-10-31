@@ -9,7 +9,7 @@
 
 import { getDb } from '../db/database';
 import { uuidv4 } from '../lib/ids';
-import { computeTotals, type SaleTotals } from '../lib/sale';
+import { computeTotals, paymentCoversTotal, type SaleTotals } from '../lib/sale';
 import { taxEngineFor } from '../lib/tax';
 import { applySaleInTx } from './stockRepository';
 import { clearActiveOrderInTx } from './orderRepository';
@@ -42,6 +42,15 @@ export async function completeSale(input: CompleteSaleInput): Promise<SaleReceip
   const taxEngine = taxEngineFor(input.taxEngineId);
   const totals = computeTotals(input.lines, input.orderDiscountMinor, taxEngine);
   if (totals.totalMinor < 0) throw new Error('Invalid sale total');
+
+  // CR-14: a completed sale must be fully paid (zero / partial payments
+  // rejected; overpayment allowed — cash rounding up). The register UI
+  // enforces this for humans; the repository is the domain boundary, so a
+  // programmatic caller can never commit a 'completed' sale that is short.
+  if (!paymentCoversTotal(input.payments, totals.totalMinor)) {
+    const paid = input.payments.reduce((s, p) => s + p.amountMinor, 0);
+    throw new Error(`Insufficient payment: paid ${paid}, expected ${totals.totalMinor}`);
+  }
 
   // Friendly oversell guard up front; the transaction re-checks authoritatively.
   // Weighed lines compare GRAMS against on-hand grams (STOCK_QTY_SQL native units).
