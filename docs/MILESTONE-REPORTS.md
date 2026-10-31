@@ -688,3 +688,91 @@ queued.
   (quota check + version bump to 1.0.0 happen at build time).
 - Standing regression: `npx tsc --noEmit` (0 errors) + `npx jest`
   (316 tests, 23 suites) green.
+
+## Post-M6 — Code review remediation (Phases 1–3, 2026-10-31)
+
+An exhaustive technical review of M1–M6 (`docs/CODE-REVIEW.md`, baseline
+`67b3fa6`: 316/316 tests, tsc clean) found **15 findings — 3 critical, 5 high,
+5 medium, 2 low** — across accounting invariants, distributed sync, inventory
+layers, drawer math and atomicity. All 15 were remediated in three phases
+(one commit per severity tier), then signed off. **The review is fully closed.**
+
+### Phase 1 — P0 (critical + medium, sync/accounting) — commit `323deac`
+- **CR-01 (critical):** exclusive tax was omitted from `saleTotals.totalMinor`
+  — exclusive-regime shops under-collected and receipts disagreed with their
+  own arithmetic. `computeTotals` now adds the tax on top in exclusive mode
+  (6 new tests).
+- **CR-02 (critical):** cloud RPCs stamped `updated_at` with the CLIENT's
+  `created_at` — offline sales stayed invisible to peer delta pulls. Fixed via
+  a server-side `synced_at` watermark.
+- **CR-03 (critical):** the pull transaction threw unhandled on an out-of-order
+  refund reference → a permanent, unrecoverable sync loop. Now defensive
+  (unknown parent skips the op, cursor still advances).
+- **CR-10 (medium):** order-discount proration across mixed-tax lines used the
+  pre-line-discount gross; now prorated on the post-line-discount balance.
+- **CR-11 (medium):** delta queries lacked deterministic ordering and
+  pagination — cursor skips above 1,000 rows; now ordered + paginated.
+
+### Phase 2 — P1 (high) — commit `7213d4a`
+- **CR-04:** the ephemeral category remap was lost between pull batches → FK
+  failures on `product.category_id`; the remap now persists across the pull.
+- **CR-05:** product pull used `ON CONFLICT (id)` which crashes SQLite on a
+  natural-key collision `(outlet_id, sku)`; now conflict-targeted on the
+  natural key.
+- **CR-06:** receiving a weighed PO wrote base-unit `qty_delta`, leaving
+  gram stock at zero; weighed lines now route through `qty_g_delta` (pure
+  `receiveDeltas` helper).
+- **CR-07:** negative adjustments/stocktakes on shortage skipped FIFO layer
+  updates → permanent layer/ledger desync. Fix = deplete **all** remaining
+  layers at their real FIFO costs and book the unattributable remainder at
+  the product's current cost (pure `cogsIncludingShortage`). **Design decision
+  — option (1), signed off by Mas 2026-10-31:** the stocktake variance is
+  computed against the live book, so rejecting short adjustments (option 2)
+  would make stocktakes impossible whenever drift pre-exists; the sale path is
+  unaffected (`completeSale` still throws on short and rolls back).
+- **CR-08:** drawer expected cash ignored refunds and misattributed them
+  across shifts. Fix = strict shift-stamped drawer math (only refunds stamped
+  to this shift move this drawer) while keeping the legacy sale-joined
+  `refundsMinor` as the Z-report DISPLAY figure. **Signed off by Mas 2026-10-31.**
+
+### Phase 3 — P2 (medium/low) — commit `d3dbf1d`
+- **CR-09:** Insights and P&L omitted refunds entirely (overstated net
+  revenue, units, margin). `getPeriodTotals` now sources refund aggregates
+  scoped by `refund.created_at` (when the money came back — not the parent
+  sale's date); `computeKpis` deducts on **both** documented bases (net basis:
+  VAT-excl. share per refund, prorated by the parent sale's own ratio; gross
+  basis: tax-inclusive amount). COGS reverses **only for restocked** lines;
+  every deduction clamps at 0 (a prior-period refund landing in the current
+  period can't create phantom profit). 12 new tests.
+- **CR-12:** product mutations + outbox enqueues ran outside transactions →
+  now tx-wrapped (crash can't leave an unsynced local mutation).
+- **CR-13:** CSV import deleted the SKU from the lookup map on first match →
+  duplicate SKUs in one file hit unique-constraint crashes; `planProductImport`
+  planner now reports per-row, no destructive pre-pass.
+- **CR-14:** `completeSale` had no payment-coverage validation →
+  `paymentCoversTotal` guard (repository-level invariant).
+- **CR-15:** finding was **stale** — the audit claimed auto-submit fired only
+  at 4 digits and locked out 5/6-digit PINs, but the code already does
+  progressive 4–8 matching (`pinEntryOutcome`). Verified; no code change.
+
+### Live verification caught a bug the tests could not
+During CR-09's device verification (real device DB, emulator-5554), weighed
+refunds under-counted units (7 shown, 6 expected). Root cause: the
+refund-lines query selected `rl.qty_g` **unaliased**, and expo-sqlite keys
+result rows by the exact SELECT expression — so `row.qtyG` was silently
+`undefined` and fell into the unit-count branch. Fix: `AS qtyG` + structural
+source-level guards (`insightsRepoGuards.test.ts`) pinning the invariant.
+**Rule recorded: every camelCase property read must be `AS camelCase` in the
+SELECT** (bare snake_case reads need snake_case property names).
+Post-fix figures matched independently computed expectations on both TODAY
+(net 28.96 / COGS 11.55 / units 6 / UPT 0.75) and ALL TIME (net 59.24 / COGS
+25.35 / units 13 / gross 33.89).
+
+### Sign-off & state
+- Both open design decisions (CR-07 option 1; CR-08 strict drawer + legacy
+  display figure) **signed off by Mas 2026-10-31** — recorded in
+  `docs/CODE-REVIEW.md` (commit `ab63cc5`).
+- **15/15 findings closed.** Gates: `npx tsc --noEmit` 0 errors,
+  `npx jest` **388/388 (26 suites)** (up from 316/23 at the review baseline).
+- All fixes live-verified on the emulator (CR-06 weighed PO receipt, CR-07
+  stocktake-on-short, CR-09 insights refunds) against the real device DB.

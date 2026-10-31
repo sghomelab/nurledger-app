@@ -12,6 +12,7 @@ stock, shifts and reports — all on one device.
 > about 5–10 minutes).
 
 **Contents**
+- [Why Nurledger works the way it does](#why-nurledger-works-the-way-it-does)
 - [The five tabs](#the-five-tabs)
 - [Selling (the register)](#selling-the-register)
 - [Refunds](#refunds)
@@ -25,6 +26,39 @@ stock, shifts and reports — all on one device.
 - [Adding more devices / cashiers](#adding-more-devices-a-second-tablet-or-phone)
 - [Turning it off / leaving / privacy](#turning-it-all-off--leaving)
 - [Troubleshooting](#troubleshooting)
+
+---
+
+## Why Nurledger works the way it does
+
+- **Your shop runs on your device.** Every sale, stock movement and shift is written to
+  a database *on the tablet or phone you are holding* — not to a remote server. The
+  internet is not a requirement: if the connection drops, the power dips, or you're in a
+  dead zone, nothing changes. You keep selling, the numbers stay correct, and anything
+  queued goes up later when sync is on.
+- **Your data is yours.** When you do turn on cloud sync, it points at **your own** free
+  Supabase account — not a Nurledger server. The people who make Nurledger never see
+  your sales, stock or shifts, and you can delete the whole project at any time (the app
+  keeps working from the device either way).
+- **Every number can be explained.** Stock is the sum of an append-only ledger of
+  movements — every receiving, sale, adjustment and stocktake is a row that can never be
+  edited or deleted. If a figure ever looks wrong, you can trace it line by line to the
+  movement that caused it. That is why stock adjustments and refunds always need a
+  reason.
+- **Money is exact.** Amounts are stored as whole cents, not decimals — there is no
+  0.1 + 0.2 drift. Split payments are divided so the parts always add up to the total
+  exactly, down to the last cent.
+- **Costs are real, not averaged.** When an item sells, the cost counted against it is
+  the actual cost of the batch it came from, oldest batch first. Your gross profit is
+  what you actually made on the stock you actually sold.
+- **One app, anywhere.** Nothing is built-in to a country. The currency, the tax regime
+  (e.g. GST 9% inclusive, SST 10% inclusive, VAT — or any custom rate) and the payment
+  methods are settings you choose for your store. The same app works in Singapore,
+  Malaysia, the EU, or anywhere else.
+- **No special permissions.** Nurledger asks for nothing unusual — no camera, no
+  Bluetooth. Barcodes are scanned with a USB/Bluetooth *keyboard-wedge* scanner or typed
+  in, and printing (receipts, labels, purchase orders) works by generating a file you
+  can print on any device, any printer.
 
 ---
 

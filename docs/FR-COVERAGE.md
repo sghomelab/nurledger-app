@@ -276,4 +276,4 @@ round-trip live + persisted · supplier master CRUD + PO picker · margin card +
    (bit vectors verified against ZXing/Zint).
 
 **Standing regression:** `npx tsc --noEmit` (0 errors) + `npx jest`
-(316 tests, 23 suites) green.
+(388 tests, 26 suites — Post-M6 code review remediation) green.
