@@ -8,7 +8,7 @@
 
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { getDb } from '../db/database';
-import { poTotalCostMinor } from '../lib/po';
+import { poTotalCostMinor, receiveDeltas } from '../lib/po';
 import { uuidv4 } from '../lib/ids';
 import { applyStockMoveInTx } from './stockRepository';
 import { enqueueOpInTx } from './outboxRepository';
@@ -147,9 +147,11 @@ export async function listPOs(): Promise<POSummary[]> {
 /**
  * Receive a PO (FR-306/FR-318): for every not-fully-received line, create a lot
  * (batch) with the line's lot code + expiry and add `qtyOrdered − qtyReceived`
- * base units of stock via the general in-tx stock move (new FIFO cost layer +
- * immutable `receive_po` ledger row, cost layer linked to the lot for FEFO).
- * When every line is received the PO flips to 'received'.
+ * of stock via the general in-tx stock move (new FIFO cost layer + immutable
+ * `receive_po` ledger row, cost layer linked to the lot for FEFO). Weighed
+ * lines (CR-06) carry their remaining quantity in GRAMS — stock_view.qty_g
+ * only moves via qty_g_delta. When every line is received the PO flips to
+ * 'received'.
  */
 export async function receivePO(id: string): Promise<PurchaseOrder> {
   const db = await getDb();
@@ -164,6 +166,17 @@ export async function receivePO(id: string): Promise<PurchaseOrder> {
     const outlet = await db.getFirstAsync<{ id: string }>('SELECT id FROM outlet LIMIT 1');
     if (!outlet) throw new Error('No outlet — DB not seeded');
 
+    // CR-06 (FR-103): weighed lines carry their received quantity in GRAMS —
+    // a base-unit qtyDelta on a weighed product lands in stock_ledger.qty_delta
+    // and is invisible to stock_view.qty_g, so the received stock "vanished"
+    // from the gram book. One IN-query for the whole receipt (not per line).
+    const lineProductIds = [...new Set(po.lines.map((l) => l.productId))];
+    const weighedRows = await db.getAllAsync<{ id: string; is_weighed: number }>(
+      `SELECT id, is_weighed FROM product WHERE id IN (${lineProductIds.map(() => '?').join(', ')})`,
+      lineProductIds,
+    );
+    const weighedById = new Map(weighedRows.map((r) => [r.id, r.is_weighed === 1] as [string, boolean]));
+
     for (const line of po.lines) {
       const remaining = line.qtyOrdered - line.qtyReceived;
       if (remaining <= 0) continue;
@@ -176,10 +189,16 @@ export async function receivePO(id: string): Promise<PurchaseOrder> {
         [lotId, line.productId, outlet.id, lotCode, line.expiryDate, now],
       );
 
-      // Stock-in: FIFO cost layer (linked to the lot) + immutable receive_po ledger row.
+      // Stock-in: FIFO cost layer (linked to the lot) + immutable receive_po
+      // ledger row. Weighed lines route `remaining` to qtyGDelta (grams); the
+      // lot still records the batch (code/expiry) even though weighed stock
+      // keeps no cost layer (COGS is a per-kg fact).
+      const isWeighed = weighedById.get(line.productId) ?? false;
+      const deltas = receiveDeltas(remaining, isWeighed);
       const move = await applyStockMoveInTx(db, {
         productId: line.productId,
-        qtyDelta: remaining,
+        qtyDelta: deltas.qtyDelta,
+        qtyGDelta: deltas.qtyGDelta,
         type: 'receive_po',
         unitCostMinor: line.unitCostMinor,
         lotId,

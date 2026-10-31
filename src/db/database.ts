@@ -7,7 +7,7 @@
  */
 
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
-import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, MIGRATE_V3_TO_V4_SQL, MIGRATE_V4_TO_V5_SQL, MIGRATE_V5_TO_V6_SQL, ENSURE_M4_SQL, ENSURE_M6_SQL, SCHEMA_SQL, SCHEMA_VERSION, OUTBOX_PENDING_INDEX_SQL, STOCK_VIEW_SQL } from './schema';
+import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, MIGRATE_V3_TO_V4_SQL, MIGRATE_V4_TO_V5_SQL, MIGRATE_V5_TO_V6_SQL, MIGRATE_V6_TO_V7_SQL, ENSURE_M4_SQL, ENSURE_M6_SQL, ENSURE_M7_SQL, SCHEMA_SQL, SCHEMA_VERSION, OUTBOX_PENDING_INDEX_SQL, STOCK_VIEW_SQL } from './schema';
 import { runSeed, isSeeded, ensureDefaultUsers } from './seed';
 import { uuidv4 } from '../lib/ids';
 
@@ -71,6 +71,12 @@ export async function getDb(): Promise<SQLiteDatabase> {
             // below (every bootstrap) so fresh + upgraded installs converge.
             await database.execAsync(MIGRATE_V5_TO_V6_SQL);
           }
+          if (current < 7) {
+            // v7: CR-04 persistent category remap (new table only). The
+            // refund.shift_id / payment_method ALTERs + backfill run in
+            // ensureM7() below (every bootstrap).
+            await database.execAsync(MIGRATE_V6_TO_V7_SQL);
+          }
           await database.runAsync('INSERT OR REPLACE INTO schema_meta (id, v) VALUES (1, ?)', [
             SCHEMA_VERSION,
           ]);
@@ -94,6 +100,10 @@ export async function getDb(): Promise<SQLiteDatabase> {
       // M6 self-heal: re-assert the refund_line/supplier tables and the
       // guarded product.supplier_id ALTER on EVERY bootstrap (idempotent).
       await ensureM6(database);
+
+      // v7 self-heal: re-assert the category_id_map table and the guarded
+      // refund.shift_id / payment_method ALTERs on EVERY bootstrap (idempotent).
+      await ensureM7(database);
 
       // FR-200: shift = {device, cashier} pair — stable device identity
       // (created once on first run; persists across restarts).
@@ -177,4 +187,34 @@ async function ensureM6(db: SQLiteDatabase): Promise<void> {
       WHERE updated_at IS NULL`,
     [Date.now(), Date.now()],
   );
+}
+
+/**
+ * v7 self-heal (every bootstrap). CR-08: the refund row gains per-shift
+ * drawer attribution (`shift_id`, `payment_method`) — guarded ALTERs, then a
+ * backfill that is idempotent by construction (it only matches rows still
+ * NULL, and each NULL becomes non-NULL after it runs):
+ *  - shift_id ← the PARENT SALE's shift (pre-v7 refunds were only ever
+ *    created while the sale's shift was open — the refund UI sits inside a
+ *    live sale);
+ *  - payment_method ← 'cash' (the only method the M6 refund flow has ever
+ *    had — factually correct, not a guess).
+ * Refunds whose sale has no shift keep NULL: they never affected a drawer.
+ * Pulled refunds (other devices) insert NULL by design — cash left the
+ * origin device's drawer, not this one's.
+ */
+async function ensureM7(db: SQLiteDatabase): Promise<void> {
+  await db.execAsync(ENSURE_M7_SQL);
+  if (!(await hasColumn(db, 'refund', 'shift_id'))) {
+    await db.execAsync('ALTER TABLE refund ADD COLUMN shift_id TEXT;');
+    await db.execAsync('ALTER TABLE refund ADD COLUMN payment_method TEXT;');
+  }
+  // Fresh-install CREATE already has the index; upgraded tables need it.
+  await db.execAsync('CREATE INDEX IF NOT EXISTS idx_refund_shift ON refund(shift_id);');
+  await db.runAsync(
+    `UPDATE refund SET shift_id = (SELECT s.shift_id FROM sale s WHERE s.id = refund.sale_id)
+      WHERE shift_id IS NULL
+        AND sale_id IN (SELECT id FROM sale WHERE shift_id IS NOT NULL)`,
+  );
+  await db.runAsync(`UPDATE refund SET payment_method = 'cash' WHERE payment_method IS NULL`);
 }

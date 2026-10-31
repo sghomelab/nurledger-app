@@ -4,6 +4,7 @@ import {
   isFullyReceived,
   planReceive,
   poTotalCostMinor,
+  receiveDeltas,
   remainingToReceive,
   type PoDocumentInput,
   type POLineLike,
@@ -74,6 +75,16 @@ describe('PO math (M3, FR-306/FR-318/FR-322)', () => {
       { productId: 'A', qtyOrdered: 10, qtyReceived: 10, unitCostMinor: 500, lotCode: 'L1', expiryDate: null },
     ]);
     expect(plan).toEqual([]);
+  });
+
+  it('CR-06: receiveDeltas routes weighed lines to grams', () => {
+    // Weighed (FR-103): 5,000 g of apples must land in qty_g_delta — a
+    // qty_delta of 5000 would be invisible to stock_view.qty_g.
+    expect(receiveDeltas(5_000, true)).toEqual({ qtyDelta: 0, qtyGDelta: 5_000 });
+  });
+
+  it('CR-06: receiveDeltas keeps base units for non-weighed lines', () => {
+    expect(receiveDeltas(12, false)).toEqual({ qtyDelta: 12, qtyGDelta: null });
   });
 });
 

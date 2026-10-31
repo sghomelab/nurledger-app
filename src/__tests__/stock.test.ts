@@ -1,6 +1,7 @@
 import {
   analyzeMargin,
   applyConsumption,
+  cogsIncludingShortage,
   consumeFifo,
   daysUntil,
   expiryUrgency,
@@ -60,6 +61,43 @@ describe('FIFO cost layers (ADR-003, spec §4.3.1 worked example)', () => {
     const rem = applyConsumption(layers, r);
     expect(rem.get('L1')).toBe(0);
     expect(rem.get('L2')).toBe(1500);
+  });
+});
+
+describe('FIFO shortage settlement (CR-07)', () => {
+  it('cogsIncludingShortage is a no-op on a full consumption', () => {
+    expect(cogsIncludingShortage(100_000, false, 0, 999)).toBe(100_000);
+  });
+
+  it('books the unattributable remainder at the fallback (current) cost', () => {
+    // Ledger says 10 on hand, but only 5 units have cost layers (drift).
+    // A stocktake counts 3 → variance −7 → consumeFifo short by 2.
+    const layers = [layer('L1', 50, 5, 1)];
+    const r = consumeFifo(layers, 7);
+    expect(r.short).toBe(true);
+    expect(r.shortageQty).toBe(2);
+    expect(r.cogsMinor).toBe(5 * 50); // only the layered 5 at real FIFO cost
+    // The 2 phantom units book at the product's current cost (e.g. 80):
+    expect(cogsIncludingShortage(r.cogsMinor, r.short, r.shortageQty, 80)).toBe(5 * 50 + 2 * 80);
+  });
+
+  it('depleting the layers leaves nothing for the next consumption', () => {
+    // After the short stocktake above, the repo zeroes every remaining layer.
+    // The ledger now agrees with the count (3), the layers hold 0 — a later
+    // sale of 3 consumes short AGAIN but the book and the layers are aligned,
+    // and no layer qty can go negative.
+    const afterSettle: LayerInput[] = [layer('L1', 50, 0, 1)];
+    const r = consumeFifo(afterSettle, 3);
+    expect(r.short).toBe(true);
+    expect(r.shortageQty).toBe(3);
+    expect(r.consumed).toEqual([]);
+    expect(cogsIncludingShortage(r.cogsMinor, r.short, r.shortageQty, 80)).toBe(3 * 80);
+  });
+
+  it('zero fallback cost leaves the layered COGS untouched', () => {
+    const layers = [layer('L1', 50, 2, 1)];
+    const r = consumeFifo(layers, 4);
+    expect(cogsIncludingShortage(r.cogsMinor, r.short, r.shortageQty, 0)).toBe(2 * 50);
   });
 });
 

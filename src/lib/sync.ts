@@ -288,6 +288,137 @@ export function resolveCategoryDelta<R extends LwwMeta & { id: string; name: str
 }
 
 // ---------------------------------------------------------------------------
+// Product pull plan (CR-05) — concurrent offline SKU collisions
+// ---------------------------------------------------------------------------
+
+/** The local state needed to plan a product pull (identity + sku + LWW meta). */
+export interface LocalProductMeta extends LwwMeta {
+  id: string;
+  sku: string;
+}
+
+export type ProductPullDecision =
+  /** Write the row under `localId`.
+   *  - `preserveIdentity: false` — normal upsert (`localId` === the incoming
+   *    id; every field including sku is written).
+   *  - `preserveIdentity: true` — the winner of a (outlet_id, sku) collision,
+   *    written under the EXISTING row's id, which keeps its id/sku/created_at
+   *    (local identity is canonical — mirrors the server's `apply_product`
+   *    unique_violation handler, which keeps the existing row's id). */
+  | { kind: 'write'; localId: string; preserveIdentity: boolean }
+  /** No write: the local row won the LWW, or the row is identical (replay). */
+  | { kind: 'kept'; reason: 'loser' | 'identical' }
+  /** No write + diagnostic: a same-id LWW winner would rename its sku onto a
+   *  sku already owned by another local row. The server RAISEs on this edge
+   *  (its op stays queued); locally we skip + surface it (CR-03 philosophy)
+   *  instead of rolling the whole pull batch on a SQLite unique-constraint
+   *  failure. */
+  | { kind: 'skipped'; reason: 'sku-rename-collision' };
+
+/**
+ * Decide, per incoming product, how to apply it against local state (CR-05).
+ *
+ * Two offline devices can create different rows (different ids) with the SAME
+ * (outlet_id, sku) before either syncs. The local `idx_product_sku` UNIQUE
+ * index makes a blind upsert throw and roll back the ENTIRE pull — the bug
+ * this planner removes. Per incoming row:
+ *  - a local row with the SAME id exists → plain LWW (the current rule);
+ *  - otherwise a local row owns the incoming (outlet_id, sku) → LWW on that
+ *    row; the winner is written under the EXISTING row's id (local identity
+ *    canonical, exactly the server's semantics), keeping its id/sku/created_at;
+ *  - otherwise → a new row under the incoming id.
+ *
+ * Within-batch sku ownership is tracked as the plan proceeds (an earlier
+ * insert/same-id rename must be visible to a later row). `local` must contain
+ * every local row whose id or (outlet-scoped) sku is referenced by `incoming`
+ * — the caller loads both sets in one query.
+ */
+export function planProductPull<R extends LwwMeta & { id: string; sku: string }>(
+  local: LocalProductMeta[],
+  incoming: R[],
+): Array<R & { decision: ProductPullDecision }> {
+  const localById = new Map(local.map((r): [string, LocalProductMeta] => [r.id, r]));
+  const skuOwner = new Map<string, string>(); // sku → local row id
+  for (const r of local) if (r.sku) skuOwner.set(r.sku, r.id);
+
+  const out: Array<R & { decision: ProductPullDecision }> = [];
+  for (const p of incoming) {
+    const existing = localById.get(p.id);
+    if (existing) {
+      if (existing.updatedAt === p.updatedAt && existing.updatedByDevice === p.updatedByDevice) {
+        out.push({ ...p, decision: { kind: 'kept', reason: 'identical' } });
+        continue;
+      }
+      if (lwwOutcome(existing, p).winner !== 'incoming') {
+        out.push({ ...p, decision: { kind: 'kept', reason: 'loser' } });
+        continue;
+      }
+      // Same-id winner — but its (possibly renamed) sku may be owned by
+      // another row: the server RAISEs on that edge; locally skip + surface.
+      const owner = p.sku ? skuOwner.get(p.sku) : undefined;
+      if (owner !== undefined && owner !== p.id) {
+        out.push({ ...p, decision: { kind: 'skipped', reason: 'sku-rename-collision' } });
+        continue;
+      }
+      out.push({ ...p, decision: { kind: 'write', localId: p.id, preserveIdentity: false } });
+      if (p.sku) {
+        if (existing.sku && skuOwner.get(existing.sku) === p.id) skuOwner.delete(existing.sku);
+        skuOwner.set(p.sku, p.id);
+      }
+      continue;
+    }
+    // New id — does another local row own its sku?
+    const owner = p.sku ? skuOwner.get(p.sku) : undefined;
+    if (owner === undefined) {
+      out.push({ ...p, decision: { kind: 'write', localId: p.id, preserveIdentity: false } });
+      if (p.sku) skuOwner.set(p.sku, p.id); // visible to later rows in THIS batch
+      continue;
+    }
+    const ownerRow = localById.get(owner);
+    if (!ownerRow) {
+      // Unreachable (skuOwner is derived from the same `local` list) — adopt.
+      out.push({ ...p, decision: { kind: 'write', localId: p.id, preserveIdentity: false } });
+      continue;
+    }
+    if (ownerRow.updatedAt === p.updatedAt && ownerRow.updatedByDevice === p.updatedByDevice) {
+      out.push({ ...p, decision: { kind: 'kept', reason: 'identical' } });
+      continue;
+    }
+    if (lwwOutcome(ownerRow, p).winner !== 'incoming') {
+      out.push({ ...p, decision: { kind: 'kept', reason: 'loser' } });
+      continue;
+    }
+    // Incoming wins: written under the existing row's id, preserving its
+    // id/sku/created_at (the server keeps ITS row's id — same rule, local
+    // mirror).
+    out.push({ ...p, decision: { kind: 'write', localId: owner, preserveIdentity: true } });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Category remap persistence (CR-04)
+// ---------------------------------------------------------------------------
+
+/**
+ * CR-04: drop remap entries whose remote id now EXISTS locally as itself.
+ * Once the remote row is in the local `category` table, products referencing
+ * it resolve directly — a leftover `remote → other` mapping would wrongly
+ * re-key them onto a different local row. Entries whose LOCAL target is gone
+ * are dropped by the loader (it only selects rows joined to live `category`).
+ */
+export function pruneCategoryRemap(
+  remap: Map<string, string>,
+  localCategoryIds: Set<string>,
+): Map<string, string> {
+  const out = new Map(remap);
+  for (const remoteId of [...out.keys()]) {
+    if (localCategoryIds.has(remoteId)) out.delete(remoteId);
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
 // Convergence helpers (used by the two-device exit test + its unit twin)
 // ---------------------------------------------------------------------------
 

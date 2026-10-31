@@ -69,6 +69,24 @@ export function applyConsumption(
   return remaining;
 }
 
+/**
+ * CR-07: total COGS when a FIFO consumption came up SHORT — the layers cover
+ * `qty − shortageQty` at their real FIFO costs (already in `cogsMinor`), and
+ * the unattributable remainder is booked at `fallbackCostMinor` (the
+ * product's CURRENT unit cost — a documented approximation, same spirit as
+ * the weighed per-kg COGS fact). Only applies when `short` is true; on a full
+ * consumption the fallback is never used and the result is unchanged.
+ */
+export function cogsIncludingShortage(
+  cogsMinor: number,
+  short: boolean,
+  shortageQty: number,
+  fallbackCostMinor: number,
+): number {
+  if (!short || shortageQty <= 0) return cogsMinor;
+  return cogsMinor + shortageQty * fallbackCostMinor;
+}
+
 /** Project on-hand stock from immutable ledger rows (ADR-002). */
 export function projectStock(qtyDeltas: Array<number | null>): number {
   return qtyDeltas.reduce<number>((sum, d) => sum + (d ?? 0), 0);

@@ -34,10 +34,11 @@ import type { CloudAdapter, CloudConfig } from '../lib/cloud/types';
 import type { ProductDeltaRow, SyncPullResult, TableCursors } from '../lib/cloud/types';
 import {
   advanceCursor,
-  applyLwwDelta,
   isRetryableError,
+  planProductPull,
+  pruneCategoryRemap,
   resolveCategoryDelta,
-  type LwwMeta,
+  type LocalProductMeta,
 } from '../lib/sync';
 import {
   clearSyncError,
@@ -169,7 +170,21 @@ async function applyPullLocally(pull: SyncPullResult): Promise<{ skipped: string
     // bug this fix removes.) The full local table is compared (small: shop
     // master data), not just the ids in the batch — a name clash with a
     // local row whose id isn't pulled this round must still be caught.
+    // CR-04: the remap is PERSISTED (category_id_map, schema v7) and loaded
+    // on EVERY tick. The old in-memory map only survived within a tick where
+    // pull.categories was non-empty — on later ticks a product referencing a
+    // previously-remapped remote category fell back to the raw remote id →
+    // FK violation → the whole pull rolled back and wedged forever. The
+    // loader only keeps entries whose local target still exists, so stale
+    // rows self-clean.
     const catIdRemap = new Map<string, string>();
+    const persisted = await db.getAllAsync<{ remote_id: string; local_id: string }>(
+      `SELECT m.remote_id, m.local_id
+         FROM category_id_map m
+        WHERE m.local_id IN (SELECT id FROM category)`,
+    );
+    for (const r of persisted) catIdRemap.set(r.remote_id, r.local_id);
+
     if (pull.categories.length > 0) {
       const local = await db.getAllAsync<{ id: string; name: string; updatedAt: number }>(
         'SELECT id, name, COALESCE(updated_at, 0) AS updatedAt FROM category',
@@ -179,7 +194,14 @@ async function applyPullLocally(pull: SyncPullResult): Promise<{ skipped: string
         local.map((r) => ({ ...r, updatedByDevice: localDevice })),
         pull.categories,
       );
-      for (const [k, v] of remap) catIdRemap.set(k, v);
+      for (const [k, v] of remap) {
+        catIdRemap.set(k, v);
+        await db.runAsync(
+          `INSERT INTO category_id_map (remote_id, local_id) VALUES (?, ?)
+             ON CONFLICT (remote_id) DO UPDATE SET local_id = excluded.local_id`,
+          [k, v],
+        );
+      }
       for (const cat of toWrite) {
         await db.runAsync(
           `INSERT INTO category (id, name, active, created_at, updated_at)
@@ -190,20 +212,76 @@ async function applyPullLocally(pull: SyncPullResult): Promise<{ skipped: string
         );
       }
     }
+    // CR-04: a remote id that now exists locally AS ITSELF no longer needs a
+    // mapping (products referencing it resolve directly) — dropping the entry
+    // keeps the table small and a stale entry can never re-key a product
+    // onto a different row. Runs every tick: a category pulled as itself in
+    // an earlier tick can invalidate an entry remapped before it landed.
+    await db.runAsync(
+      'DELETE FROM category_id_map WHERE remote_id IN (SELECT id FROM category)',
+    );
 
-    // --- products: LWW (updated_at, device tie-break) ---
+    // --- products: LWW (updated_at, device tie-break) + CR-05 sku collisions ---
     if (pull.products.length > 0) {
-      const ph = pull.products.map(() => '?').join(', ');
-      const local = await db.getAllAsync<{ id: string; updatedAt: number }>(
-        `SELECT id, updated_at AS updatedAt FROM product WHERE id IN (${ph})`,
-        pull.products.map((p) => p.id),
+      const ids = pull.products.map((p) => p.id);
+      const skus = [...new Set(pull.products.map((p) => p.sku).filter((s) => s.length > 0))];
+      const idPh = ids.map(() => '?').join(', ');
+      const skuPh = skus.length > 0 ? skus.map(() => '?').join(', ') : 'NULL';
+      // Load every local row that can interact with this batch: same-id rows
+      // (LWW) AND (outlet-scoped) same-sku rows (CR-05 collision candidates).
+      const local = await db.getAllAsync<{ id: string; sku: string; updatedAt: number }>(
+        `SELECT id, sku, updated_at AS updatedAt FROM product
+          WHERE id IN (${idPh}) OR (outlet_id = ? AND sku IN (${skuPh}))`,
+        [...ids, outletId, ...skus],
       );
       const localDevice = (await getDeviceId()) ?? 'unknown'; // matches buildProductPayload's fallback
-      const localById = new Map<string, LwwMeta>(
-        local.map((r): [string, LwwMeta] => [r.id, { updatedAt: r.updatedAt, updatedByDevice: localDevice }]),
-      );
-      const { toWrite } = applyLwwDelta(localById, pull.products);
-      for (const p of toWrite) {
+      const localMeta: LocalProductMeta[] = local.map((r) => ({
+        id: r.id,
+        sku: r.sku,
+        updatedAt: r.updatedAt,
+        updatedByDevice: localDevice,
+      }));
+      const plan = planProductPull(localMeta, pull.products);
+      for (const item of plan) {
+        const p = item;
+        // A same-name/different-id category created offline on another
+        // device is re-keyed onto the local row (see catIdRemap above) so
+        // the local UNIQUE(name) invariant — and this FK — hold.
+        const categoryId = p.categoryId ? (catIdRemap.get(p.categoryId) ?? p.categoryId) : null;
+
+        if (p.decision.kind === 'write' && p.decision.preserveIdentity) {
+          // CR-05: a (outlet_id, sku) collision where the INCOMING row won —
+          // written under the EXISTING row's id, which keeps its id/sku/
+          // created_at (local identity is canonical — the server's
+          // apply_product unique_violation handler does the same with its
+          // own id). No column may collide: sku is unchanged by design.
+          await db.runAsync(
+            `UPDATE product SET
+               name = ?, category_id = ?, unit_type = ?, is_weighed = ?, barcode = ?,
+               carton_barcode = ?, carton_size = ?, cost_minor = ?, price_minor = ?,
+               tax_category = ?, min_qty = ?, max_qty = ?, velocity_class = ?,
+               description = ?, active = ?, updated_at = ?
+             WHERE id = ?`,
+            [
+              p.name, categoryId, p.unitType, p.isWeighed ? 1 : 0, p.barcode,
+              p.cartonBarcode, p.cartonSize, p.costMinor, p.priceMinor, p.taxCategory,
+              p.minQty, p.maxQty, p.velocityClass, p.description, p.active ? 1 : 0,
+              p.updatedAt, p.decision.localId,
+            ],
+          );
+          continue;
+        }
+        if (p.decision.kind === 'kept') continue;
+        if (p.decision.kind === 'skipped') {
+          // CR-05 guard: a same-id winner would rename its sku onto one owned
+          // by another local row. The server RAISEs on this edge (its op
+          // stays queued); locally we skip + surface (CR-03 philosophy)
+          // instead of rolling the whole batch on the unique index.
+          skipped.push(`product ${p.id} — rename to sku '${p.sku}' collides with a local row`);
+          continue;
+        }
+        // 'write' + preserveIdentity=false: new row or same-id LWW winner —
+        // the standard upsert (ON CONFLICT (id)).
         await db.runAsync(
           `INSERT INTO product
              (id, outlet_id, sku, name, category_id, unit_type, is_weighed, barcode,
@@ -221,10 +299,7 @@ async function applyPullLocally(pull: SyncPullResult): Promise<{ skipped: string
              active = excluded.active, created_at = excluded.created_at, updated_at = excluded.updated_at`,
           [
             p.id, outletId, p.sku, p.name,
-            // A same-name/different-id category created offline on another
-            // device is re-keyed onto the local row (see catIdRemap above) so
-            // the local UNIQUE(name) invariant — and this FK — hold.
-            p.categoryId ? (catIdRemap.get(p.categoryId) ?? p.categoryId) : null,
+            categoryId,
             p.unitType, p.isWeighed ? 1 : 0,
             p.barcode, p.cartonBarcode, p.cartonSize, p.costMinor, p.priceMinor, p.taxCategory,
             p.minQty, p.maxQty, p.velocityClass, p.description, p.active ? 1 : 0,

@@ -1,8 +1,10 @@
 /**
  * Shift math (FR-200…FR-204, pure — integer minor units, ADR-004).
  *
- * Drawer invariant: expected cash = float + cash sales + cash in − cash out.
- * Variance = counted − expected (FR-202: "expected vs counted variance").
+ * Drawer invariant: expected cash = float + cash sales + cash in − cash out
+ * − cash refunds (CR-08: a refund paid in cash leaves the drawer, so the
+ * expected balance must fall by the refund amount — without this, every
+ * refund guaranteed a false "short" variance at Z).
  *
  * Z-report (FR-202): sales by payment method, cash movements, variance,
  * refunds. Refunds land in M6 (FR-110/FR-111) — the field is present with 0
@@ -25,11 +27,18 @@ export interface CashTotals {
   cashSaleMinor: number;
   cashInMinor: number;
   cashOutMinor: number;
+  /**
+   * CR-08: cash-method refunds STAMPED to this shift (refund.shift_id =
+   * shift, payment_method = 'cash'). Strictly the shift's own refunds —
+   * pulled copies from other devices stay un-stamped by design and must not
+   * move this drawer.
+   */
+  cashRefundMinor: number;
 }
 
-/** FR-202 drawer math: float + cash sales + cash in − cash out. */
+/** FR-202 drawer math: float + cash sales + cash in − cash out − cash refunds. */
 export function expectedCashMinor(t: CashTotals): number {
-  return t.floatMinor + t.cashSaleMinor + t.cashInMinor - t.cashOutMinor;
+  return t.floatMinor + t.cashSaleMinor + t.cashInMinor - t.cashOutMinor - t.cashRefundMinor;
 }
 
 export type VarianceClass = 'exact' | 'over' | 'short';

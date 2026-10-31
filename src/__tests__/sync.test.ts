@@ -15,12 +15,16 @@ import {
   ledgerSignature,
   lwwOutcome,
   nextDrainBatch,
+  planProductPull,
   productResolveRef,
+  pruneCategoryRemap,
   resolveCategoryDelta,
   saleResolveCandidates,
   saleSignature,
   type LwwMeta,
+  type LocalProductMeta,
   type OutboxOp,
+  type ProductPullDecision,
 } from '../lib/sync';
 
 function op(partial: Partial<OutboxOp> & { opId: string }): OutboxOp {
@@ -326,5 +330,157 @@ describe('categories pull resolution (schema v3 — FK-safe pull + name collisio
     );
     expect(toWrite).toEqual([cat('remote-1', 'Snacks', 1000, 'devA'), cat('remote-2', 'Beverages', 1000, 'devA')]);
     expect(remap.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CR-05: product pull plan (concurrent offline SKU collisions) — the unit
+// twin of the pull fix. Two devices can create DIFFERENT rows (different
+// ids) with the SAME (outlet_id, sku) offline; a blind upsert hit the local
+// UNIQUE index and rolled back the entire pull.
+//
+// CR-04: category remap pruning — the persisted remap (schema v7) must drop
+// entries whose remote id now exists locally as itself.
+// ---------------------------------------------------------------------------
+
+type ProdRow = { id: string; sku: string; name: string } & LwwMeta;
+
+function prod(id: string, sku: string, updatedAt = 1000, updatedByDevice = 'devA'): ProdRow {
+  return { id, sku, name: id, updatedAt, updatedByDevice };
+}
+
+function lmeta(id: string, sku: string, updatedAt = 1000, updatedByDevice = 'devA'): LocalProductMeta {
+  return { id, sku, updatedAt, updatedByDevice };
+}
+
+describe('product pull plan (CR-05)', () => {
+  it('adopts a new product (no local row, sku free)', () => {
+    const plan = planProductPull([lmeta('l1', 'SKU-1')], [prod('p1', 'SKU-9', 2000, 'devA')]);
+    expect(plan[0]!.decision).toEqual({ kind: 'write', localId: 'p1', preserveIdentity: false });
+  });
+
+  it('same-id row: plain LWW — the incoming winner is a normal upsert', () => {
+    const plan = planProductPull(
+      [lmeta('p1', 'SKU-1', 1000, 'devB')],
+      [prod('p1', 'SKU-1', 2000, 'devA')],
+    );
+    expect(plan[0]!.decision).toEqual({ kind: 'write', localId: 'p1', preserveIdentity: false });
+  });
+
+  it('same-id row: the local winner is kept (no write)', () => {
+    const plan = planProductPull(
+      [lmeta('p1', 'SKU-1', 2000, 'devB')],
+      [prod('p1', 'SKU-1', 1000, 'devA')],
+    );
+    expect(plan[0]!.decision).toEqual({ kind: 'kept', reason: 'loser' });
+  });
+
+  it('same-id row: identical state is a kept replay', () => {
+    const plan = planProductPull(
+      [lmeta('p1', 'SKU-1', 1000, 'devA')],
+      [prod('p1', 'SKU-1', 1000, 'devA')],
+    );
+    expect(plan[0]!.decision).toEqual({ kind: 'kept', reason: 'identical' });
+  });
+
+  it('NEW id whose sku is owned + incoming is newer: written under the EXISTING row\'s id (identity preserved)', () => {
+    // Two devices each created "SKU-1" offline under different ids; the local
+    // row is older. A blind INSERT of the incoming id would violate the local
+    // UNIQUE(outlet_id, sku) index and roll back the whole pull — instead the
+    // winner updates the existing row, which keeps its id/sku/created_at
+    // (mirrors the server's apply_product unique_violation handler).
+    const plan = planProductPull(
+      [lmeta('local-p1', 'SKU-1', 1000, 'devB')],
+      [prod('remote-p1', 'SKU-1', 2000, 'devA')],
+    );
+    expect(plan[0]!.decision).toEqual({ kind: 'write', localId: 'local-p1', preserveIdentity: true });
+  });
+
+  it('NEW id whose sku is owned + the local owner is newer: kept, no write', () => {
+    const plan = planProductPull(
+      [lmeta('local-p1', 'SKU-1', 2000, 'devB')],
+      [prod('remote-p1', 'SKU-1', 1000, 'devA')],
+    );
+    expect(plan[0]!.decision).toEqual({ kind: 'kept', reason: 'loser' });
+  });
+
+  it('NEW id whose sku is owned + state identical: kept replay', () => {
+    const plan = planProductPull(
+      [lmeta('local-p1', 'SKU-1', 1000, 'devA')],
+      [prod('remote-p1', 'SKU-1', 1000, 'devA')],
+    );
+    expect(plan[0]!.decision).toEqual({ kind: 'kept', reason: 'identical' });
+  });
+
+  it('same-id winner renaming onto an OWNED sku: skipped + surfaced (no rollback)', () => {
+    // The server RAISEs on this edge (its op stays queued); locally the batch
+    // must keep moving (CR-03 philosophy) — the row is skipped and reported.
+    const plan = planProductPull(
+      [lmeta('p1', 'SKU-1', 1000, 'devB'), lmeta('p2', 'SKU-2', 1000, 'devB')],
+      [prod('p1', 'SKU-2', 2000, 'devA')], // p1 is newer and renames onto p2's sku
+    );
+    expect(plan[0]!.decision).toEqual({ kind: 'skipped', reason: 'sku-rename-collision' });
+  });
+
+  it('within-batch: an earlier insert claims the sku; a later rename onto it is skipped', () => {
+    const plan = planProductPull(
+      [lmeta('p1', 'SKU-1', 1000, 'devB')],
+      [
+        prod('new-1', 'SKU-9', 1500, 'devA'), // inserted first — claims SKU-9
+        prod('p1', 'SKU-9', 2000, 'devA'),    // same-id winner renames onto SKU-9
+      ],
+    );
+    expect(plan[0]!.decision).toEqual({ kind: 'write', localId: 'new-1', preserveIdentity: false });
+    expect(plan[1]!.decision).toEqual({ kind: 'skipped', reason: 'sku-rename-collision' });
+  });
+
+  it('within-batch: a winning rename frees the old sku for a later new row', () => {
+    const plan = planProductPull(
+      [lmeta('p1', 'SKU-1', 1000, 'devB')],
+      [
+        prod('p1', 'SKU-2', 2000, 'devA'),     // winner: p1 renames SKU-1 → SKU-2
+        prod('new-1', 'SKU-1', 1500, 'devC'),  // adopts the freed SKU-1
+      ],
+    );
+    expect(plan[0]!.decision).toEqual({ kind: 'write', localId: 'p1', preserveIdentity: false });
+    expect(plan[1]!.decision).toEqual({ kind: 'write', localId: 'new-1', preserveIdentity: false });
+  });
+
+  it('an empty incoming sku never participates in collision matching', () => {
+    const plan = planProductPull(
+      [lmeta('p1', 'SKU-1', 1000, 'devB')],
+      [prod('new-1', '', 2000, 'devA')],
+    );
+    expect(plan[0]!.decision).toEqual({ kind: 'write', localId: 'new-1', preserveIdentity: false });
+  });
+});
+
+describe('category remap pruning (CR-04)', () => {
+  it('drops entries whose remote id now exists locally as itself', () => {
+    // remote-2 was remapped onto local-1 in an earlier pull; this tick the
+    // remote row landed as itself — the mapping is obsolete (a leftover entry
+    // would re-key products referencing remote-2 onto the WRONG local row).
+    const remap = new Map<string, string>([
+      ['remote-1', 'local-1'],
+      ['remote-2', 'local-1'],
+    ]);
+    const pruned = pruneCategoryRemap(remap, new Set(['remote-2', 'local-1']));
+    expect(pruned.get('remote-1')).toBe('local-1');
+    expect(pruned.has('remote-2')).toBe(false);
+  });
+
+  it('keeps entries for remote ids that are still not local', () => {
+    const remap = new Map<string, string>([['remote-1', 'local-1']]);
+    const pruned = pruneCategoryRemap(remap, new Set(['local-1', 'local-2']));
+    expect(pruned.get('remote-1')).toBe('local-1');
+  });
+
+  it('does not mutate the input map', () => {
+    const remap = new Map<string, string>([
+      ['remote-1', 'local-1'],
+      ['remote-2', 'local-1'],
+    ]);
+    pruneCategoryRemap(remap, new Set(['remote-2']));
+    expect(remap.size).toBe(2);
   });
 });

@@ -19,9 +19,11 @@ import {
   expectedCashMinor,
   type CashMove,
   type CashMoveType,
+  type CashTotals,
   type SalesByMethod,
   type ZReport,
 } from '../lib/shift';
+import type { SQLiteDatabase } from 'expo-sqlite';
 
 export interface Shift {
   id: string;
@@ -205,6 +207,36 @@ export interface CloseShiftInput {
 }
 
 /**
+ * CR-08: refund totals for a shift, in one query.
+ *  - `cashRefundMinor` — refunds STAMPED to this shift, cash method: the
+ *    drawer math subtracts exactly the cash that left THIS drawer. Pulled
+ *    copies from other devices stay un-stamped (NULL) by design and never
+ *    enter this sum — the cash left the origin device's drawer.
+ *  - `refundsMinor` — the Z-report DISPLAY figure: refunds stamped to this
+ *    shift OR against this shift's sales (covers pre-v7 rows whose
+ *    shift_id is NULL — same attribution as the old sale-join, now only for
+ *    display; the old join wrongly drove the drawer math for cross-shift
+ *    refunds).
+ */
+async function shiftRefundTotals(
+  db: SQLiteDatabase,
+  shiftId: string,
+): Promise<{ cashRefundMinor: number; refundsMinor: number }> {
+  const row = await db.getFirstAsync<{ cash: number; display: number }>(
+    `SELECT
+       COALESCE(SUM(CASE WHEN r.shift_id = ? AND COALESCE(r.payment_method, 'cash') = 'cash'
+                         THEN r.amount_minor END), 0) AS cash,
+       COALESCE(SUM(CASE WHEN r.shift_id = ? OR s.shift_id = ?
+                         THEN r.amount_minor END), 0) AS display
+      FROM refund r
+      LEFT JOIN sale s ON s.id = r.sale_id
+     WHERE r.shift_id = ? OR s.shift_id = ?`,
+    [shiftId, shiftId, shiftId, shiftId, shiftId],
+  );
+  return { cashRefundMinor: row?.cash ?? 0, refundsMinor: row?.display ?? 0 };
+}
+
+/**
  * FR-202: close the shift. Drawer math (src/lib/shift): expected = float +
  * cash sales + in − out; variance = counted − expected. The Z-report is
  * built and stored as JSON on the shift row (the single source of truth for
@@ -222,17 +254,12 @@ export async function closeShift(input: CloseShiftInput): Promise<Shift> {
   const moves = await listCashMoves(shift.id);
   const cashInMinor = moves.filter((m) => m.type === 'in').reduce((s, m) => s + m.amountMinor, 0);
   const cashOutMinor = moves.filter((m) => m.type === 'out').reduce((s, m) => s + m.amountMinor, 0);
-  // M6 (FR-110): refunds recorded against this shift's sales feed the Z-report.
-  const refundsRow = await db.getFirstAsync<{ n: number }>(
-    `SELECT COALESCE(SUM(r.amount_minor), 0) AS n
-       FROM refund r JOIN sale s ON s.id = r.sale_id
-      WHERE s.shift_id = ?`,
-    [shift.id],
-  );
-  const refundsMinor = refundsRow?.n ?? 0;
+  // M6 (FR-110) + CR-08: refunds feed both the Z-report display and the
+  // drawer math (cash refunds leave the drawer — expected falls by that).
+  const { cashRefundMinor, refundsMinor } = await shiftRefundTotals(db, shift.id);
 
   const closedAt = Date.now();
-  const totals = { floatMinor: shift.floatMinor, cashSaleMinor, cashInMinor, cashOutMinor };
+  const totals: CashTotals = { floatMinor: shift.floatMinor, cashSaleMinor, cashInMinor, cashOutMinor, cashRefundMinor };
   const expected = expectedCashMinor(totals);
   const report = buildZReport({
     shiftId: shift.id,
@@ -268,11 +295,12 @@ export interface DrawerSnapshot {
   shift: Shift;
   salesByMethod: SalesByMethod;
   moves: CashMove[];
-  totals: { floatMinor: number; cashSaleMinor: number; cashInMinor: number; cashOutMinor: number };
+  totals: CashTotals;
   expectedCashMinor: number;
 }
 
 export async function getShiftDrawerSnapshot(shiftId: string): Promise<DrawerSnapshot | null> {
+  const db = await getDb();
   const shift = await getShift(shiftId);
   if (!shift) return null;
   const salesByMethod = await getShiftSalesByMethod(shiftId);
@@ -280,6 +308,9 @@ export async function getShiftDrawerSnapshot(shiftId: string): Promise<DrawerSna
   const cashSaleMinor = salesByMethod['cash'] ?? 0;
   const cashInMinor = moves.filter((m) => m.type === 'in').reduce((s, m) => s + m.amountMinor, 0);
   const cashOutMinor = moves.filter((m) => m.type === 'out').reduce((s, m) => s + m.amountMinor, 0);
-  const totals = { floatMinor: shift.floatMinor, cashSaleMinor, cashInMinor, cashOutMinor };
+  // CR-08: the live drawer card must agree with the Z-report — cash refunds
+  // made so far already reduced the expected balance.
+  const { cashRefundMinor } = await shiftRefundTotals(db, shiftId);
+  const totals: CashTotals = { floatMinor: shift.floatMinor, cashSaleMinor, cashInMinor, cashOutMinor, cashRefundMinor };
   return { shift, salesByMethod, moves, totals, expectedCashMinor: expectedCashMinor(totals) };
 }

@@ -9,6 +9,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { getDb } from '../db/database';
 import {
   applyConsumption,
+  cogsIncludingShortage,
   consumeFifo,
   daysUntil,
   expiryUrgency,
@@ -359,25 +360,52 @@ export async function applyStockMoveInTx(
   );
   const result = consumeFifo(layers, qty);
   const lotId = input.lotId ?? (await firstFefoLotIdInTx(db, productId));
+  let cogsMinor = result.cogsMinor;
+  let rowUnitCost: number | null = result.consumed[0]?.unitCostMinor ?? null;
   if (!result.short) {
     const remaining = applyConsumption(layers, result);
     for (const c of result.consumed) {
       const newQty = remaining.get(c.layerId) ?? 0;
       await db.runAsync('UPDATE cost_layer SET qty_remaining = ? WHERE id = ?', [newQty, c.layerId]);
     }
+  } else {
+    // CR-07: the out exceeds the active cost layers — pre-existing drift
+    // between the ledger (what stock_view shows) and the layers. The old code
+    // skipped the layer updates here while still committing the FULL-qty
+    // ledger row, so every short adjustment/stocktake widened the drift and
+    // COGS was silently under-booked. Now: deplete ALL remaining layers to 0
+    // at their real FIFO costs, and book the unattributable remainder at the
+    // product's CURRENT unit cost (documented approximation — same spirit as
+    // the weighed per-kg COGS fact). The stocktake is the reconciliation
+    // mechanism and its variance is computed against the LIVE book, so
+    // depleting layers converges both the ledger and the layers to the
+    // counted physical truth. The sale path is unaffected: completeSale
+    // throws on `short` and the whole sale rolls back, so the layer updates
+    // above are undone and a sale can never oversell.
+    for (const l of layers) {
+      if (l.qtyRemaining > 0) {
+        await db.runAsync('UPDATE cost_layer SET qty_remaining = 0 WHERE id = ?', [l.id]);
+      }
+    }
+    const p = await db.getFirstAsync<{ cost_minor: number }>(
+      'SELECT cost_minor FROM product WHERE id = ?',
+      [productId],
+    );
+    const fallbackCost = p ? p.cost_minor : 0;
+    cogsMinor = cogsIncludingShortage(result.cogsMinor, result.short, result.shortageQty, fallbackCost);
+    if (rowUnitCost == null) rowUnitCost = fallbackCost;
   }
-  const unitCostMinor = result.consumed[0]?.unitCostMinor ?? null;
   await db.runAsync(
     `INSERT INTO stock_ledger
        (id, outlet_id, product_id, lot_id, type, qty_delta, unit_cost_minor, cogs_minor,
         ref_type, ref_id, reason, device_id, sync_op_id, created_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [uuidv4(), outletRow.id, productId, lotId, input.type, -qty, unitCostMinor,
-     result.cogsMinor, input.refType, input.refId, input.reason ?? null, input.deviceId ?? null, syncOpId, now],
+    [uuidv4(), outletRow.id, productId, lotId, input.type, -qty, rowUnitCost,
+     cogsMinor, input.refType, input.refId, input.reason ?? null, input.deviceId ?? null, syncOpId, now],
   );
   return {
-    cogsMinor: result.cogsMinor,
-    unitCostMinor,
+    cogsMinor,
+    unitCostMinor: rowUnitCost,
     lotId,
     short: result.short,
     shortageQty: result.shortageQty,

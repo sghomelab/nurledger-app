@@ -142,3 +142,17 @@ export function planReceive(
   }
   return plan;
 }
+
+/**
+ * CR-06 (FR-103): the stock-in delta shape for receiving `qty` of a product.
+ * Weighed products keep stock in GRAMS — stock_view.qty_g only moves via
+ * qty_g_delta, so a base-unit delta on them would land in qty_delta and the
+ * received stock would be invisible to the gram book. (The same branching the
+ * adjustment dialog and refund restock use.)
+ */
+export function receiveDeltas(
+  qty: number,
+  isWeighed: boolean,
+): { qtyDelta: number; qtyGDelta: number | null } {
+  return isWeighed ? { qtyDelta: 0, qtyGDelta: qty } : { qtyDelta: qty, qtyGDelta: null };
+}

@@ -3,7 +3,7 @@
  * Bump SCHEMA_VERSION and add a migration step in database.ts when changing existing tables.
  */
 
-export const SCHEMA_VERSION = 6;
+export const SCHEMA_VERSION = 7;
 
 /**
  * M2: active-cart persistence (NFR-3 — every cart mutation is written to SQLite
@@ -246,9 +246,19 @@ CREATE TABLE IF NOT EXISTS refund (
   restock INTEGER NOT NULL DEFAULT 1,
   amount_minor INTEGER NOT NULL,
   pin_verified_by TEXT,
+  -- CR-08: per-shift drawer attribution. shift_id = the shift open when the
+  -- refund was created (NULL = none open / pulled from another device — by
+  -- design, cash left the ORIGIN device's drawer, never this one's).
+  -- payment_method = how the refund was paid out (the M6 flow is cash-only;
+  -- the drawer math filters on it so future methods can't skew the drawer).
+  -- Both are local-only facts — the cloud refund row carries no shift (shifts
+  -- never sync).
+  shift_id TEXT,
+  payment_method TEXT,
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_refund_sale ON refund(sale_id);
+CREATE INDEX IF NOT EXISTS idx_refund_shift ON refund(shift_id);
 
 -- FR-110 (M6): line-level detail — per-line restock + prorated amounts
 CREATE TABLE IF NOT EXISTS refund_line (
@@ -454,3 +464,32 @@ export const ENSURE_M6_SQL = REFUND_LINE_TABLE_SQL + SUPPLIER_TABLE_SQL;
  * (hasColumn), mirroring the v3 `reason` pattern.
  */
 export const MIGRATE_V5_TO_V6_SQL = REFUND_LINE_TABLE_SQL + SUPPLIER_TABLE_SQL;
+
+/**
+ * CR-04: persistent category remap. When a remote category collides by name
+ * with a local row (different ids), the remote id is remapped onto the local
+ * one — and that mapping must SURVIVE pull ticks where `pull.categories` is
+ * empty but pulled products still reference the remapped id (the ephemeral
+ * in-memory map was the bug). `remote_id` = the cloud category id,
+ * `local_id` = the local row it points at. Rows are dropped once the remote
+ * id exists locally as itself (useSync) and are always validated against
+ * live `category` rows on load.
+ */
+export const CATEGORY_ID_MAP_SQL = `
+CREATE TABLE IF NOT EXISTS category_id_map (
+  remote_id TEXT PRIMARY KEY,
+  local_id TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_category_id_map_local ON category_id_map(local_id);
+`;
+
+/**
+ * v6 → v7: CR-04 persistent category remap (new table — idempotent DDL).
+ * The non-idempotent `refund.shift_id` / `refund.payment_method` ALTERs and
+ * their backfill run in the every-bootstrap `ensureM7` self-heal (database.ts)
+ * so fresh + upgraded installs converge.
+ */
+export const MIGRATE_V6_TO_V7_SQL = CATEGORY_ID_MAP_SQL;
+
+/** v7 self-heal (every bootstrap, see ENSURE_M4_SQL for the pattern). */
+export const ENSURE_M7_SQL = CATEGORY_ID_MAP_SQL;

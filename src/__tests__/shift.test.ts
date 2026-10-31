@@ -18,17 +18,31 @@ const NO_MOVES: CashMove[] = [];
 
 describe('expectedCashMinor (drawer invariant)', () => {
   it('float + cash sales + in − out', () => {
-    const t: CashTotals = { floatMinor: 10_000, cashSaleMinor: 25_500, cashInMinor: 5_000, cashOutMinor: 1_500 };
+    const t: CashTotals = { floatMinor: 10_000, cashSaleMinor: 25_500, cashInMinor: 5_000, cashOutMinor: 1_500, cashRefundMinor: 0 };
     expect(expectedCashMinor(t)).toBe(39_000);
   });
 
   it('handles zero sales (fresh shift)', () => {
-    expect(expectedCashMinor({ floatMinor: 20_000, cashSaleMinor: 0, cashInMinor: 0, cashOutMinor: 0 })).toBe(20_000);
+    expect(expectedCashMinor({ floatMinor: 20_000, cashSaleMinor: 0, cashInMinor: 0, cashOutMinor: 0, cashRefundMinor: 0 })).toBe(20_000);
   });
 
   it('can go below the float when cash out exceeds sales + in', () => {
-    const t: CashTotals = { floatMinor: 10_000, cashSaleMinor: 0, cashInMinor: 0, cashOutMinor: 15_000 };
+    const t: CashTotals = { floatMinor: 10_000, cashSaleMinor: 0, cashInMinor: 0, cashOutMinor: 15_000, cashRefundMinor: 0 };
     expect(expectedCashMinor(t)).toBe(-5_000);
+  });
+});
+
+describe('expectedCashMinor (CR-08: cash refunds leave the drawer)', () => {
+  it('subtracts cash-method refunds stamped to the shift', () => {
+    // S$100 float, S$200 cash sales, then a S$20 cash refund out of the drawer:
+    // expected = 10_000 + 20_000 + 0 − 0 − 2_000 = 28_000.
+    const t: CashTotals = { floatMinor: 10_000, cashSaleMinor: 20_000, cashInMinor: 0, cashOutMinor: 0, cashRefundMinor: 2_000 };
+    expect(expectedCashMinor(t)).toBe(28_000);
+  });
+
+  it('a refund can drive the expected balance below the float', () => {
+    const t: CashTotals = { floatMinor: 5_000, cashSaleMinor: 0, cashInMinor: 0, cashOutMinor: 0, cashRefundMinor: 6_000 };
+    expect(expectedCashMinor(t)).toBe(-1_000);
   });
 });
 
@@ -48,15 +62,23 @@ describe('classifyVariance', () => {
 
 describe('varianceMinor (counted − expected)', () => {
   it('is counted minus expected', () => {
-    const t: CashTotals = { floatMinor: 10_000, cashSaleMinor: 10_000, cashInMinor: 0, cashOutMinor: 0 };
+    const t: CashTotals = { floatMinor: 10_000, cashSaleMinor: 10_000, cashInMinor: 0, cashOutMinor: 0, cashRefundMinor: 0 };
     expect(varianceMinor(20_000, t)).toBe(0);
     expect(varianceMinor(21_000, t)).toBe(1_000);
     expect(varianceMinor(19_000, t)).toBe(-1_000);
   });
+
+  it('CR-08: counting the drawer AS-IS after a refund is "exact" only when the refund is deducted', () => {
+    // Float 10, cash sales 10, a 3 cash refund left the drawer → the drawer
+    // physically holds 17. With the refund deducted the Z is exact; the old
+    // formula (no refund term) would have reported a 3 short.
+    const t: CashTotals = { floatMinor: 10_000, cashSaleMinor: 10_000, cashInMinor: 0, cashOutMinor: 0, cashRefundMinor: 3_000 };
+    expect(varianceMinor(17_000, t)).toBe(0);
+  });
 });
 
 describe('buildZReport', () => {
-  const totals: CashTotals = { floatMinor: 10_000, cashSaleMinor: 40_000, cashInMinor: 5_000, cashOutMinor: 2_000 };
+  const totals: CashTotals = { floatMinor: 10_000, cashSaleMinor: 40_000, cashInMinor: 5_000, cashOutMinor: 2_000, cashRefundMinor: 0 };
   const byMethod: SalesByMethod = { cash: 40_000, card: 15_000 };
   const moves: CashMove[] = [
     { id: 'm1', type: 'in', amountMinor: 5_000, reason: 'Float top-up', createdAt: 1 },
@@ -79,7 +101,7 @@ describe('buildZReport', () => {
     const short = buildZReport({
       shiftId: 's1', deviceId: null, cashierName: null, openedAt: 100, closedAt: 200,
       salesByMethod: {}, cashMoves: NO_MOVES,
-      totals: { floatMinor: 10_000, cashSaleMinor: 0, cashInMinor: 0, cashOutMinor: 0 },
+      totals: { floatMinor: 10_000, cashSaleMinor: 0, cashInMinor: 0, cashOutMinor: 0, cashRefundMinor: 0 },
       countedMinor: 9_000, notes: 'counted low',
     });
     expect(short.expectedMinor).toBe(10_000);
@@ -92,17 +114,34 @@ describe('buildZReport', () => {
     const over = buildZReport({
       shiftId: 's2', deviceId: null, cashierName: 'Owner', openedAt: 1, closedAt: 2,
       salesByMethod: { cash: 1_000 }, cashMoves: NO_MOVES,
-      totals: { floatMinor: 0, cashSaleMinor: 1_000, cashInMinor: 0, cashOutMinor: 0 },
+      totals: { floatMinor: 0, cashSaleMinor: 1_000, cashInMinor: 0, cashOutMinor: 0, cashRefundMinor: 0 },
       countedMinor: 1_500, notes: null,
     });
     expect(over.varianceClass).toBe('over');
     expect(over.varianceMinor).toBe(500);
   });
+
+  it('CR-08: expected and variance account for cash refunds', () => {
+    // expected = 10_000 + 40_000 + 5_000 − 2_000 − 4_000 = 49_000 — the S$40
+    // refund already left the drawer, so a drawer counted at 49_000 is exact.
+    // Pre-fix the expected was 53_000 (no refund term) and the same physical
+    // count read as a false "40 short" — the guaranteed false variance.
+    const t: CashTotals = { floatMinor: 10_000, cashSaleMinor: 40_000, cashInMinor: 5_000, cashOutMinor: 2_000, cashRefundMinor: 4_000 };
+    const z = buildZReport({
+      shiftId: 's3', deviceId: 'd1', cashierName: 'Jun', openedAt: 100, closedAt: 200,
+      salesByMethod: byMethod, cashMoves: moves, totals: t, countedMinor: 49_000, notes: null,
+      refundsMinor: 4_000,
+    });
+    expect(z.expectedMinor).toBe(49_000);
+    expect(z.varianceMinor).toBe(0);
+    expect(z.varianceClass).toBe('exact');
+    expect(z.refundsMinor).toBe(4_000);
+  });
 });
 
 describe('buildXReport (interim, no counted/variance)', () => {
   it('snapshots the open shift', () => {
-    const totals: CashTotals = { floatMinor: 10_000, cashSaleMinor: 12_000, cashInMinor: 0, cashOutMinor: 1_000 };
+    const totals: CashTotals = { floatMinor: 10_000, cashSaleMinor: 12_000, cashInMinor: 0, cashOutMinor: 1_000, cashRefundMinor: 0 };
     const x = buildXReport('s1', 'Jun', 100, { cash: 12_000 }, totals, 999);
     expect(x.kind).toBe('X');
     expect(x.expectedCashMinor).toBe(21_000);
@@ -110,5 +149,13 @@ describe('buildXReport (interim, no counted/variance)', () => {
     expect(x.generatedAt).toBe(999);
     // X has no counted/variance fields.
     expect('varianceMinor' in x).toBe(false);
+  });
+
+  it('CR-08: the live drawer card already reflects cash refunds made', () => {
+    // 10 + 12 + 0 − 1 − 2 (a refund) = 19 — the X-report and the eventual Z
+    // must agree, or the cashier watches the expected balance jump at close.
+    const totals: CashTotals = { floatMinor: 10_000, cashSaleMinor: 12_000, cashInMinor: 0, cashOutMinor: 1_000, cashRefundMinor: 2_000 };
+    const x = buildXReport('s1', 'Jun', 100, { cash: 12_000 }, totals, 999);
+    expect(x.expectedCashMinor).toBe(19_000);
   });
 });
