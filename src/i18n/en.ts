@@ -1,0 +1,223 @@
+/**
+ * English dictionary (FR-115) — the reference language.
+ *
+ * M6 sweep scope (M6-TASKS): tabs, sell, inventory, settings, dialogs.
+ * Document BODIES stay English by design (receipt FR-109, labels FR-317,
+ * PO FR-306) — only UI chrome/labels live here. Payment-method names
+ * (Cash / Card / PayNow / Touch 'n Go) are business-locale DATA from
+ * `paymentMethodsFor(outlet.locale)` and are deliberately NOT in this file.
+ *
+ * Interpolation: `{param}` tokens, substituted by `t()`.
+ * Plurals: English has them — use the paired `…One`/`…Many` keys.
+ */
+const en = {
+  // ── shared ────────────────────────────────────────────────────────────
+  'common.cancel': 'Cancel',
+  'common.save': 'Save',
+  'common.done': 'Done',
+  'common.add': 'Add',
+  'common.remove': 'Remove',
+
+  // ── tab bar (tabs/_layout) ────────────────────────────────────────────
+  'tab.sell': 'Sell',
+  'tab.inventory': 'Inventory',
+  'tab.expiry': 'Expiry',
+  'tab.insights': 'Insights',
+  'tab.shift': 'Shift',
+
+  // ── sync status (sell banner + settings) ──────────────────────────────
+  'sync.syncing': 'Syncing…',
+  'sync.queuedAuto': '{n} ops queued — syncing automatically',
+  'sync.error': 'Sync error: {err}',
+  'sync.synced': 'Synced {time}',
+  'sync.connected': 'Connected',
+  'sync.queuedOff': '{n} ops queued · Sync off',
+  'sync.queuedOffShort': '{n} ops queued · sync off',
+  'sync.off': 'Sync off — sales queue locally',
+
+  // ── sell / register (tabs/index) ──────────────────────────────────────
+  'sell.scanPlaceholder': 'Scan or type barcode + Enter',
+  'sell.cameraA11y': 'Camera scan (deferred)',
+  'sell.registerLocked': 'Register locked',
+  'sell.registerLockedSell': 'Open a shift first (Shift tab) to start selling.',
+  'sell.registerLockedPay': 'Open a shift first (Shift tab) to take payment.',
+  'sell.scanFailed': 'Scan failed',
+  'sell.lockBanner': 'Register locked — no shift open.',
+  'sell.openShift': 'Open shift',
+  'sell.searchPlaceholder': 'Search name, SKU or barcode',
+  'sell.currentOrder': 'Current Order',
+  'sell.itemsOne': '{n} item',
+  'sell.itemsMany': '{n} items',
+  'sell.clear': 'Clear',
+  'sell.cartEmpty': 'Scan a barcode, search, or tap a product above to start the order.',
+  'sell.orderDiscount': 'Order discount',
+  'sell.charge': 'CHARGE',
+  'sell.chargeAmount': 'CHARGE {amount}',
+  'sell.processing': 'PROCESSING…',
+  'sell.error': 'Error',
+  'sell.saleFailed': 'Sale failed',
+  'sell.couldNotOpenShift': 'Could not open shift',
+  'sell.quantity': 'Quantity',
+  'sell.couldNotAdd': 'Could not add',
+  'sell.cameraScan': 'Camera scan',
+  'sell.cameraScanMsg':
+    'Camera barcode scanning is deferred (FR-100). Use a scanner wedge, type the barcode, or tap a product — everything works offline.',
+  'sell.invalidWeight': 'Invalid weight',
+  'sell.invalidWeightMsg': 'Enter the weight in kg, e.g. 0.25 or 1.25',
+  'sell.weighTitle': 'Weighed — {name}',
+  'sell.weighSub': '{stock} in stock · {price}/kg',
+  'sell.weighLine': '{weight} · line price',
+  'sell.weighAdd': 'Add to order',
+  'sell.openShiftFloat': 'Open shift — starting float',
+  'sell.promptPrice': 'Price',
+  'sell.promptDiscount': 'Discount',
+
+  // ── cart line (CartLineRow) ───────────────────────────────────────────
+  'cart.discount': 'discount',
+
+  // ── totals (TotalsBlock) ──────────────────────────────────────────────
+  'totals.subtotal': 'Subtotal',
+  'totals.discount': 'Discount',
+  'totals.tax': 'Tax ({rate}%, {mode})',
+  'totals.taxIncl': 'incl.',
+  'totals.taxExcl': 'excl.',
+  'totals.total': 'TOTAL',
+  'totals.grossMargin': 'Gross margin (FIFO)',
+
+  // ── payment sheet (PaymentSheet) ─────────────────────────────────────
+  'pay.totalDue': 'TOTAL DUE',
+  'pay.cashTendered': 'Cash tendered',
+  'pay.changeDue': 'Change due',
+  'pay.split': 'Split',
+  'pay.splitHint': 'Split evenly across the first two methods (FR-107).',
+  'pay.qrPrepareHint': 'Prepare the payment to show the customer a reference.',
+  'pay.qrPrepare': 'Prepare QR',
+  'pay.reference': 'REFERENCE',
+  'pay.due': '{amount} due',
+  'pay.chargeTerminal': 'Charge on terminal',
+  'pay.mobileWallet': 'Mobile wallet',
+  'pay.stub': 'MVP stub (ADR-006): {detail} — no live acquirer is wired.',
+  'pay.cardDetail': 'tender via the external card terminal',
+  'pay.mobileDetail': 'confirm the wallet payment at the counter',
+  'pay.completeSale': 'Complete sale',
+  'pay.prepareFirst': 'Prepare first',
+  'pay.confirmPaid': 'Confirm paid',
+
+  // ── receipt chrome only (ReceiptView) — body stays English (FR-109) ──
+  'receipt.success': 'Payment successful',
+
+  // ── money prompt (MoneyPrompt) ────────────────────────────────────────
+  'money.hint': '{currency} — enter in major units (e.g. 1.50)',
+
+  // ── quick chips (QuickChips) ──────────────────────────────────────────
+  'quick.noMatch': 'No products match',
+
+  // ── stock status chips (Chip) ─────────────────────────────────────────
+  'status.in_stock': 'In Stock',
+  'status.low_stock': 'Low Stock',
+  'status.depleted': 'Depleted',
+  'status.sold_out': 'Sold Out',
+
+  // ── inventory tab (tabs/inventory) ────────────────────────────────────
+  'inv.purchaseOrders': 'Purchase Orders',
+  'inv.stocktake': 'Stocktake',
+  'inv.labels': 'Label printing',
+  'inv.suppliers': 'Suppliers',
+  'inv.csv': 'Product data (CSV)',
+  'inv.lowStockOnly': 'Low Stock Only',
+  'inv.noMatch': 'No products match',
+  'inv.noneYet': 'No products yet',
+
+  // ── gate actions (PinPrompt header) ───────────────────────────────────
+  'gate.discount': 'Discount',
+  'gate.price_override': 'Price override',
+  'gate.stock_adjust': 'Stock adjustment',
+  'gate.close_shift': 'Close shift',
+  'gate.store_settings': 'Store settings',
+  'gate.refund': 'Refund',
+  'gate.stocktake_apply': 'Apply stocktake',
+
+  // ── PIN prompt (PinPrompt) ────────────────────────────────────────────
+  'pin.required': '{action} — PIN required',
+  'pin.hint': 'Enter the owner/manager PIN to continue (min {n} digits).',
+  'pin.noPinSet': 'No owner/manager has a PIN set yet — add one in Settings.',
+  'pin.wrong': 'Wrong PIN — try again',
+
+  // ── stock adjustment (AdjustStockDialog) ──────────────────────────────
+  'adjust.title': 'Adjust stock',
+  'adjust.onHand': 'On hand',
+  'adjust.qtyBase': 'Quantity (base units) *',
+  'adjust.qtyGrams': 'Quantity (grams) *',
+  'adjust.reason': 'Reason * (required)',
+  'adjust.reasonPlaceholder': 'Or type a reason…',
+  'adjust.confirm': 'Confirm adjustment',
+  'adjust.applying': 'Applying…',
+  'adjust.foot': 'Applies an immutable ledger entry. {money} = no cost change recorded.',
+  'adjust.failed': 'Adjustment failed',
+  'adjust.reason.damage': 'Damage',
+  'adjust.reason.lost': 'Lost / stolen',
+  'adjust.reason.found': 'Found',
+  'adjust.reason.counting': 'Counting correction',
+  'adjust.reason.quality': 'Quality / returned',
+
+  // ── settings screen ───────────────────────────────────────────────────
+  'settings.title': 'Store settings',
+  'settings.store': 'Store',
+  'settings.storeName': 'Store name *',
+  'settings.storeNamePh': 'e.g. My Provision Store',
+  'settings.language': 'Language · FR-115',
+  'settings.appLanguage': 'App language',
+  'settings.langEn': 'English',
+  'settings.langMs': 'Bahasa Melayu',
+  'settings.languageNote':
+    'Applies to this device only. Business settings (currency, tax, payment methods) are unchanged.',
+  'settings.currency': 'Currency · FR-602',
+  'settings.sellIn': 'Sell in',
+  'settings.isoCode': 'ISO currency code (3 letters)',
+  'settings.currencyNote':
+    'Changing the currency reinterprets existing prices and cart amounts in the new currency — review product prices after switching.',
+  'settings.tax': 'Tax · FR-600',
+  'settings.taxRegime': 'Tax regime',
+  'settings.rate': 'Rate % (0–40)',
+  'settings.pricingMode': 'Pricing mode',
+  'settings.inclusive': 'Inclusive',
+  'settings.exclusive': 'Exclusive',
+  'settings.taxNote':
+    'Inclusive: prices already contain tax (SG GST style). Exclusive: tax is added on top. Presets are suggestions only — any rate works via Custom.',
+  'settings.cloud': 'Cloud sync · FR-503',
+  'settings.cloudNote':
+    'Optional. Link this store to its own free Supabase project (BYO — your data stays in your project). Everything keeps working offline either way; queued sales sync when you turn it on.',
+  'settings.connect': 'Connect your backend',
+  'settings.owner': 'owner: {email}',
+  'settings.syncNow': 'Sync now',
+  'settings.disconnect': 'Disconnect',
+  'settings.disconnectTitle': 'Disconnect backend?',
+  'settings.disconnectMsg':
+    'The connection is removed from this device. Sales, stock and the sync queue are NOT touched — reconnect any time to resume from where it left off.',
+  'settings.disconnected': 'Disconnected',
+  'settings.disconnectedMsg': 'You can connect again any time.',
+  'settings.receipt': 'Receipt · FR-109',
+  'settings.printerWidth': 'Printer width',
+  'settings.receiptNote': 'The on-screen receipt (and any future printer output) renders at this width.',
+  'settings.saveBtn': 'Save settings',
+  'settings.typeOtherIso': 'Type another ISO code…',
+  'settings.customRate': 'Custom rate…',
+  'settings.missingFields': 'Missing fields',
+  'settings.missingName': 'Store name is required.',
+  'settings.invalidCurrency': 'Invalid currency',
+  'settings.invalidCurrencyMsg': 'Currency must be a 3-letter ISO code, e.g. SGD or MYR.',
+  'settings.unknownCurrency': 'Unknown currency',
+  'settings.unknownCurrencyMsg': '“{code}” is not a recognized currency code.',
+  'settings.invalidRate': 'Invalid tax rate',
+  'settings.invalidRateMsg': 'Rate must be 0–40 with up to 2 decimals, e.g. 7.75.',
+  'settings.saved': 'Saved',
+  'settings.savedMsg': 'Store settings updated.',
+  'settings.saveFailed': 'Save failed',
+
+  // ── picker overlay (PickerOverlay) ────────────────────────────────────
+  'picker.titleCurrency': 'Currency',
+  'picker.titleTax': 'Tax',
+} as const;
+
+export default en;
+export type EnDict = typeof en;

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useOutlet } from '../src/hooks/useAppData';
 import { useUsers } from '../src/hooks/useShift';
 import { useSync } from '../src/hooks/useSync';
+import { useT } from '../src/hooks/useT';
 import { updateOutlet } from '../src/repositories/outletRepository';
 import {
   disconnectCloud,
@@ -52,6 +53,7 @@ export default function SettingsScreen() {
   const { active, users } = useUsers();
   const [gateVisible, setGateVisible] = useState(false);
   const { outlet, reload } = useOutlet();
+  const { t, lang, setLanguage } = useT();
 
   const [name, setName] = useState('');
   const [currency, setCurrency] = useState('SGD');
@@ -108,7 +110,7 @@ export default function SettingsScreen() {
     })),
     {
       key: 'other',
-      label: 'Type another ISO code…',
+      label: t('settings.typeOtherIso'),
       onPress: () => {
         setCustomCurrency(true);
         setPicker(null);
@@ -132,7 +134,7 @@ export default function SettingsScreen() {
     })),
     {
       key: 'custom',
-      label: 'Custom rate…',
+      label: t('settings.customRate'),
       onPress: () => {
         setTaxPresetId('custom');
         setPicker(null);
@@ -142,21 +144,21 @@ export default function SettingsScreen() {
 
   const save = async () => {
     if (!name.trim()) {
-      Alert.alert('Missing fields', 'Store name is required.');
+      Alert.alert(t('settings.missingFields'), t('settings.missingName'));
       return;
     }
     if (!activeCurrency) {
-      Alert.alert('Invalid currency', 'Currency must be a 3-letter ISO code, e.g. SGD or MYR.');
+      Alert.alert(t('settings.invalidCurrency'), t('settings.invalidCurrencyMsg'));
       return;
     }
     if (!isFormattableCurrency(activeCurrency)) {
-      Alert.alert('Unknown currency', `“${activeCurrency}” is not a recognized currency code.`, [
+      Alert.alert(t('settings.unknownCurrency'), t('settings.unknownCurrencyMsg', { code: activeCurrency }), [
         { text: 'OK' },
       ]);
       return;
     }
     if (taxPresetId === 'custom' && !isValidCustomRate(customRate)) {
-      Alert.alert('Invalid tax rate', 'Rate must be 0–40 with up to 2 decimals, e.g. 7.75.');
+      Alert.alert(t('settings.invalidRate'), t('settings.invalidRateMsg'));
       return;
     }
     const preset = TAX_PRESETS.find((p) => p.id === taxPresetId);
@@ -169,9 +171,9 @@ export default function SettingsScreen() {
         taxEngine: activeEngineId,
       });
       await reload();
-      Alert.alert('Saved', 'Store settings updated.', [{ text: 'OK', onPress: () => router.back() }]);
+      Alert.alert(t('settings.saved'), t('settings.savedMsg'), [{ text: 'OK', onPress: () => router.back() }]);
     } catch (e) {
-      Alert.alert('Save failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('settings.saveFailed'), e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -214,19 +216,19 @@ export default function SettingsScreen() {
 
   const confirmDisconnect = () => {
     Alert.alert(
-      'Disconnect backend?',
-      'The connection is removed from this device. Sales, stock and the sync queue are NOT touched — reconnect any time to resume from where it left off.',
+      t('settings.disconnectTitle'),
+      t('settings.disconnectMsg'),
       [
-        { text: 'Cancel' },
+        { text: t('common.cancel') },
         {
-          text: 'Disconnect',
+          text: t('settings.disconnect'),
           style: 'destructive',
           onPress: () =>
             requireCloudGate(async () => {
               await disconnectCloud();
               setCloudCfg(null);
               await sync.refresh();
-              Alert.alert('Disconnected', 'You can connect again any time.');
+              Alert.alert(t('settings.disconnected'), t('settings.disconnectedMsg'));
             }),
         },
       ],
@@ -248,15 +250,27 @@ export default function SettingsScreen() {
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Card>
-          <SectionTitle>Store</SectionTitle>
-          <Field label="Store name *">
-            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. My Provision Store" />
+          <SectionTitle>{t('settings.store')}</SectionTitle>
+          <Field label={t('settings.storeName')}>
+            <TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('settings.storeNamePh')} />
           </Field>
         </Card>
 
         <Card>
-          <SectionTitle>Currency · FR-602</SectionTitle>
-          <Field label="Sell in">
+          <SectionTitle>{t('settings.language')}</SectionTitle>
+          <Field label={t('settings.appLanguage')}>
+            <Segmented
+              options={[t('settings.langEn'), t('settings.langMs')]}
+              value={lang === 'en' ? t('settings.langEn') : t('settings.langMs')}
+              onChange={(v) => void setLanguage(v === t('settings.langMs') ? 'ms' : 'en')}
+            />
+          </Field>
+          <Text style={styles.note}>{t('settings.languageNote')}</Text>
+        </Card>
+
+        <Card>
+          <SectionTitle>{t('settings.currency')}</SectionTitle>
+          <Field label={t('settings.sellIn')}>
             <Pressable style={styles.selectBox} onPress={() => setPicker('currency')}>
               <Text style={styles.selectText}>
                 {activeCurrency || '—'}
@@ -266,11 +280,11 @@ export default function SettingsScreen() {
             </Pressable>
           </Field>
           {customCurrency && (
-            <Field label="ISO currency code (3 letters)">
+            <Field label={t('settings.isoCode')}>
               <TextInput
                 style={styles.inputMono}
                 value={customCode}
-                onChangeText={(t) => setCustomCode(t.toUpperCase())}
+                onChangeText={(t2) => setCustomCode(t2.toUpperCase())}
                 placeholder="e.g. TWD"
                 autoCapitalize="characters"
                 autoCorrect={false}
@@ -278,15 +292,12 @@ export default function SettingsScreen() {
               />
             </Field>
           )}
-          <Text style={styles.note}>
-            Changing the currency reinterprets existing prices and cart amounts in the new
-            currency — review product prices after switching.
-          </Text>
+          <Text style={styles.note}>{t('settings.currencyNote')}</Text>
         </Card>
 
         <Card>
-          <SectionTitle>Tax · FR-600</SectionTitle>
-          <Field label="Tax regime">
+          <SectionTitle>{t('settings.tax')}</SectionTitle>
+          <Field label={t('settings.taxRegime')}>
             <Pressable style={styles.selectBox} onPress={() => setPicker('tax')}>
               <Text style={styles.selectText}>{taxEngineLabel(activeEngineId)}</Text>
               <Text style={styles.chevron}>⌄</Text>
@@ -295,7 +306,7 @@ export default function SettingsScreen() {
           {taxPresetId === 'custom' && (
             <View style={styles.row}>
               <View style={styles.colHalf}>
-                <Field label="Rate % (0–40)">
+                <Field label={t('settings.rate')}>
                   <TextInput
                     style={styles.inputMono}
                     value={customRate}
@@ -306,32 +317,29 @@ export default function SettingsScreen() {
                 </Field>
               </View>
               <View style={styles.colHalf}>
-                <Field label="Pricing mode">
-                  <Segmented options={['inclusive', 'exclusive']} value={customMode} onChange={(v) => setCustomMode(v as TaxMode)} />
+                <Field label={t('settings.pricingMode')}>
+                  <Segmented
+                    options={[t('settings.inclusive'), t('settings.exclusive')]}
+                    value={t(customMode === 'inclusive' ? 'settings.inclusive' : 'settings.exclusive')}
+                    onChange={(v) => setCustomMode(v === t('settings.exclusive') ? 'exclusive' : 'inclusive')}
+                  />
                 </Field>
               </View>
             </View>
           )}
-          <Text style={styles.note}>
-            Inclusive: prices already contain tax (SG GST style). Exclusive: tax is added on
-            top. Presets are suggestions only — any rate works via Custom.
-          </Text>
+          <Text style={styles.note}>{t('settings.taxNote')}</Text>
         </Card>
 
         <Card>
-          <SectionTitle>Cloud sync · FR-503</SectionTitle>
+          <SectionTitle>{t('settings.cloud')}</SectionTitle>
           {!cloudCfg ? (
             <>
-              <Text style={styles.note}>
-                Optional. Link this store to its own free Supabase project (BYO — your data
-                stays in your project). Everything keeps working offline either way; queued
-                sales sync when you turn it on.
-              </Text>
+              <Text style={styles.note}>{t('settings.cloudNote')}</Text>
               <Pressable
                 style={styles.cloudBtn}
                 onPress={() => requireCloudGate(() => router.push('/cloud-setup'))}
               >
-                <Text style={styles.cloudBtnText}>Connect your backend</Text>
+                <Text style={styles.cloudBtnText}>{t('settings.connect')}</Text>
               </Pressable>
             </>
           ) : (
@@ -343,7 +351,7 @@ export default function SettingsScreen() {
                     {cloudCfg.url}
                   </Text>
                   {cloudCfg.ownerEmail && (
-                    <Text style={styles.cloudSub}>owner: {cloudCfg.ownerEmail}</Text>
+                    <Text style={styles.cloudSub}>{t('settings.owner', { email: cloudCfg.ownerEmail })}</Text>
                   )}
                 </View>
                 <Switch
@@ -356,15 +364,15 @@ export default function SettingsScreen() {
                 <Text style={styles.cloudMetaText}>
                   {sync.enabled
                     ? sync.syncing
-                      ? 'Syncing…'
+                      ? t('sync.syncing')
                       : sync.pending > 0
-                        ? `${sync.pending} ops queued — syncing automatically`
+                        ? t('sync.queuedAuto', { n: sync.pending })
                         : sync.lastSyncedAt
-                          ? `Synced ${new Date(sync.lastSyncedAt).toLocaleTimeString()}`
-                          : 'Connected'
+                          ? t('sync.synced', { time: new Date(sync.lastSyncedAt).toLocaleTimeString() })
+                          : t('sync.connected')
                     : sync.pending > 0
-                      ? `${sync.pending} ops queued · sync off`
-                      : 'Sync off — sales queue locally'}
+                      ? t('sync.queuedOffShort', { n: sync.pending })
+                      : t('sync.off')}
                 </Text>
                 {sync.lastError && <Text style={styles.cloudError}>{sync.lastError}</Text>}
               </View>
@@ -379,10 +387,10 @@ export default function SettingsScreen() {
                   }
                   disabled={sync.syncing || !sync.enabled}
                 >
-                  <Text style={styles.cloudBtnText}>Sync now</Text>
+                  <Text style={styles.cloudBtnText}>{t('settings.syncNow')}</Text>
                 </Pressable>
                 <Pressable style={[styles.cloudBtn, { flex: 1, backgroundColor: colors.danger }]} onPress={confirmDisconnect}>
-                  <Text style={styles.cloudBtnText}>Disconnect</Text>
+                  <Text style={styles.cloudBtnText}>{t('settings.disconnect')}</Text>
                 </Pressable>
               </View>
             </>
@@ -390,19 +398,17 @@ export default function SettingsScreen() {
         </Card>
 
         <Card>
-          <SectionTitle>Receipt · FR-109</SectionTitle>
-          <Field label="Printer width">
+          <SectionTitle>{t('settings.receipt')}</SectionTitle>
+          <Field label={t('settings.printerWidth')}>
             <Segmented options={['58mm', '80mm']} value={receiptWidth} onChange={onReceiptWidth} />
           </Field>
-          <Text style={styles.note}>
-            The on-screen receipt (and any future printer output) renders at this width.
-          </Text>
+          <Text style={styles.note}>{t('settings.receiptNote')}</Text>
         </Card>
       </ScrollView>
 
       <View style={styles.footer}>
         <Pressable style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={requestSave} disabled={saving}>
-          <Text style={styles.saveText}>Save settings</Text>
+          <Text style={styles.saveText}>{t('settings.saveBtn')}</Text>
         </Pressable>
       </View>
 
@@ -434,10 +440,10 @@ export default function SettingsScreen() {
       )}
 
       {picker === 'currency' && (
-        <PickerOverlay title="Currency" rows={currencyRows} onClose={() => setPicker(null)} />
+        <PickerOverlay title={t('picker.titleCurrency')} rows={currencyRows} onClose={() => setPicker(null)} />
       )}
       {picker === 'tax' && (
-        <PickerOverlay title="Tax" rows={taxRows} onClose={() => setPicker(null)} />
+        <PickerOverlay title={t('picker.titleTax')} rows={taxRows} onClose={() => setPicker(null)} />
       )}
     </KeyboardAvoidingView>
   );

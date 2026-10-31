@@ -17,6 +17,9 @@
  *      - sales + lines + payments + ledger rows: pure UNION by UUID (a row
  *        already present locally is skipped, NEVER overwritten) — stock is
  *        never client-merged; it stays a projection of the ledger (ADR-002).
+ *      - refunds (M6): same union-by-UUID append-only rule; the header's sale
+ *        uuid is resolved to the local sale id, the child lines' refund uuid to
+ *        the local refund id (restock ledger rows arrive via the ledger pull).
  *     Cursors then advance (monotonic).
  *
  * Sync is OFF by default (cloud.sync_enabled = '0'/missing): the engine stays
@@ -33,6 +36,7 @@ import {
   advanceCursor,
   applyLwwDelta,
   isRetryableError,
+  resolveCategoryDelta,
   type LwwMeta,
 } from '../lib/sync';
 import {
@@ -46,9 +50,12 @@ import {
   setLastSyncedAt,
 } from '../repositories/cloudConfigRepository';
 import {
+  backfillCategoriesOnce,
   backfillOnce,
+  buildCategoryPayload,
   buildLedgerPayload,
   buildProductPayload,
+  buildRefundPayload,
   buildSalePayload,
   getCursor,
   markUploaded,
@@ -99,7 +106,7 @@ async function drainBatch(cfg: CloudConfig): Promise<number> {
   const ops = await pendingOps(DRAIN_BATCH);
   if (ops.length === 0) return 0;
 
-  const prepared: Array<{ opId: string; entity: 'sale' | 'ledger' | 'product'; payload: string; createdAt: number }> = [];
+  const prepared: Array<{ opId: string; entity: 'sale' | 'ledger' | 'product' | 'refund' | 'category'; payload: string; createdAt: number }> = [];
   for (const op of ops) {
     // cfg.outletId is the CLOUD tenant id — payloads are re-keyed from the
     // device's local outlet id when this device joined an existing store.
@@ -108,7 +115,11 @@ async function drainBatch(cfg: CloudConfig): Promise<number> {
         ? await buildSalePayload(op.opId, op.payload, cfg.outletId)
         : op.entity === 'ledger'
           ? await buildLedgerPayload(op.opId, cfg.outletId)
-          : await buildProductPayload(op.opId, op.payload, cfg.outletId);
+          : op.entity === 'refund'
+            ? await buildRefundPayload(op.opId, op.payload, cfg.outletId)
+            : op.entity === 'category'
+              ? await buildCategoryPayload(op.opId, op.payload, cfg.outletId)
+              : await buildProductPayload(op.opId, op.payload, cfg.outletId);
     if (payload == null) {
       // Poison op: the source row is gone (rows are immutable, so this is a
       // data-integrity surprise) — drop it so it cannot block the FIFO.
@@ -131,6 +142,42 @@ async function applyPullLocally(pull: SyncPullResult): Promise<void> {
   if (!outletRow) throw new Error('No outlet — DB not seeded');
   const outletId = outletRow.id;
   await db.withTransactionAsync(async () => {
+    // --- categories FIRST (M6, schema v3) — LWW by id, same rules as products.
+    // Pulled before products so a product's category_id FK can never dangle:
+    // without this, one device's CSV-created category broke EVERY other
+    // device's pull batch (FK violation on the product upsert).
+    //
+    // Name-collision guard: the local `category.name` is UNIQUE, but two
+    // devices can create same-named categories with different ids offline
+    // (ids are per-device UUIDs; there is no rename path today). The pure
+    // resolver (lib/sync.ts) keeps the LOCAL row's identity and remaps the
+    // remote id onto it — pulled products referencing the remote id are
+    // re-keyed below. (A hard INSERT would fail the whole batch — the exact
+    // bug this fix removes.) The full local table is compared (small: shop
+    // master data), not just the ids in the batch — a name clash with a
+    // local row whose id isn't pulled this round must still be caught.
+    const catIdRemap = new Map<string, string>();
+    if (pull.categories.length > 0) {
+      const local = await db.getAllAsync<{ id: string; name: string; updatedAt: number }>(
+        'SELECT id, name, COALESCE(updated_at, 0) AS updatedAt FROM category',
+      );
+      const localDevice = (await getDeviceId()) ?? 'unknown';
+      const { toWrite, remap } = resolveCategoryDelta(
+        local.map((r) => ({ ...r, updatedByDevice: localDevice })),
+        pull.categories,
+      );
+      for (const [k, v] of remap) catIdRemap.set(k, v);
+      for (const cat of toWrite) {
+        await db.runAsync(
+          `INSERT INTO category (id, name, active, created_at, updated_at)
+             VALUES (?, ?, 1, ?, ?)
+             ON CONFLICT (id) DO UPDATE SET
+               name = excluded.name, updated_at = excluded.updated_at`,
+          [cat.id, cat.name, cat.createdAt, cat.updatedAt],
+        );
+      }
+    }
+
     // --- products: LWW (updated_at, device tie-break) ---
     if (pull.products.length > 0) {
       const ph = pull.products.map(() => '?').join(', ');
@@ -160,7 +207,12 @@ async function applyPullLocally(pull: SyncPullResult): Promise<void> {
              velocity_class = excluded.velocity_class, description = excluded.description,
              active = excluded.active, created_at = excluded.created_at, updated_at = excluded.updated_at`,
           [
-            p.id, outletId, p.sku, p.name, p.categoryId, p.unitType, p.isWeighed ? 1 : 0,
+            p.id, outletId, p.sku, p.name,
+            // A same-name/different-id category created offline on another
+            // device is re-keyed onto the local row (see catIdRemap above) so
+            // the local UNIQUE(name) invariant — and this FK — hold.
+            p.categoryId ? (catIdRemap.get(p.categoryId) ?? p.categoryId) : null,
+            p.unitType, p.isWeighed ? 1 : 0,
             p.barcode, p.cartonBarcode, p.cartonSize, p.costMinor, p.priceMinor, p.taxCategory,
             p.minQty, p.maxQty, p.velocityClass, p.description, p.active ? 1 : 0,
             p.createdAt, p.updatedAt,
@@ -227,6 +279,54 @@ async function applyPullLocally(pull: SyncPullResult): Promise<void> {
       );
     }
 
+    // --- refunds + lines (M6): union by UUID (append-only, never overwrite) ---
+    // The refund header references the sale by uuid; resolve it to the local
+    // sale id (the sale itself may have just landed in this same batch).
+    const refundSaleUuids = pull.refunds
+      .map((r) => r.saleUuid)
+      .filter((u) => !saleIdByUuid.has(u));
+    if (refundSaleUuids.length > 0) {
+      const more = await db.getAllAsync<{ id: string; uuid: string }>(
+        `SELECT id, uuid FROM sale WHERE uuid IN (${refundSaleUuids.map(() => '?').join(', ')})`,
+        refundSaleUuids,
+      );
+      for (const r of more) saleIdByUuid.set(r.uuid, r.id);
+    }
+    for (const rf of pull.refunds) {
+      const saleId = saleIdByUuid.get(rf.saleUuid);
+      if (!saleId) {
+        throw new Error(`Pulled refund ${rf.uuid} references unknown sale uuid ${rf.saleUuid}`);
+      }
+      await db.runAsync(
+        `INSERT INTO refund (id, uuid, sale_id, reason_code, restock, amount_minor, pin_verified_by, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT (uuid) DO NOTHING`,
+        [rf.id, rf.uuid, saleId, rf.reasonCode, rf.restock ? 1 : 0, rf.amountMinor, rf.userId, rf.createdAt],
+      );
+    }
+    // refund_line.refund_id is the LOCAL refund id (the server row's `id` is
+    // the same value — generated together with the uuid on the origin device).
+    const refundIdByUuid = new Map<string, string>(
+      pull.refunds.length > 0
+        ? (await db.getAllAsync<{ id: string; uuid: string }>(
+          `SELECT id, uuid FROM refund WHERE uuid IN (${pull.refunds.map(() => '?').join(', ')})`,
+          pull.refunds.map((r) => r.uuid),
+        )).map((r) => [r.uuid, r.id] as [string, string])
+        : [],
+    );
+    for (const rl of pull.refundLines) {
+      const refundId = refundIdByUuid.get(rl.refundUuid);
+      if (!refundId) {
+        throw new Error(`Pulled refund_line ${rl.id} references unknown refund uuid ${rl.refundUuid}`);
+      }
+      await db.runAsync(
+        `INSERT INTO refund_line (id, refund_id, sale_line_id, product_id, qty, qty_g, amount_minor, restock)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT (id) DO NOTHING`,
+        [rl.id, refundId, rl.saleLineId, rl.productId, rl.qty, rl.qtyG, rl.amountMinor, rl.restock ? 1 : 0],
+      );
+    }
+
     // --- ledger rows: union by row UUID / op id (stock is NEVER client-merged) ---
     for (const l of pull.ledger) {
       await db.runAsync(
@@ -255,6 +355,10 @@ function syncTick(): Promise<void> {
 
       // First connect: enqueue pre-M5 history exactly once.
       await backfillOnce();
+      // Schema v3: enqueue pre-v3 categories exactly once (seed/CSV categories
+      // predate the category outbox entity; without this, the other devices
+      // could never see them and product pulls would dangle on category_id).
+      await backfillCategoriesOnce();
 
       // Phase 1 — PUSH (FIFO drain).
       for (let round = 0; round < DRAIN_MAX_ROUNDS; round++) {
@@ -264,15 +368,19 @@ function syncTick(): Promise<void> {
 
       // Phase 2 — PULL (deltas since cursors) + local apply + cursor advance.
       const cursors: TableCursors = {
+        category: await getCursor('category'),
         product: await getCursor('product'),
         sale: await getCursor('sale'),
         ledger: await getCursor('ledger'),
+        refund: await getCursor('refund'),
       };
       const pull = await adapter().pullDeltas(cfg, cursors);
       await applyPullLocally(pull);
+      await setCursor('category', advanceCursor(cursors.category, pull.categories));
       await setCursor('product', advanceCursor(cursors.product, pull.products));
       await setCursor('sale', advanceCursor(cursors.sale, pull.sales));
       await setCursor('ledger', advanceCursor(cursors.ledger, pull.ledger));
+      await setCursor('refund', advanceCursor(cursors.refund, pull.refunds));
 
       await clearSyncError();
       const now = Date.now();

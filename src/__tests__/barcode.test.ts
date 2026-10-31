@@ -20,6 +20,13 @@ describe('parseBarcodeSg — plain GTINs (FR-101/102, FR-322)', () => {
   it('trims scanner whitespace', () => {
     expect(parseBarcodeSg('  8991234567890  ')).toEqual({ kind: 'plain', code: '8991234567890' });
   });
+
+  it('normalizes a leading-0 13-digit scan to its 12-digit UPC-A (FR-317 label round-trip)', () => {
+    // Scanners report a UPC-A symbol as EAN-13 "0"+code — the label's
+    // 12-digit product barcode must scan back to the same lookup key.
+    expect(parseBarcodeSg('0012000000355')).toEqual({ kind: 'plain', code: '012000000355' });
+    expect(parseBarcodeSg('0112345678902')).toEqual({ kind: 'plain', code: '112345678902' });
+  });
 });
 
 describe('parseBarcodeSg — weighed EAN-13 in-store (FR-104: prefix 2, weight = last 5 digits)', () => {

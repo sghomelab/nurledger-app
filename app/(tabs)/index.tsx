@@ -6,6 +6,7 @@ import { useCart } from '../../src/hooks/useCart';
 import { useProducts } from '../../src/hooks/useAppData';
 import { useShift, useUsers } from '../../src/hooks/useShift';
 import { useSync } from '../../src/hooks/useSync';
+import { useT } from '../../src/hooks/useT';
 import { QuickChips } from '../../src/components/register/QuickChips';
 import { CartLineRow } from '../../src/components/register/CartLineRow';
 import { TotalsBlock } from '../../src/components/register/TotalsBlock';
@@ -47,6 +48,7 @@ export default function SellTab() {
   const { products, reload } = useProducts();
   const { active, users } = useUsers();
   const shift = useShift();
+  const { t } = useT();
 
   const [barcode, setBarcode] = useState('');
   const [search, setSearch] = useState('');
@@ -85,22 +87,22 @@ export default function SellTab() {
   const syncBanner = useMemo<{ icon: ComponentProps<typeof Ionicons>['name']; color: string; bg: string; text: string } | null>(() => {
     if (!sync.connected) return null;
     if (sync.enabled) {
-      if (sync.syncing) return { icon: 'sync-outline', color: '#B45309', bg: colors.warningSoft, text: 'Syncing…' };
+      if (sync.syncing) return { icon: 'sync-outline', color: '#B45309', bg: colors.warningSoft, text: t('sync.syncing') };
       if (sync.pending > 0) {
-        return { icon: 'cloud-upload-outline', color: '#B45309', bg: colors.warningSoft, text: `${sync.pending} ops queued — syncing automatically` };
+        return { icon: 'cloud-upload-outline', color: '#B45309', bg: colors.warningSoft, text: t('sync.queuedAuto', { n: sync.pending }) };
       }
       if (sync.lastError) {
-        return { icon: 'warning-outline', color: colors.danger, bg: colors.dangerSoft, text: `Sync error: ${sync.lastError}` };
+        return { icon: 'warning-outline', color: colors.danger, bg: colors.dangerSoft, text: t('sync.error', { err: sync.lastError }) };
       }
       return sync.lastSyncedAt
-        ? { icon: 'cloud-done-outline', color: colors.positive, bg: colors.primarySoft, text: `Synced ${new Date(sync.lastSyncedAt).toLocaleTimeString()}` }
-        : { icon: 'cloud-outline', color: colors.slate500, bg: colors.slate100, text: 'Connected' };
+        ? { icon: 'cloud-done-outline', color: colors.positive, bg: colors.primarySoft, text: t('sync.synced', { time: new Date(sync.lastSyncedAt).toLocaleTimeString() }) }
+        : { icon: 'cloud-outline', color: colors.slate500, bg: colors.slate100, text: t('sync.connected') };
     }
     if (sync.pending > 0) {
-      return { icon: 'cloud-offline-outline', color: '#B45309', bg: colors.warningSoft, text: `${sync.pending} ops queued · Sync off` };
+      return { icon: 'cloud-offline-outline', color: '#B45309', bg: colors.warningSoft, text: t('sync.queuedOff', { n: sync.pending }) };
     }
     return null;
-  }, [sync.connected, sync.enabled, sync.syncing, sync.pending, sync.lastError, sync.lastSyncedAt]);
+  }, [sync.connected, sync.enabled, sync.syncing, sync.pending, sync.lastError, sync.lastSyncedAt, t]);
 
   /**
    * PIN gate (FR-500 / DEV-003): run `job` directly when the active user's role
@@ -144,7 +146,7 @@ export default function SellTab() {
     if (!code) return;
     setBarcode('');
     if (!shiftOpen) {
-      Alert.alert('Register locked', 'Open a shift first (Shift tab) to start selling.');
+      Alert.alert(t('sell.registerLocked'), t('sell.registerLockedSell'));
       return;
     }
     try {
@@ -156,14 +158,14 @@ export default function SellTab() {
         setWeigh({ product, text: (weightG / 1000).toString() });
       }
     } catch (e) {
-      Alert.alert('Scan failed', errMsg(e));
+      Alert.alert(t('sell.scanFailed'), errMsg(e));
     }
   }, [barcode, cart, shiftOpen]);
 
   const pickProduct = useCallback(
     async (p: ProductWithStock) => {
       if (!shiftOpen) {
-        Alert.alert('Register locked', 'Open a shift first (Shift tab) to start selling.');
+        Alert.alert(t('sell.registerLocked'), t('sell.registerLockedSell'));
         return;
       }
       // M5 (FR-103): weighed products go through the weight prompt, not a
@@ -175,7 +177,7 @@ export default function SellTab() {
       try {
         await cart.addProduct(p);
       } catch (e) {
-        Alert.alert('Could not add', errMsg(e));
+        Alert.alert(t('sell.couldNotAdd'), errMsg(e));
       }
     },
     [cart, shiftOpen],
@@ -186,7 +188,7 @@ export default function SellTab() {
       try {
         await cart.setQty(key, current + delta);
       } catch (e) {
-        Alert.alert('Quantity', errMsg(e));
+        Alert.alert(t('sell.quantity'), errMsg(e));
       }
     },
     [cart],
@@ -197,7 +199,7 @@ export default function SellTab() {
     if (!weigh) return;
     const g = parseWeightToG(weigh.text);
     if (g == null) {
-      Alert.alert('Invalid weight', 'Enter the weight in kg, e.g. 0.25 or 1.25');
+      Alert.alert(t('sell.invalidWeight'), t('sell.invalidWeightMsg'));
       return;
     }
     const product = weigh.product;
@@ -205,7 +207,7 @@ export default function SellTab() {
     try {
       await cart.addWeighed(product, g);
     } catch (e) {
-      Alert.alert('Could not add', errMsg(e));
+      Alert.alert(t('sell.couldNotAdd'), errMsg(e));
     }
   }, [weigh, cart]);
 
@@ -217,7 +219,7 @@ export default function SellTab() {
   const onCharge = useCallback(() => {
     if (!canCharge) return;
     if (!shiftOpen) {
-      Alert.alert('Register locked', 'Open a shift first (Shift tab) to take payment.');
+      Alert.alert(t('sell.registerLocked'), t('sell.registerLockedPay'));
       return;
     }
     Keyboard.dismiss();
@@ -237,7 +239,7 @@ export default function SellTab() {
         setReceipt(r);
         void reload(); // stock changed — refresh the product list (stock levels, chips)
       } catch (e) {
-        Alert.alert('Sale failed', errMsg(e));
+        Alert.alert(t('sell.saleFailed'), errMsg(e));
       }
     },
     [cart, reload, active, shift.open],
@@ -267,7 +269,7 @@ export default function SellTab() {
           floatMinor,
         });
       } catch (e) {
-        Alert.alert('Could not open shift', errMsg(e));
+        Alert.alert(t('sell.couldNotOpenShift'), errMsg(e));
       }
     },
     [shift, cart.outlet, active],
@@ -287,17 +289,14 @@ export default function SellTab() {
           : prompt.kind === 'price'
             ? () => cart.setLinePrice(prompt.key, minor)
             : () => cart.setLineDiscount(prompt.key, minor);
-      job().catch((e) => Alert.alert('Error', errMsg(e)));
+      job().catch((e) => Alert.alert(t('sell.error'), errMsg(e)));
     },
     [prompt, cart, doOpenShift],
   );
 
   const cameraStub = useCallback(() => {
-    Alert.alert(
-      'Camera scan',
-      'Camera barcode scanning is deferred (FR-100). Use a scanner wedge, type the barcode, or tap a product — everything works offline.',
-    );
-  }, []);
+    Alert.alert(t('sell.cameraScan'), t('sell.cameraScanMsg'));
+  }, [t]);
 
   return (
     <View style={styles.wrap}>
@@ -310,7 +309,7 @@ export default function SellTab() {
             value={barcode}
             onChangeText={setBarcode}
             onSubmitEditing={() => void submitBarcode()}
-            placeholder="Scan or type barcode + Enter"
+            placeholder={t('sell.scanPlaceholder')}
             placeholderTextColor={colors.slate400}
             autoFocus
             autoCorrect={false}
@@ -319,7 +318,7 @@ export default function SellTab() {
             blurOnSubmit={false}
           />
         </View>
-        <Pressable style={styles.camBtn} onPress={cameraStub} hitSlop={4} accessibilityLabel="Camera scan (deferred)">
+        <Pressable style={styles.camBtn} onPress={cameraStub} hitSlop={4} accessibilityLabel={t('sell.cameraA11y')}>
           <Ionicons name="camera-outline" size={22} color={colors.slate400} />
         </Pressable>
       </View>
@@ -339,10 +338,10 @@ export default function SellTab() {
         <View style={styles.lockBanner}>
           <Ionicons name="lock-closed" size={16} color={colors.danger} />
           <Text style={styles.lockText} numberOfLines={2}>
-            Register locked — no shift open.
+            {t('sell.lockBanner')}
           </Text>
           <Pressable style={styles.lockBtn} onPress={() => setPrompt({ kind: 'openshift' })} hitSlop={6}>
-            <Text style={styles.lockBtnText}>Open shift</Text>
+            <Text style={styles.lockBtnText}>{t('sell.openShift')}</Text>
           </Pressable>
         </View>
       )}
@@ -354,7 +353,7 @@ export default function SellTab() {
           style={styles.searchInput}
           value={search}
           onChangeText={setSearch}
-          placeholder="Search name, SKU or barcode"
+          placeholder={t('sell.searchPlaceholder')}
           placeholderTextColor={colors.slate400}
           autoCorrect={false}
           autoCapitalize="none"
@@ -365,16 +364,16 @@ export default function SellTab() {
       {/* Current Order cart */}
       <View style={styles.cartCard}>
         <View style={styles.cartHead}>
-          <Text style={styles.cartTitle}>Current Order</Text>
+          <Text style={styles.cartTitle}>{t('sell.currentOrder')}</Text>
           <View style={styles.cartHeadRight}>
             {lines.length > 0 && (
               <NumberText style={styles.cartCount}>
-                {totals.unitCount} item{totals.unitCount === 1 ? '' : 's'}
+                {t(totals.unitCount === 1 ? 'sell.itemsOne' : 'sell.itemsMany', { n: totals.unitCount })}
               </NumberText>
             )}
             {lines.length > 0 && (
-              <Pressable onPress={() => void cart.clear().catch((e) => Alert.alert('Error', errMsg(e)))} hitSlop={8}>
-                <Text style={styles.clearText}>Clear</Text>
+              <Pressable onPress={() => void cart.clear().catch((e) => Alert.alert(t('sell.error'), errMsg(e)))} hitSlop={8}>
+                <Text style={styles.clearText}>{t('sell.clear')}</Text>
               </Pressable>
             )}
           </View>
@@ -384,7 +383,7 @@ export default function SellTab() {
           <View style={styles.cartEmpty}>
             <Ionicons name="cart-outline" size={34} color={colors.slate300} />
             <Text style={styles.cartEmptyText}>
-              Scan a barcode, search, or tap a product above to start the order.
+              {t('sell.cartEmpty')}
             </Text>
           </View>
         ) : (
@@ -395,7 +394,7 @@ export default function SellTab() {
                 line={l}
                 currency={currency}
                 onQty={(d) => void bumpQty(l.key, l.qty, d)}
-                onRemove={() => void cart.removeLine(l.key).catch((e) => Alert.alert('Error', errMsg(e)))}
+                onRemove={() => void cart.removeLine(l.key).catch((e) => Alert.alert(t('sell.error'), errMsg(e)))}
                 onSetPrice={() => requireGate('price_override', () => setPrompt({ kind: 'price', key: l.key }))}
                 onSetDiscount={() => requireGate('discount', () => setPrompt({ kind: 'discount', key: l.key }))}
               />
@@ -410,9 +409,9 @@ export default function SellTab() {
         onPress={() => requireGate('discount', () => setPrompt({ kind: 'order' }))}
         disabled={lines.length === 0}
       >
-        <Text style={styles.orderDiscLabel}>Order discount</Text>
+        <Text style={styles.orderDiscLabel}>{t('sell.orderDiscount')}</Text>
         <NumberText style={orderDiscountMinor > 0 ? { color: colors.positive } : { color: colors.slate400 }}>
-          {orderDiscountMinor > 0 ? `−${formatMoney(orderDiscountMinor, currency)}` : 'Add'}
+          {orderDiscountMinor > 0 ? `−${formatMoney(orderDiscountMinor, currency)}` : t('common.add')}
         </NumberText>
       </Pressable>
 
@@ -421,7 +420,7 @@ export default function SellTab() {
       {/* CHARGE — prototype primary CTA */}
       <Pressable style={[styles.chargeBtn, !canCharge && styles.chargeBtnDisabled]} onPress={onCharge} disabled={!canCharge}>
         <Text style={styles.chargeText}>
-          {canCharge ? `CHARGE  ${formatMoney(totals.totalMinor, currency)}` : cart.busy ? 'PROCESSING…' : 'CHARGE'}
+          {canCharge ? t('sell.chargeAmount', { amount: formatMoney(totals.totalMinor, currency) }) : cart.busy ? t('sell.processing') : t('sell.charge')}
         </Text>
       </Pressable>
 
@@ -456,9 +455,9 @@ export default function SellTab() {
       <Modal visible={weigh !== null} animationType="slide" onRequestClose={() => setWeigh(null)}>
         {weigh && (
           <View style={styles.weighWrap}>
-            <Text style={styles.weighTitle}>Weighed — {weigh.product.name}</Text>
+            <Text style={styles.weighTitle}>{t('sell.weighTitle', { name: weigh.product.name })}</Text>
             <Text style={styles.weighSub}>
-              {formatWeight(weigh.product.stockQty)} in stock · {formatMoney(weigh.product.priceMinor, currency)}/kg
+              {t('sell.weighSub', { stock: formatWeight(weigh.product.stockQty), price: formatMoney(weigh.product.priceMinor, currency) })}
             </Text>
             <View style={styles.weighFieldRow}>
               <TextInput
@@ -476,7 +475,7 @@ export default function SellTab() {
             {weighG != null && weighG > 0 && (
               <View style={styles.weighPreview}>
                 <Text style={styles.weighPreviewLabel}>
-                  {formatWeight(weighG)} · line price
+                  {t('sell.weighLine', { weight: formatWeight(weighG) })}
                 </Text>
                 <NumberText style={styles.weighPreviewValue}>
                   {formatMoney(linePriceForWeight(weigh.product.priceMinor, weighG), currency)}
@@ -485,14 +484,14 @@ export default function SellTab() {
             )}
             <View style={styles.weighActions}>
               <Pressable style={styles.weighCancel} onPress={() => setWeigh(null)}>
-                <Text style={styles.weighCancelText}>Cancel</Text>
+                <Text style={styles.weighCancelText}>{t('common.cancel')}</Text>
               </Pressable>
               <Pressable
                 style={[styles.weighOk, (weighG == null || weighG <= 0) && { opacity: 0.45 }]}
                 onPress={() => void confirmWeigh()}
                 disabled={weighG == null || weighG <= 0}
               >
-                <Text style={styles.weighOkText}>Add to order</Text>
+                <Text style={styles.weighOkText}>{t('sell.weighAdd')}</Text>
               </Pressable>
             </View>
           </View>
@@ -504,10 +503,10 @@ export default function SellTab() {
         <MoneyPrompt
           title={
             prompt.kind === 'openshift'
-              ? 'Open shift — starting float'
+              ? t('sell.openShiftFloat')
               : prompt.kind === 'order'
-                ? 'Order discount'
-                : `${prompt.kind === 'price' ? 'Price' : 'Discount'} — ${promptLine?.name ?? ''}`
+                ? t('sell.orderDiscount')
+                : `${t(prompt.kind === 'price' ? 'sell.promptPrice' : 'sell.promptDiscount')} — ${promptLine?.name ?? ''}`
           }
           currency={currency}
           initialMinor={promptInitial}

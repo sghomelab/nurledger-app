@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { formatMoneyBare, parseMoneyToMinor } from '../../lib/money';
+import { useT } from '../../hooks/useT';
 import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
  */
 export function MoneyPrompt({ title, currency, initialMinor, onSave, onCancel }: Props) {
   const [text, setText] = useState(formatMoneyBare(initialMinor));
+  const { t } = useT();
   const value = parseMoneyToMinor(text);
 
   return (
@@ -33,13 +35,13 @@ export function MoneyPrompt({ title, currency, initialMinor, onSave, onCancel }:
             autoFocus
             style={styles.input}
           />
-          <Text style={styles.hint}>{currency} — enter in major units (e.g. 1.50)</Text>
+          <Text style={styles.hint}>{t('money.hint', { currency })}</Text>
           <View style={styles.buttons}>
             <Pressable style={styles.cancelBtn} onPress={onCancel}>
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
             <Pressable style={styles.saveBtn} onPress={() => onSave(value)}>
-              <Text style={styles.saveText}>Save</Text>
+              <Text style={styles.saveText}>{t('common.save')}</Text>
             </Pressable>
           </View>
         </Pressable>

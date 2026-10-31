@@ -4,6 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { NumberText } from './NumberText';
 import { Chip } from './Chip';
 import { PinPrompt } from './PinPrompt';
+import { useT } from '../hooks/useT';
+import { enDict, type MsgKey } from '../i18n';
 import { colors, fonts, radius, spacing, typography } from '../theme/tokens';
 import { applyStockMove } from '../repositories/stockRepository';
 import { useUsers } from '../hooks/useShift';
@@ -13,7 +15,18 @@ import { formatMoney } from '../lib/money';
 
 type Dir = 'add' | 'remove';
 
-const PRESET_REASONS = ['Damage', 'Lost / stolen', 'Found', 'Counting correction', 'Quality / returned'];
+/**
+ * Preset adjustment reasons (FR-115). The chips DISPLAY the localized label
+ * but STORE the canonical English text — the ledger `reason` is synced
+ * business data (document bodies stay English), not UI chrome.
+ */
+const PRESET_REASONS: MsgKey[] = [
+  'adjust.reason.damage',
+  'adjust.reason.lost',
+  'adjust.reason.found',
+  'adjust.reason.counting',
+  'adjust.reason.quality',
+];
 
 /**
  * Stock adjustment (M3, FR-305): a signed quantity correction with a REQUIRED
@@ -33,6 +46,7 @@ export function AdjustStockDialog({
   onClose: () => void;
 }) {
   const { active, users } = useUsers();
+  const { t } = useT();
   const [dir, setDir] = useState<Dir>('add');
   const [qty, setQty] = useState('');
   const [reason, setReason] = useState('');
@@ -63,7 +77,7 @@ export function AdjustStockDialog({
       onApplied();
       onClose();
     } catch (e) {
-      Alert.alert('Adjustment failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('adjust.failed'), e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -83,7 +97,7 @@ export function AdjustStockDialog({
       <Pressable style={styles.backdrop} onPress={onClose}>
         <Pressable style={styles.card} onPress={() => {}}>
           <View style={styles.head}>
-            <Text style={styles.title}>Adjust stock</Text>
+            <Text style={styles.title}>{t('adjust.title')}</Text>
             <Pressable onPress={onClose} hitSlop={8}>
               <Ionicons name="close" size={22} color={colors.slate400} />
             </Pressable>
@@ -91,7 +105,7 @@ export function AdjustStockDialog({
           <Text style={styles.product} numberOfLines={1}>{product.name}</Text>
 
           <View style={styles.stockRow}>
-            <Text style={styles.stockLabel}>On hand</Text>
+            <Text style={styles.stockLabel}>{t('adjust.onHand')}</Text>
             <NumberText style={styles.stockVal}>{product.stockQty}</NumberText>
             <Text style={styles.stockLabel}>→</Text>
             <NumberText style={[styles.stockVal, projected < product.stockQty && { color: colors.danger }, projected > product.stockQty && { color: colors.positive }]}>
@@ -102,16 +116,16 @@ export function AdjustStockDialog({
           <View style={styles.dirRow}>
             <Pressable style={[styles.dirBtn, dir === 'add' && styles.dirBtnAdd]} onPress={() => setDir('add')}>
               <Ionicons name="add-circle" size={20} color={dir === 'add' ? colors.white : colors.slate500} />
-              <Text style={[styles.dirText, dir === 'add' && { color: colors.white }]}>Add</Text>
+              <Text style={[styles.dirText, dir === 'add' && { color: colors.white }]}>{t('common.add')}</Text>
             </Pressable>
             <Pressable style={[styles.dirBtn, dir === 'remove' && styles.dirBtnRemove]} onPress={() => setDir('remove')}>
               <Ionicons name="remove-circle" size={20} color={dir === 'remove' ? colors.white : colors.slate500} />
-              <Text style={[styles.dirText, dir === 'remove' && { color: colors.white }]}>Remove</Text>
+              <Text style={[styles.dirText, dir === 'remove' && { color: colors.white }]}>{t('common.remove')}</Text>
             </Pressable>
           </View>
 
           <Text style={styles.label}>
-            {product.isWeighed ? 'Quantity (grams) *' : 'Quantity (base units) *'}
+            {product.isWeighed ? t('adjust.qtyGrams') : t('adjust.qtyBase')}
           </Text>
           <TextInput
             style={styles.inputMono}
@@ -122,11 +136,11 @@ export function AdjustStockDialog({
             keyboardType="number-pad"
           />
 
-          <Text style={styles.label}>Reason * (required)</Text>
+          <Text style={styles.label}>{t('adjust.reason')}</Text>
           <View style={styles.reasonChips}>
             {PRESET_REASONS.map((r) => (
-              <Pressable key={r} onPress={() => setReason(r)}>
-                <Chip label={r} tone={reason === r ? 'primary' : 'neutral'} />
+              <Pressable key={r} onPress={() => setReason(enDict[r])}>
+                <Chip label={t(r)} tone={reason === enDict[r] ? 'primary' : 'neutral'} />
               </Pressable>
             ))}
           </View>
@@ -134,14 +148,14 @@ export function AdjustStockDialog({
             style={[styles.input, { marginTop: spacing.sm }]}
             value={reason}
             onChangeText={setReason}
-            placeholder="Or type a reason…"
+            placeholder={t('adjust.reasonPlaceholder')}
             placeholderTextColor={colors.slate400}
           />
 
           <Pressable style={[styles.confirmBtn, !canConfirm && { opacity: 0.5 }]} onPress={requestApply} disabled={!canConfirm || saving}>
-            <Text style={styles.confirmText}>{saving ? 'Applying…' : 'Confirm adjustment'}</Text>
+            <Text style={styles.confirmText}>{saving ? t('adjust.applying') : t('adjust.confirm')}</Text>
           </Pressable>
-          <Text style={styles.foot}>Applies an immutable ledger entry. {formatMoney(0, currency)} = no cost change recorded.</Text>
+          <Text style={styles.foot}>{t('adjust.foot', { money: formatMoney(0, currency) })}</Text>
           {gateVisible && (
             <PinPrompt
               visible

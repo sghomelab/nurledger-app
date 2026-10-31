@@ -222,6 +222,14 @@ export async function closeShift(input: CloseShiftInput): Promise<Shift> {
   const moves = await listCashMoves(shift.id);
   const cashInMinor = moves.filter((m) => m.type === 'in').reduce((s, m) => s + m.amountMinor, 0);
   const cashOutMinor = moves.filter((m) => m.type === 'out').reduce((s, m) => s + m.amountMinor, 0);
+  // M6 (FR-110): refunds recorded against this shift's sales feed the Z-report.
+  const refundsRow = await db.getFirstAsync<{ n: number }>(
+    `SELECT COALESCE(SUM(r.amount_minor), 0) AS n
+       FROM refund r JOIN sale s ON s.id = r.sale_id
+      WHERE s.shift_id = ?`,
+    [shift.id],
+  );
+  const refundsMinor = refundsRow?.n ?? 0;
 
   const closedAt = Date.now();
   const totals = { floatMinor: shift.floatMinor, cashSaleMinor, cashInMinor, cashOutMinor };
@@ -237,6 +245,7 @@ export async function closeShift(input: CloseShiftInput): Promise<Shift> {
     totals,
     countedMinor: Math.round(input.countedMinor),
     notes: input.notes?.trim() ? input.notes.trim() : null,
+    refundsMinor,
   });
 
   // withTransactionAsync is void-returning, so the single write (UPDATE shift)

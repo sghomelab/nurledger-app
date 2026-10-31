@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { NumberText } from '../NumberText';
 import { formatMoney } from '../../lib/money';
 import { formatWeight } from '../../lib/weighed';
+import { useT } from '../../hooks/useT';
 import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
 import type { CartLine } from '../../types';
 
@@ -23,6 +24,7 @@ interface Props {
  * qty stepper — qty is fixed at 1 and the price is per-amount, not per-unit.
  */
 export function CartLineRow({ line, currency, onQty, onRemove, onSetPrice, onSetDiscount }: Props) {
+  const { t } = useT();
   const lineTotal = line.unitPriceMinor * line.qty - Math.max(0, line.discountMinor);
   const weighed = line.qtyG != null;
   return (
@@ -50,7 +52,7 @@ export function CartLineRow({ line, currency, onQty, onRemove, onSetPrice, onSet
                   −{formatMoney(line.discountMinor, currency)}
                 </NumberText>
               ) : (
-                <Text style={[styles.meta, { color: colors.slate400 }]}>discount</Text>
+                <Text style={[styles.meta, { color: colors.slate400 }]}>{t('cart.discount')}</Text>
               )}
               <Ionicons name="pricetag-outline" size={11} color={colors.slate400} />
             </View>

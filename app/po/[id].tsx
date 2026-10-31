@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Sharing from 'expo-sharing';
+import { Directory, File, Paths } from 'expo-file-system';
 import { useOutlet, useProducts } from '../../src/hooks/useAppData';
 import { getPO, receivePO } from '../../src/repositories/poRepository';
-import { isFullyReceived, remainingToReceive } from '../../src/lib/po';
+import { buildPoText, isFullyReceived, remainingToReceive } from '../../src/lib/po';
 import { formatMoney } from '../../src/lib/money';
 import { NumberText } from '../../src/components/NumberText';
 import { Chip } from '../../src/components/Chip';
@@ -71,6 +73,41 @@ export default function PODetailScreen() {
         },
       ],
     );
+  };
+
+  // FR-306: print/share — build a plain-text PO document and hand it to the
+  // system share sheet (WhatsApp / email / print). Same exports/ pattern as
+  // label printing so shared files are easy to find and re-share.
+  const share = async () => {
+    if (!po) return;
+    setBusy(true);
+    try {
+      const text = buildPoText(
+        po,
+        currency,
+        (pid) => {
+          const p = products?.find((x) => x.id === pid);
+          return p ? { name: p.name, sku: p.sku } : undefined;
+        },
+        outlet?.name,
+      );
+      const dir = new Directory(Paths.join(Paths.document.uri, 'exports'));
+      dir.create({ intermediates: true, idempotent: true });
+      const stamp = new Date().toISOString().replace(/[:T]/g, '-').slice(0, 16);
+      const file = new File(Paths.join(dir.uri, `po_${po.supplierName.replace(/[^\w]+/g, '_').toLowerCase()}_${stamp}.txt`));
+      file.write(text);
+      if (!(await Sharing.isAvailableAsync())) {
+        throw new Error('Sharing is not available on this device');
+      }
+      await Sharing.shareAsync(file.uri, {
+        dialogTitle: 'Share purchase order',
+        mimeType: 'text/plain',
+      });
+    } catch (e) {
+      Alert.alert('Share failed', e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
   };
 
   if (loaded && !po) {
@@ -146,6 +183,10 @@ export default function PODetailScreen() {
       )}
 
       <View style={styles.footer}>
+        <Pressable style={[styles.shareBtn, busy && { opacity: 0.7 }]} onPress={() => void share()} disabled={busy}>
+          <Ionicons name="share-social-outline" size={20} color={colors.primary} />
+          <Text style={styles.shareText}>Share</Text>
+        </Pressable>
         {receivable ? (
           <Pressable style={[styles.receiveBtn, busy && { opacity: 0.7 }]} onPress={receive} disabled={busy}>
             <Ionicons name="checkbox-outline" size={20} color={colors.white} />
@@ -207,9 +248,16 @@ const styles = StyleSheet.create({
   footer: {
     padding: spacing.lg, borderTopWidth: 1, borderColor: colors.slate200, backgroundColor: colors.white,
     position: 'absolute', bottom: 0, left: 0, right: 0,
+    flexDirection: 'row', gap: spacing.md,
   },
+  shareBtn: {
+    backgroundColor: colors.white, borderRadius: radius.control, paddingVertical: 14,
+    paddingHorizontal: spacing.lg, borderWidth: 1, borderColor: colors.slate200,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+  },
+  shareText: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.primary },
   receiveBtn: {
-    backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 14,
+    flex: 1, backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 14,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
   },
   receiveText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },

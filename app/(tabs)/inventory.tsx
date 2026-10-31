@@ -3,6 +3,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { FlatList, Pressable, Switch, TextInput, View, Text, StyleSheet, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useProducts, useOutlet } from '../../src/hooks/useAppData';
+import { useT } from '../../src/hooks/useT';
 import { StatusChip } from '../../src/components/Chip';
 import { NumberText } from '../../src/components/NumberText';
 import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
@@ -14,12 +15,14 @@ import type { ProductWithStock } from '../../src/types';
  * M1: product master + local CRUD. M3 (this milestone): product detail with
  * full columns + status + quick actions (Adjust w/ reason, Restock→PO, Edit,
  * Deactivate), reorder suggestions, PO create/receive in batches, carton
- * break (FR-318/FR-322). Stocktake (FR-304) + label printing (FR-317) → M6.
+ * break (FR-318/FR-322). M6: stocktake (FR-304) + label printing (FR-317)
+ * entry points.
  */
 export default function InventoryTab() {
   const router = useRouter();
   const { products, lowStock, search, setSearch, reload } = useProducts();
   const { outlet } = useOutlet();
+  const { t } = useT();
   const [lowOnly, setLowOnly] = useState(false);
 
   // Refresh stock + the low-stock badge on every tab focus: the tab stays
@@ -38,7 +41,35 @@ export default function InventoryTab() {
       {/* PO entry point (M3, FR-306) */}
       <Pressable style={styles.poRow} onPress={() => router.push('/po')}>
         <Ionicons name="business-outline" size={18} color={colors.primary} />
-        <Text style={styles.poText}>Purchase Orders</Text>
+        <Text style={styles.poText}>{t('inv.purchaseOrders')}</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.slate400} />
+      </Pressable>
+
+      {/* Stocktake entry point (M6, FR-304) */}
+      <Pressable style={[styles.poRow, { marginTop: spacing.sm }]} onPress={() => router.push('/stocktake')}>
+        <Ionicons name="clipboard-outline" size={18} color={colors.primary} />
+        <Text style={styles.poText}>{t('inv.stocktake')}</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.slate400} />
+      </Pressable>
+
+      {/* Label printing entry point (M6, FR-317) */}
+      <Pressable style={[styles.poRow, { marginTop: spacing.sm }]} onPress={() => router.push('/labels')}>
+        <Ionicons name="print-outline" size={18} color={colors.primary} />
+        <Text style={styles.poText}>{t('inv.labels')}</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.slate400} />
+      </Pressable>
+
+      {/* Suppliers entry point (M6, FR-313) */}
+      <Pressable style={[styles.poRow, { marginTop: spacing.sm }]} onPress={() => router.push('/suppliers')}>
+        <Ionicons name="business-outline" size={18} color={colors.primary} />
+        <Text style={styles.poText}>{t('inv.suppliers')}</Text>
+        <Ionicons name="chevron-forward" size={16} color={colors.slate400} />
+      </Pressable>
+
+      {/* Product data (CSV) entry point (M6, FR-314) */}
+      <Pressable style={[styles.poRow, { marginTop: spacing.sm }]} onPress={() => router.push('/csv')}>
+        <Ionicons name="swap-vertical-outline" size={18} color={colors.primary} />
+        <Text style={styles.poText}>{t('inv.csv')}</Text>
         <Ionicons name="chevron-forward" size={16} color={colors.slate400} />
       </Pressable>
 
@@ -48,7 +79,7 @@ export default function InventoryTab() {
           <Ionicons name="search" size={16} color={colors.slate400} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search name, SKU or barcode"
+            placeholder={t('sell.searchPlaceholder')}
             placeholderTextColor={colors.slate400}
             value={search}
             onChangeText={setSearch}
@@ -65,7 +96,7 @@ export default function InventoryTab() {
       {/* Low Stock Only toggle (prototype: "Toggle between showing only low stock items or entire catalog") */}
       <View style={styles.toggleRow}>
         <Text style={styles.toggleLabel}>
-          Low Stock Only {lowStock > 0 ? <NumberText style={styles.toggleCount}>{lowStock}</NumberText> : null}
+          {t('inv.lowStockOnly')} {lowStock > 0 ? <NumberText style={styles.toggleCount}>{lowStock}</NumberText> : null}
         </Text>
         <Switch
           value={lowOnly}
@@ -83,7 +114,7 @@ export default function InventoryTab() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="cube-outline" size={40} color={colors.slate300} />
-            <Text style={styles.emptyText}>{search ? 'No products match' : 'No products yet'}</Text>
+            <Text style={styles.emptyText}>{search ? t('inv.noMatch') : t('inv.noneYet')}</Text>
           </View>
         }
         renderItem={({ item }) => (

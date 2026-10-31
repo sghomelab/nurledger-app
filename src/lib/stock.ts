@@ -4,6 +4,7 @@
  */
 
 import type { ExpiryRadarSummary, ExpiryUrgency } from '../types';
+import { marginPct } from './money';
 
 export interface LayerInput {
   id: string;
@@ -164,5 +165,75 @@ export function summarizeRadar(
     otherQty,
     expiredWasteQty: expiredQty,
     batchCount: entries.length,
+  };
+}
+
+// ── FR-320: margin compression (cost layer vs stable selling price) ─────────
+
+export interface MarginAnalysis {
+  /** Unit cost of the OLDEST layer — the cost the price was originally set against. */
+  baselineCostMinor: number;
+  /** Unit cost of the NEWEST layer (most recent receipt, whether or not it has qty left). */
+  currentCostMinor: number;
+  /** Margin % at the baseline cost. */
+  baselineMarginPct: number;
+  /** Margin % at the current (newest) cost. */
+  currentMarginPct: number;
+  /** True when the newest cost has risen above the baseline, compressing the margin. */
+  compressed: boolean;
+  /**
+   * Suggested price (minor units) that would restore the baseline margin at the
+   * current cost: `price × (1 − baselineMarginPct/100)` recomputed off the newest
+   * cost → `newCost / (1 − baselineMargin)`. null when not worth suggesting.
+   */
+  suggestedPriceMinor: number | null;
+}
+
+/**
+ * FR-320: compare a product's FIFO cost layers against its owner-set selling
+ * price. The price is NEVER auto-derived (ADR-003) — this only SURFACES margin
+ * compression and SUGGESTS a reprice to hold the original (baseline) margin.
+ * Applying the suggestion is a separate, owner-confirmed step (UI gate).
+ *
+ * Baseline = oldest layer (what the price was set against). Current = newest
+ * layer (the cost future sales will draw from once older layers deplete).
+ */
+export function analyzeMargin(priceMinor: number, layers: LayerInput[]): MarginAnalysis {
+  const none: MarginAnalysis = {
+    baselineCostMinor: 0,
+    currentCostMinor: 0,
+    baselineMarginPct: 0,
+    currentMarginPct: 0,
+    compressed: false,
+    suggestedPriceMinor: null,
+  };
+  if (priceMinor <= 0 || layers.length === 0) return none;
+
+  // FIFO order (oldest first) — same rule as consumeFifo.
+  const ordered = [...layers].sort(
+    (a, b) => a.receivedAt - b.receivedAt || a.id.localeCompare(b.id),
+  );
+  const baseline = ordered[0]!;
+  const current = ordered[ordered.length - 1]!;
+
+  const baselineMarginPct = marginPct(priceMinor, baseline.unitCostMinor);
+  const currentMarginPct = marginPct(priceMinor, current.unitCostMinor);
+  const compressed = current.unitCostMinor > baseline.unitCostMinor;
+
+  // Suggest a price that holds the baseline margin at the current cost.
+  // margin = (P − C)/P = baselineMargin  →  P = C / (1 − baselineMargin).
+  let suggestedPriceMinor: number | null = null;
+  if (compressed && baselineMarginPct > 0 && baselineMarginPct < 100) {
+    const keep = 100 - baselineMarginPct; // cost is (100 − margin)% of price
+    suggestedPriceMinor = Math.ceil((current.unitCostMinor * 100) / keep);
+  }
+
+  return {
+    baselineCostMinor: baseline.unitCostMinor,
+    currentCostMinor: current.unitCostMinor,
+    baselineMarginPct,
+    currentMarginPct,
+    compressed,
+    suggestedPriceMinor,
   };
 }

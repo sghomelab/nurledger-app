@@ -65,7 +65,7 @@ export interface ZReport {
   countedMinor: number;
   varianceMinor: number;
   varianceClass: VarianceClass;
-  /** FR-110/FR-111 refunds land in M6 — 0 keeps the report shape stable. */
+  /** Refunds against this shift's sales (FR-110 — wired in M6). */
   refundsMinor: number;
   notes: string | null;
 }
@@ -81,6 +81,8 @@ export interface ZReportInput {
   totals: CashTotals;
   countedMinor: number;
   notes: string | null;
+  /** M6 (FR-110): refunds recorded against this shift's sales (minor). */
+  refundsMinor?: number;
 }
 
 export function buildZReport(input: ZReportInput): ZReport {
@@ -100,7 +102,7 @@ export function buildZReport(input: ZReportInput): ZReport {
     countedMinor: input.countedMinor,
     varianceMinor: v,
     varianceClass: classifyVariance(v),
-    refundsMinor: 0,
+    refundsMinor: input.refundsMinor ?? 0,
     notes: input.notes,
   };
 }

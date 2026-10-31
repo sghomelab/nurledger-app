@@ -211,11 +211,13 @@ export function useCart() {
         if (!product) throw new Error(`No weighed product for scale key "${parsed.itemKey}"`);
         return { needsWeight: { product, weightG: parsed.weightG } };
       }
-      const product = await findByBarcode(code);
+      // Lookup on the PARSER's normalized code: a leading-0 UPC-A scanned as
+      // EAN-13 "0"+code is normalized back to the 12-digit GTIN (FR-317).
+      const product = await findByBarcode(parsed.code);
       if (!product) throw new Error(`No product for barcode "${code}"`);
       // FR-318/FR-322: scanning the CARTON barcode sells a whole carton (cartonSize
       // base units); scanning the unit barcode sells 1 base unit.
-      const qty = product.cartonBarcode === code ? product.cartonSize : 1;
+      const qty = product.cartonBarcode === parsed.code ? product.cartonSize : 1;
       await addProduct(product, qty);
       return {};
     },

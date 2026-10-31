@@ -1,4 +1,5 @@
 import {
+  analyzeMargin,
   applyConsumption,
   consumeFifo,
   daysUntil,
@@ -133,5 +134,65 @@ describe('expiry urgency & radar summary (M3, FR-307, prototype §5)', () => {
     expect(s.expiringQty).toBe(18); // critical 10 + soon 8
     expect(s.otherQty).toBe(100);
     expect(s.batchCount).toBe(5);
+  });
+});
+
+describe('analyzeMargin (M6, FR-320 margin compression)', () => {
+  it('flags compression when the newest cost rose above the baseline and suggests a reprice', () => {
+    // Price set at S$8.00 against a S$5.00 cost → 37.5% → 38% integer margin.
+    // New receipt at S$6.00 → margin compresses to 25%.
+    const layers = [layer('L1', 500, 500, 1), layer('L2', 600, 500, 2)];
+    const a = analyzeMargin(800, layers);
+    expect(a.baselineCostMinor).toBe(500);
+    expect(a.currentCostMinor).toBe(600);
+    expect(a.baselineMarginPct).toBe(38); // 37.5% rounds up (app shows integer %)
+    expect(a.currentMarginPct).toBe(25);
+    expect(a.compressed).toBe(true);
+    // hold 38% at S$6.00 cost → ceil(600 × 100 / (100 − 38)) = ceil(967.74) = 968
+    expect(a.suggestedPriceMinor).toBe(968);
+  });
+
+  it('does not flag compression when cost held or fell', () => {
+    const same = analyzeMargin(800, [layer('L1', 500, 100, 1), layer('L2', 500, 100, 2)]);
+    expect(same.compressed).toBe(false);
+    expect(same.suggestedPriceMinor).toBeNull();
+
+    const fell = analyzeMargin(800, [layer('L1', 500, 100, 1), layer('L2', 400, 100, 2)]);
+    expect(fell.compressed).toBe(false);
+    expect(fell.suggestedPriceMinor).toBeNull();
+    // margin improved
+    expect(fell.currentMarginPct).toBeGreaterThan(fell.baselineMarginPct);
+  });
+
+  it('is a no-op with no layers or a non-positive price', () => {
+    const noLayers = analyzeMargin(800, []);
+    expect(noLayers.compressed).toBe(false);
+    expect(noLayers.suggestedPriceMinor).toBeNull();
+
+    const noPrice = analyzeMargin(0, [layer('L1', 500, 100, 1), layer('L2', 600, 100, 2)]);
+    expect(noPrice.compressed).toBe(false);
+    expect(noPrice.suggestedPriceMinor).toBeNull();
+  });
+
+  it('never suggests when the baseline margin is 0% or 100% (no sensible target)', () => {
+    // price == baseline cost → 0% baseline margin
+    const zero = analyzeMargin(500, [layer('L1', 500, 100, 1), layer('L2', 600, 100, 2)]);
+    expect(zero.compressed).toBe(true);
+    expect(zero.suggestedPriceMinor).toBeNull();
+
+    // baseline cost 0 → 100% margin (division guard)
+    const hundred = analyzeMargin(800, [layer('L1', 0, 100, 1), layer('L2', 600, 100, 2)]);
+    expect(hundred.compressed).toBe(true);
+    expect(hundred.suggestedPriceMinor).toBeNull();
+  });
+
+  it('suggests a price above the current one when cost exceeds the selling price', () => {
+    // price S$5.00, baseline cost S$4.00 (20% margin), new cost S$6.00 → negative margin
+    const a = analyzeMargin(500, [layer('L1', 400, 100, 1), layer('L2', 600, 100, 2)]);
+    expect(a.compressed).toBe(true);
+    expect(a.currentMarginPct).toBeLessThan(0);
+    // hold 20% at S$6.00 → 600 / 0.80 = 750
+    expect(a.suggestedPriceMinor).toBe(750);
+    expect(a.suggestedPriceMinor).toBeGreaterThan(500);
   });
 });

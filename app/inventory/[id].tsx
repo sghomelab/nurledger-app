@@ -3,15 +3,19 @@ import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCategories, useOutlet, useProducts } from '../../src/hooks/useAppData';
-import { getProduct, deactivateProduct } from '../../src/repositories/productRepository';
-import { batchesWithQty, ledgerHistory } from '../../src/repositories/stockRepository';
-import { reorderSuggestion, daysUntil, expiryUrgency } from '../../src/lib/stock';
+import { useUsers } from '../../src/hooks/useShift';
+import { getProduct, deactivateProduct, updateProduct } from '../../src/repositories/productRepository';
+import { getSupplier } from '../../src/repositories/supplierRepository';
+import { batchesWithQty, costLayersOf, ledgerHistory } from '../../src/repositories/stockRepository';
+import { analyzeMargin, reorderSuggestion, daysUntil, expiryUrgency, type MarginAnalysis } from '../../src/lib/stock';
+import { roleCanAct } from '../../src/lib/roles';
 import { marginPct, formatMoney } from '../../src/lib/money';
 import { StatusChip } from '../../src/components/Chip';
 import { NumberText } from '../../src/components/NumberText';
 import { AdjustStockDialog } from '../../src/components/AdjustStockDialog';
+import { PinPrompt } from '../../src/components/PinPrompt';
 import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
-import type { BatchWithQty, ExpiryUrgency, ProductWithStock, StockLedgerRow } from '../../src/types';
+import type { BatchWithQty, ExpiryUrgency, ProductWithStock, StockLedgerRow, Supplier } from '../../src/types';
 
 function fmtDate(ts: number): string {
   return new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
@@ -41,19 +45,28 @@ export default function ProductDetailScreen() {
   const [product, setProduct] = useState<ProductWithStock | null>(null);
   const [batches, setBatches] = useState<BatchWithQty[]>([]);
   const [ledger, setLedger] = useState<StockLedgerRow[]>([]);
+  const [supplier, setSupplier] = useState<Supplier | null>(null);
+  const [margin, setMargin] = useState<MarginAnalysis | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [adjusting, setAdjusting] = useState(false);
+  const [gateVisible, setGateVisible] = useState(false);
+  const { active, users } = useUsers();
 
   const load = useCallback(async () => {
     if (!id) return;
-    const [p, allBatches, hist] = await Promise.all([
+    const [p, allBatches, hist, layers] = await Promise.all([
       getProduct(id),
       batchesWithQty(),
       ledgerHistory(id, 6),
+      costLayersOf(id),
     ]);
     setProduct(p);
     setBatches(allBatches.filter((b) => b.productId === id));
     setLedger(hist);
+    // FR-313: resolve the linked supplier (null when unlinked).
+    setSupplier(p?.supplierId ? await getSupplier(p.supplierId) : null);
+    // FR-320: margin compression — oldest layer (baseline) vs newest layer.
+    setMargin(analyzeMargin(p?.priceMinor ?? 0, layers));
     setLoaded(true);
   }, [id]);
 
@@ -82,6 +95,29 @@ export default function ProductDetailScreen() {
     ]);
   };
 
+  // FR-320: apply the suggested reprice (only on explicit owner confirmation;
+  // the price is NEVER auto-derived from cost — ADR-003).
+  const applySuggestedPrice = async () => {
+    if (!product || !margin || margin.suggestedPriceMinor == null) return;
+    try {
+      await updateProduct(product.id, { ...product, priceMinor: margin.suggestedPriceMinor });
+      await reload();
+      await load();
+    } catch (e) {
+      Alert.alert('Price update failed', e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const requestSuggestedPrice = () => {
+    // Gated for cashiers (owner/manager apply directly) — same pattern as
+    // stock_adjust / refund gates.
+    if (active && roleCanAct(active.role, 'price_override')) {
+      void applySuggestedPrice();
+      return;
+    }
+    setGateVisible(true);
+  };
+
   if (loaded && !product) {
     return (
       <View style={styles.center}>
@@ -94,7 +130,7 @@ export default function ProductDetailScreen() {
   }
 
   const currency = outlet?.currency ?? 'SGD';
-  const margin = marginPct(product.priceMinor, product.costMinor);
+  const marginChip = marginPct(product.priceMinor, product.costMinor);
   const suggested = reorderSuggestion(product.stockQty, product.minQty, product.maxQty);
   const belowMin = product.stockQty < product.minQty;
   const categoryName = categories?.find((c) => c.id === product.categoryId)?.name ?? '—';
@@ -116,7 +152,7 @@ export default function ProductDetailScreen() {
         <Metric label="On hand" value={String(product.stockQty)} />
         <Metric label="Price" value={formatMoney(product.priceMinor, currency)} />
         <Metric label="Cost" value={formatMoney(product.costMinor, currency)} />
-        <Metric label="Margin" value={`${margin}%`} accent={colors.positive} />
+        <Metric label="Margin" value={`${marginChip}%`} accent={colors.positive} />
       </View>
 
       {/* Reorder suggestion (FR-308) */}
@@ -135,6 +171,31 @@ export default function ProductDetailScreen() {
         </Pressable>
       )}
 
+      {/* Margin compression (FR-320): newest cost rose above the baseline */}
+      {margin?.compressed && (
+        <View style={styles.marginCard}>
+          <Ionicons name="trending-down-outline" size={22} color={colors.warning} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.marginTitle}>
+              Margin compressed {margin.baselineMarginPct}% → {margin.currentMarginPct}%
+            </Text>
+            <Text style={styles.marginSub}>
+              Latest cost {formatMoney(margin.currentCostMinor, currency)} vs {formatMoney(margin.baselineCostMinor, currency)} when the price was set
+            </Text>
+            {margin.suggestedPriceMinor != null && (
+              <Text style={styles.marginSuggest}>
+                {formatMoney(margin.suggestedPriceMinor, currency)} holds {margin.baselineMarginPct}% margin
+              </Text>
+            )}
+          </View>
+          {margin.suggestedPriceMinor != null && (
+            <Pressable style={styles.marginBtn} onPress={requestSuggestedPrice}>
+              <Text style={styles.marginBtnText}>Use</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
       {/* Details (the prototype columns) */}
       <SectionTitle>Details</SectionTitle>
       <View style={styles.card}>
@@ -142,6 +203,7 @@ export default function ProductDetailScreen() {
         <Row label="Barcode" value={product.barcode ?? '—'} mono />
         <Row label="Carton barcode" value={product.cartonBarcode ?? '—'} mono sub={`1 carton = ${product.cartonSize} units`} />
         <Row label="Category" value={categoryName} />
+        <Row label="Supplier" value={supplier?.name ?? '—'} sub={supplier ? `${supplier.leadTimeDays}d lead` : undefined} />
         <Row label="Unit type" value={product.unitType} />
         <Row label="Velocity tier" value={product.velocityClass ?? '—'} />
         <Row label="Min (reorder)" value={String(product.minQty)} mono />
@@ -207,6 +269,9 @@ export default function ProductDetailScreen() {
         <ActionButton icon="create-outline" label="Edit" tone="neutral" onPress={() =>
           router.push({ pathname: '/inventory/edit', params: { id: product.id } })
         } />
+        <ActionButton icon="print-outline" label="Label" tone="neutral" onPress={() =>
+          router.push({ pathname: '/labels', params: { product: product.id } })
+        } />
         <ActionButton icon="eye-off-outline" label="Deactivate" tone="danger" onPress={() => void deactivate()} />
       </View>
 
@@ -216,6 +281,19 @@ export default function ProductDetailScreen() {
           currency={currency}
           onApplied={() => { void load(); void reload(); }}
           onClose={() => setAdjusting(false)}
+        />
+      )}
+
+      {gateVisible && (
+        <PinPrompt
+          visible
+          action="price_override"
+          users={users ?? []}
+          onSuccess={() => {
+            setGateVisible(false);
+            void applySuggestedPrice();
+          }}
+          onCancel={() => setGateVisible(false)}
         />
       )}
     </ScrollView>
@@ -284,6 +362,17 @@ const styles = StyleSheet.create({
   },
   reorderTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: '#92400E' },
   reorderSub: { fontFamily: fonts.sans, fontSize: 12, color: '#B45309', marginTop: 2 },
+  marginCard: {
+    flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.md,
+    backgroundColor: colors.warningSoft, borderRadius: radius.card, borderWidth: 1, borderColor: colors.warning, padding: spacing.md,
+  },
+  marginTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: '#92400E' },
+  marginSub: { fontFamily: fonts.sans, fontSize: 12, color: '#B45309', marginTop: 2 },
+  marginSuggest: { fontFamily: fonts.sans, fontSize: 12, color: '#92400E', marginTop: 4 },
+  marginBtn: {
+    backgroundColor: colors.warning, borderRadius: radius.control, paddingVertical: 8, paddingHorizontal: spacing.lg,
+  },
+  marginBtnText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.white },
   sectionTitle: {
     fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500, textTransform: 'uppercase', letterSpacing: 0.5,
     marginTop: spacing.xl, marginBottom: spacing.sm, marginLeft: spacing.lg + 2,

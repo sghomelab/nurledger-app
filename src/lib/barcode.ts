@@ -39,6 +39,14 @@ export function parseBarcodeSg(raw: string): ParsedBarcode {
   const code = raw.trim();
   if (!/^\d+$/.test(code)) return { kind: 'unknown', code };
 
+  // A 13-digit scan starting with 0 is a UPC-A read as EAN-13: scanners report
+  // the UPC-A symbol as "0"+code (the UPC-A symbol IS the EAN-13 0+code symbol).
+  // Normalize back to the 12-digit GTIN so exact-match lookup hits the stored
+  // `barcode` (FR-317 printed labels scan back correctly).
+  if (code.length === 13 && code[0] === '0') {
+    return { kind: 'plain', code: code.slice(1) };
+  }
+
   // GTIN lengths: 8, 12, 13, 14.
   if (code.length === 8 || code.length === 12 || code.length === 14) {
     return { kind: 'plain', code };

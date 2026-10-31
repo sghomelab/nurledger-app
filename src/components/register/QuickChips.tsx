@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useT } from '../../hooks/useT';
 import { colors, fonts, radius, spacing } from '../../theme/tokens';
 import type { ProductWithStock } from '../../types';
 
@@ -11,10 +12,11 @@ export function QuickChips({
   products: ProductWithStock[];
   onPick: (p: ProductWithStock) => void;
 }) {
+  const { t } = useT();
   if (products.length === 0) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>No products match</Text>
+        <Text style={styles.emptyText}>{t('quick.noMatch')}</Text>
       </View>
     );
   }

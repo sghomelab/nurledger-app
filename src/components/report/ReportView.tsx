@@ -40,6 +40,12 @@ export function ReportView({ report, currency }: Props) {
         )}
         <Divider />
         <Row label="Total sales" value={formatMoney(totalByMethod(report.salesByMethod), currency)} strong />
+        {isZ && (
+          <>
+            <Divider />
+            <Row label="Refunds" value={`−${formatMoney(report.refundsMinor, currency)}`} />
+          </>
+        )}
       </View>
 
       {/* Cash movements */}

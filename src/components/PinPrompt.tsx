@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { canUnlock, GATE_ACTION_LABELS, type GateAction } from '../lib/roles';
+import { canUnlock, type GateAction } from '../lib/roles';
 import { isValidPin, PIN_MAX_LENGTH, PIN_MIN_LENGTH, verifyPin } from '../lib/pin';
+import { useT } from '../hooks/useT';
+import type { MsgKey } from '../i18n';
 import { colors, fonts, radius, spacing, typography } from '../theme/tokens';
 import type { AppUser } from '../types';
 
@@ -17,6 +19,17 @@ interface Props {
   onCancel: () => void;
 }
 
+/** i18n key per gate action (FR-115) — mirrors GATE_ACTION_LABELS (English). */
+const GATE_KEYS: Record<GateAction, MsgKey> = {
+  discount: 'gate.discount',
+  price_override: 'gate.price_override',
+  stock_adjust: 'gate.stock_adjust',
+  close_shift: 'gate.close_shift',
+  store_settings: 'gate.store_settings',
+  refund: 'gate.refund',
+  stocktake_apply: 'gate.stocktake_apply',
+};
+
 /**
  * PIN unlock prompt (FR-500 / DEV-003/DEV-005). Shown when the ACTIVE user's
  * role does not permit a gated action: entering a PIN belonging to a
@@ -27,6 +40,7 @@ interface Props {
  * the kiosk pattern (no IME to fight, no autocorrect surprises).
  */
 export function PinPrompt({ visible, action, users, onSuccess, onCancel }: Props) {
+  const { t } = useT();
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +61,7 @@ export function PinPrompt({ visible, action, users, onSuccess, onCancel }: Props
         setPin('');
         onSuccess();
       } else if (next.length === PIN_MAX_LENGTH) {
-        setError('Wrong PIN — try again');
+        setError(t('pin.wrong'));
         setPin('');
       }
     }
@@ -69,11 +83,11 @@ export function PinPrompt({ visible, action, users, onSuccess, onCancel }: Props
       <Pressable style={styles.backdrop} onPress={dismiss}>
         <Pressable style={styles.card} onPress={() => {}}>
           <Ionicons name="lock-closed" size={22} color={colors.primary} />
-          <Text style={styles.title}>{GATE_ACTION_LABELS[action]} — PIN required</Text>
+          <Text style={styles.title}>{t('pin.required', { action: t(GATE_KEYS[action]) })}</Text>
           <Text style={styles.hint}>
             {unlockers.length > 0
-              ? `Enter the owner/manager PIN to continue (min ${PIN_MIN_LENGTH} digits).`
-              : 'No owner/manager has a PIN set yet — add one in Settings.'}
+              ? t('pin.hint', { n: PIN_MIN_LENGTH })
+              : t('pin.noPinSet')}
           </Text>
 
           {/* Dots */}
@@ -106,7 +120,7 @@ export function PinPrompt({ visible, action, users, onSuccess, onCancel }: Props
           </View>
 
           <Pressable style={styles.cancelBtn} onPress={dismiss}>
-            <Text style={styles.cancelText}>Cancel</Text>
+            <Text style={styles.cancelText}>{t('common.cancel')}</Text>
           </Pressable>
         </Pressable>
       </Pressable>

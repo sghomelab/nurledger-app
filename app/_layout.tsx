@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { loadFonts } from '../src/fonts';
 import { getDb } from '../src/db/database';
+import { useT } from '../src/hooks/useT';
 import { colors, fonts } from '../src/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -13,6 +14,8 @@ SplashScreen.preventAutoHideAsync().catch(() => {});
  * Offline-first: no network involvement on startup (spec §4.2 rule 1).
  */
 export default function RootLayout() {
+  const { t } = useT();
+
   useEffect(() => {
     (async () => {
       try {
@@ -35,7 +38,7 @@ export default function RootLayout() {
         <Stack.Screen name="po" options={{ ...headerOptions, title: 'Purchase Orders' }} />
         <Stack.Screen name="po/new" options={{ ...headerOptions, title: 'New PO' }} />
         <Stack.Screen name="po/[id]" options={{ ...headerOptions, title: 'PO' }} />
-        <Stack.Screen name="settings" options={{ ...headerOptions, title: 'Store settings' }} />
+        <Stack.Screen name="settings" options={{ ...headerOptions, title: t('settings.title') }} />
         <Stack.Screen name="cloud-setup" options={{ ...headerOptions, title: 'Connect your backend' }} />
       </Stack>
     </>

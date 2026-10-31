@@ -20,7 +20,9 @@ export type GateAction =
   | 'price_override' // FR-105 per-line price adjust (DEV-003)
   | 'stock_adjust' // FR-305/DEV-005 adjustment apply
   | 'close_shift' // FR-202 — "manager PIN on close" (prototype)
-  | 'store_settings'; // outlet currency/tax locale changes
+  | 'store_settings' // outlet currency/tax locale changes
+  | 'refund' // FR-110 — refund create (manager PIN, spec FR-501)
+  | 'stocktake_apply'; // FR-304 — apply a counted stocktake (manager PIN, spec FR-501)
 
 export const GATE_ACTION_LABELS: Record<GateAction, string> = {
   discount: 'Discount',
@@ -28,6 +30,8 @@ export const GATE_ACTION_LABELS: Record<GateAction, string> = {
   stock_adjust: 'Stock adjustment',
   close_shift: 'Close shift',
   store_settings: 'Store settings',
+  refund: 'Refund',
+  stocktake_apply: 'Apply stocktake',
 };
 
 /** Owner and Manager pass every M4 gate directly (see header note). */

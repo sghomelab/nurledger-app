@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, fonts, touchTarget } from '../../src/theme/tokens';
 import { useProducts } from '../../src/hooks/useAppData';
+import { useT } from '../../src/hooks/useT';
 
 /**
  * 5-section bottom navigation — prototype order (PROTOTYPE-REFERENCE §1, ADR-005):
@@ -9,6 +10,7 @@ import { useProducts } from '../../src/hooks/useAppData';
  */
 export default function TabLayout() {
   const { lowStock } = useProducts();
+  const { t } = useT();
 
   return (
     <Tabs
@@ -30,14 +32,14 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Sell',
+          title: t('tab.sell'),
           tabBarIcon: ({ color, size }) => <Ionicons name="cart" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="inventory"
         options={{
-          title: 'Inventory',
+          title: t('tab.inventory'),
           tabBarBadge: lowStock > 0 ? lowStock : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.warning },
           tabBarIcon: ({ color, size }) => <Ionicons name="cube" size={size} color={color} />,
@@ -46,21 +48,21 @@ export default function TabLayout() {
       <Tabs.Screen
         name="expiry"
         options={{
-          title: 'Expiry',
+          title: t('tab.expiry'),
           tabBarIcon: ({ color, size }) => <Ionicons name="hourglass-outline" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="insights"
         options={{
-          title: 'Insights',
+          title: t('tab.insights'),
           tabBarIcon: ({ color, size }) => <Ionicons name="stats-chart" size={size} color={color} />,
         }}
       />
       <Tabs.Screen
         name="shift"
         options={{
-          title: 'Shift',
+          title: t('tab.shift'),
           tabBarIcon: ({ color, size }) => <Ionicons name="cash-outline" size={size} color={color} />,
         }}
       />

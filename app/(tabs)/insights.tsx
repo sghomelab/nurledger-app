@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useRouter } from 'expo-router';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../../src/components/Screen';
@@ -52,6 +53,7 @@ export default function InsightsTab() {
 
   const [csv, setCsv] = useState<{ fileName: string; text: string } | null>(null);
   const [expenseVisible, setExpenseVisible] = useState(false);
+  const router = useRouter();
 
   const currency = outlet?.currency ?? 'SGD';
   const k = ins.data?.kpis;
@@ -296,7 +298,12 @@ export default function InsightsTab() {
           <Text style={styles.empty}>No sales in this period.</Text>
         ) : (
           ins.salesHistory.map((s) => (
-            <View key={s.id} style={styles.saleRow}>
+            <Pressable
+              key={s.id}
+              style={styles.saleRow}
+              onPress={() => router.push(`/refund/${s.id}`)}
+              accessibilityHint="Open refund for this sale"
+            >
               <View style={{ flex: 1 }}>
                 <Text style={styles.abcName} numberOfLines={1}>
                   {new Date(s.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -305,7 +312,8 @@ export default function InsightsTab() {
                 <Text style={styles.abcMeta} numberOfLines={2}>{s.products ?? '—'}</Text>
               </View>
               <NumberText style={styles.abcRevenue}>{formatMoney(s.totalMinor, currency)}</NumberText>
-            </View>
+              <Ionicons name="chevron-forward" size={16} color={colors.slate300} />
+            </Pressable>
           ))
         )}
       </Card>

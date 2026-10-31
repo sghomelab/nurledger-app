@@ -133,19 +133,60 @@ export interface LedgerDeltaRow {
   updatedAt: number;
 }
 
+/** M6 (FR-110): refund deltas (append-only, uuid = client UUID). */
+export interface RefundDeltaRow {
+  id: string;
+  uuid: string;
+  saleUuid: string;
+  outletId: string;
+  deviceId: string | null;
+  userId: string | null;
+  reasonCode: string;
+  restock: boolean;
+  amountMinor: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface RefundLineDeltaRow {
+  id: string;
+  refundUuid: string;
+  saleLineId: string;
+  productId: string;
+  qty: number;
+  qtyG: number | null;
+  amountMinor: number;
+  restock: boolean;
+}
+
+/** M6 (schema v3): category deltas (LWW like products — pulled BEFORE
+ *  products so a product's category_id FK can never dangle on pull). */
+export interface CategoryDeltaRow {
+  id: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  updatedByDevice: string | null;
+}
+
 export interface TableCursors {
   /** epoch ms per table; 0 = "pull everything". */
   product: number;
   sale: number;
   ledger: number;
+  refund: number;
+  category: number;
 }
 
 export interface SyncPullResult {
+  categories: CategoryDeltaRow[];
   products: ProductDeltaRow[];
   sales: SaleDeltaRow[];
   saleLines: SaleLineDeltaRow[];
   payments: PaymentDeltaRow[];
   ledger: LedgerDeltaRow[];
+  refunds: RefundDeltaRow[];
+  refundLines: RefundLineDeltaRow[];
   /** Max updatedAt observed per table (for cursor advancement). */
   maxUpdatedAt: TableCursors;
 }

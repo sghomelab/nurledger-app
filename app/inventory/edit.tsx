@@ -7,8 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { PickerOverlay } from '../../src/components/PickerOverlay';
 import { useCategories, useOutlet, useProducts } from '../../src/hooks/useAppData';
 import { createProduct, getProduct, updateProduct, type ProductInput } from '../../src/repositories/productRepository';
+import { listSuppliers } from '../../src/repositories/supplierRepository';
 import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
-import type { UnitType, VelocityClass } from '../../src/types';
+import type { SupplierWithCounts, UnitType, VelocityClass } from '../../src/types';
 
 /**
  * Product add/edit form (M1 local CRUD, FR-300). Money fields are entered as
@@ -41,6 +42,15 @@ export default function ProductFormScreen() {
   const [saving, setSaving] = useState(false);
   const [catPicker, setCatPicker] = useState(false);
 
+  // FR-313: supplier master link
+  const [supplierId, setSupplierId] = useState<string | null>(null);
+  const [suppliers, setSuppliers] = useState<SupplierWithCounts[]>([]);
+  const [supplierPicker, setSupplierPicker] = useState(false);
+
+  useEffect(() => {
+    void listSuppliers().then(setSuppliers);
+  }, []);
+
   // Load existing product once (edit flow)
   useEffect(() => {
     if (isNew || loaded) return;
@@ -64,6 +74,7 @@ export default function ProductFormScreen() {
       setCartonBarcode(p.cartonBarcode ?? '');
       setVelocityClass(p.velocityClass);
       setDescription(p.description ?? '');
+      setSupplierId(p.supplierId);
       setLoaded(true);
     })();
   }, [isNew, loaded, id, router]);
@@ -97,6 +108,7 @@ export default function ProductFormScreen() {
         barcode: barcode.trim() || null,
         cartonBarcode: cartonBarcode.trim() || null,
         cartonSize: Math.max(1, toInt(cartonSize)),
+        supplierId,
         costMinor: toMinor(cost),
         priceMinor: toMinor(price),
         taxCategory: 'standard',
@@ -146,6 +158,14 @@ export default function ProductFormScreen() {
           </Pressable>
         </Field>
 
+        {/* FR-313: per-supplier SKU link */}
+        <Field label="Supplier">
+          <Pressable style={styles.selectBox} onPress={() => setSupplierPicker(true)}>
+            <Text style={styles.selectText}>{suppliers.find((s) => s.id === supplierId)?.name ?? 'None'}</Text>
+            <Ionicons name="chevron-down" size={16} color={colors.slate400} />
+          </Pressable>
+        </Field>
+
         <View style={styles.row}>
           <View style={styles.colHalf}><Field label="Unit type"><Segmented options={['each', 'kg', 'carton']} value={unitType} onChange={(v) => setUnitType(v as UnitType)} /></Field></View>
           <View style={styles.colHalf}><Field label="Velocity tier"><Segmented options={['A', 'B', 'C']} value={velocityClass ?? ''} onChange={(v) => setVelocityClass((v as VelocityClass) || null)} /></Field></View>
@@ -187,6 +207,25 @@ export default function ProductFormScreen() {
             { key: 'none', label: 'None', onPress: () => { setCategoryId(null); setCatPicker(false); } },
           ]}
           onClose={() => setCatPicker(false)}
+        />
+      )}
+
+      {supplierPicker && (
+        <PickerOverlay
+          title="Supplier (FR-313)"
+          rows={[
+            ...suppliers.map((s) => ({
+              key: s.id,
+              label: s.name,
+              sublabel: `${s.leadTimeDays}d lead`,
+              onPress: () => {
+                setSupplierId(s.id);
+                setSupplierPicker(false);
+              },
+            })),
+            { key: 'none', label: 'None', onPress: () => { setSupplierId(null); setSupplierPicker(false); } },
+          ]}
+          onClose={() => setSupplierPicker(false)}
         />
       )}
     </KeyboardAvoidingView>

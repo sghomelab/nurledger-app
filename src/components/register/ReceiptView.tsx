@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatMoney } from '../../lib/money';
 import { layoutReceipt, renderReceiptText, WIDTH_COLS, type ReceiptData, type ReceiptWidth } from '../../lib/receipt';
 import { PAYMENT_METHODS, paymentMethodsFor } from '../../lib/payment';
+import { useT } from '../../hooks/useT';
 import type { SaleReceipt } from '../../repositories/saleRepository';
 import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
 
@@ -37,6 +38,7 @@ interface Props {
  * reference (FR-601).
  */
 export function ReceiptView({ receipt, currency, changeMinor, outletName, cashierName, locale, width, onDone }: Props) {
+  const { t } = useT();
   const { sale, totals } = receipt;
   const number = sale.uuid.slice(0, 8).toUpperCase();
   const dt = new Date(sale.createdAt);
@@ -84,7 +86,7 @@ export function ReceiptView({ receipt, currency, changeMinor, outletName, cashie
     <View style={styles.wrap}>
       <View style={styles.success}>
         <Ionicons name="checkmark-circle" size={54} color={colors.positive} />
-        <Text style={styles.successTitle}>Payment successful</Text>
+        <Text style={styles.successTitle}>{t('receipt.success')}</Text>
         <Text style={styles.successSub}>
           Receipt #{number} · {stamp}
         </Text>
@@ -95,7 +97,7 @@ export function ReceiptView({ receipt, currency, changeMinor, outletName, cashie
       </ScrollView>
 
       <Pressable style={styles.doneBtn} onPress={onDone}>
-        <Text style={styles.doneText}>Done</Text>
+        <Text style={styles.doneText}>{t('common.done')}</Text>
       </Pressable>
     </View>
   );

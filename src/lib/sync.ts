@@ -21,7 +21,7 @@
  */
 
 /** Outbox entities the M5 engine knows about. */
-export type SyncEntity = 'sale' | 'ledger' | 'product';
+export type SyncEntity = 'sale' | 'ledger' | 'product' | 'refund' | 'category';
 
 /** A queued outbox op (local row, pre-upload). */
 export interface OutboxOp {
@@ -234,6 +234,54 @@ export function advanceCursor(current: number, rows: Array<{ updatedAt: number }
   let max = current;
   for (const r of rows) if (r.updatedAt > max) max = r.updatedAt;
   return max;
+}
+
+// ---------------------------------------------------------------------------
+// Categories (M6, cloud schema v3) — pull resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve pulled CATEGORIES against local state (M6, schema v3).
+ *
+ * Categories sync like products (LWW by updated_at, device tie-break) but
+ * carry one extra invariant: the LOCAL `category.name` is UNIQUE, while ids
+ * are per-device UUIDs — two devices can create same-named categories with
+ * DIFFERENT ids while offline. The server deliberately has no
+ * UNIQUE(outlet_id, name) (a constraint would stall the FIFO drain), so the
+ * collision must be resolved on pull:
+ *  - same id → LWW (a remote winner updates the local name);
+ *  - different id but same name (case-insensitive) → the LOCAL row keeps
+ *    identity and the remote id is REMAPPED onto it (returned in `remap`),
+ *    so products referencing the remote id are re-keyed and the UNIQUE(name)
+ *    invariant never breaks the pull batch (the exact bug that stranded
+ *    device B's pull on a product.category_id FK violation, 2026-10-31).
+ *
+ * Returns the categories to WRITE (id- and name-clean) plus the
+ * remote-id → local-id remap.
+ */
+export function resolveCategoryDelta<R extends LwwMeta & { id: string; name: string }>(
+  local: Array<LwwMeta & { id: string; name: string }>,
+  remote: R[],
+): { toWrite: R[]; remap: Map<string, string> } {
+  const localById = new Map(local.map((c): [string, LwwMeta] => [c.id, c]));
+  const { toWrite } = applyLwwDelta(localById, remote);
+  const remap = new Map<string, string>();
+  const localNameById = new Map(local.map((c): [string, string] => [c.name.toLowerCase(), c.id]));
+  // Names already claimed earlier in THIS batch (two new same-named remote
+  // categories from two devices, pulled by a third — the server holds both).
+  const writtenNameById = new Map<string, string>();
+  const writes: R[] = [];
+  for (const w of toWrite) {
+    const lc = w.name.toLowerCase();
+    const clashId = writtenNameById.get(lc) ?? localNameById.get(lc);
+    if (clashId !== undefined && clashId !== w.id) {
+      remap.set(w.id, clashId);
+    } else {
+      writes.push(w);
+      writtenNameById.set(lc, w.id);
+    }
+  }
+  return { toWrite: writes, remap };
 }
 
 // ---------------------------------------------------------------------------

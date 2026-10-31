@@ -1,6 +1,8 @@
 import { Text, StyleSheet, View } from 'react-native';
 import { colors, fonts, radius, spacing } from '../theme/tokens';
+import { useT } from '../hooks/useT';
 import type { StockStatus } from '../lib/stock';
+import type { MsgKey } from '../i18n';
 
 type Tone = 'neutral' | 'primary' | 'positive' | 'warning' | 'danger';
 
@@ -29,9 +31,18 @@ export const STATUS_META: Record<StockStatus, { label: string; tone: Tone }> = {
   sold_out: { label: 'Sold Out', tone: 'neutral' },
 };
 
+/** i18n key per status (FR-115) — labels render through the active UI language. */
+const STATUS_KEYS: Record<StockStatus, MsgKey> = {
+  in_stock: 'status.in_stock',
+  low_stock: 'status.low_stock',
+  depleted: 'status.depleted',
+  sold_out: 'status.sold_out',
+};
+
 export function StatusChip({ status }: { status: StockStatus }) {
+  const { t } = useT();
   const meta = STATUS_META[status];
-  return <Chip label={meta.label} tone={meta.tone} />;
+  return <Chip label={t(STATUS_KEYS[status])} tone={meta.tone} />;
 }
 
 const styles = StyleSheet.create({

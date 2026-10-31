@@ -16,6 +16,7 @@ import {
   lwwOutcome,
   nextDrainBatch,
   productResolveRef,
+  resolveCategoryDelta,
   saleResolveCandidates,
   saleSignature,
   type LwwMeta,
@@ -223,5 +224,100 @@ describe('outbox op → source-row resolution (drain payload reconstruction)', (
       expect(productResolveRef('prod-1', 'oops{')).toBe('prod-1');
       expect(productResolveRef('prod-1', JSON.stringify({ productId: 7 }))).toBe('prod-1');
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Categories (M6, cloud schema v3) — pull resolution
+//
+// Regression (2026-10-31, two-device R2): categories were NOT synced, but
+// product.category_id REFERENCES category(id) locally. A category created on
+// device A (CSV import) made device B's product upsert violate the FK and
+// stranded B's ENTIRE pull batch on stale cursors. Categories now sync; this
+// is the unit twin of the fix.
+// ---------------------------------------------------------------------------
+
+function cat(id: string, name: string, updatedAt = 1000, updatedByDevice = 'devA') {
+  return { id, name, updatedAt, updatedByDevice };
+}
+
+describe('categories pull resolution (schema v3 — FK-safe pull + name collisions)', () => {
+  it('adopts a new remote category (no local row)', () => {
+    const { toWrite, remap } = resolveCategoryDelta([], [cat('c1', 'Snacks')]);
+    expect(toWrite).toEqual([cat('c1', 'Snacks')]);
+    expect(remap.size).toBe(0);
+  });
+
+  it('skips a category already present locally with the same id + state', () => {
+    const { toWrite, remap } = resolveCategoryDelta(
+      [cat('c1', 'Snacks', 1000, 'devA')],
+      [cat('c1', 'Snacks', 1000, 'devA')],
+    );
+    expect(toWrite).toEqual([]);
+    expect(remap.size).toBe(0);
+  });
+
+  it('applies LWW: a later-timestamp remote row wins and is written', () => {
+    const { toWrite } = resolveCategoryDelta(
+      [cat('c1', 'Snacks', 1000, 'devA')],
+      [cat('c1', 'Snacks', 2000, 'devB')],
+    );
+    expect(toWrite).toEqual([cat('c1', 'Snacks', 2000, 'devB')]);
+  });
+
+  it('keeps the local row when it is newer (remote loses LWW)', () => {
+    const { toWrite } = resolveCategoryDelta(
+      [cat('c1', 'Snacks', 2000, 'devB')],
+      [cat('c1', 'Snacks', 1000, 'devA')],
+    );
+    expect(toWrite).toEqual([]);
+  });
+
+  it('SAME name, DIFFERENT id (two devices, offline): local id keeps identity, remote id remaps', () => {
+    const { toWrite, remap } = resolveCategoryDelta(
+      [cat('local-1', 'Snacks', 1000, 'devB')],
+      [cat('remote-1', 'Snacks', 1000, 'devA')],
+    );
+    expect(toWrite).toEqual([]);
+    expect(remap.get('remote-1')).toBe('local-1');
+  });
+
+  it('name collision is case-insensitive (local UNIQUE(name) is the client invariant)', () => {
+    const { toWrite, remap } = resolveCategoryDelta(
+      [cat('local-1', 'snacks', 1000, 'devB')],
+      [cat('remote-1', 'Snacks', 2000, 'devA')],
+    );
+    expect(toWrite).toEqual([]);
+    expect(remap.get('remote-1')).toBe('local-1');
+  });
+
+  it('a clash with a local row whose id is NOT in the pulled batch is still caught', () => {
+    // The resolver is given the FULL local table, so a name clash with any
+    // local category must remap — otherwise the INSERT would violate
+    // UNIQUE(name) and strand the whole pull batch.
+    const { toWrite, remap } = resolveCategoryDelta(
+      [cat('local-1', 'Snacks', 500, 'devC'), cat('local-2', 'Beverages', 500, 'devC')],
+      [cat('remote-1', 'Snacks', 1000, 'devA')],
+    );
+    expect(toWrite).toEqual([]);
+    expect(remap.get('remote-1')).toBe('local-1');
+  });
+
+  it('two NEW same-named remote categories (pulled by a third device): first written, second remapped', () => {
+    const { toWrite, remap } = resolveCategoryDelta([], [
+      cat('remote-1', 'Snacks', 1000, 'devA'),
+      cat('remote-2', 'Snacks', 1000, 'devB'),
+    ]);
+    expect(toWrite).toEqual([cat('remote-1', 'Snacks', 1000, 'devA')]);
+    expect(remap.get('remote-2')).toBe('remote-1');
+  });
+
+  it('distinct names pass through untouched (no remap noise)', () => {
+    const { toWrite, remap } = resolveCategoryDelta(
+      [cat('local-1', 'Bakery', 1000, 'devB')],
+      [cat('remote-1', 'Snacks', 1000, 'devA'), cat('remote-2', 'Beverages', 1000, 'devA')],
+    );
+    expect(toWrite).toEqual([cat('remote-1', 'Snacks', 1000, 'devA'), cat('remote-2', 'Beverages', 1000, 'devA')]);
+    expect(remap.size).toBe(0);
   });
 });

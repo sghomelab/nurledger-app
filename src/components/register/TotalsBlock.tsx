@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { NumberText } from '../NumberText';
 import { formatMoney } from '../../lib/money';
+import { useT } from '../../hooks/useT';
 import type { SaleTotals } from '../../lib/sale';
 import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
 
@@ -15,22 +16,26 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
 
 /** Subtotal / Discount / Tax / TOTAL + live gross margin (FIFO, FR-321/FR-108). */
 export function TotalsBlock({ totals, currency }: { totals: SaleTotals; currency: string }) {
-  const taxLabel = `Tax (${totals.tax.ratePct}%, ${totals.tax.mode === 'inclusive' ? 'incl.' : 'excl.'})`;
+  const { t } = useT();
+  const taxLabel = t('totals.tax', {
+    rate: totals.tax.ratePct,
+    mode: t(totals.tax.mode === 'inclusive' ? 'totals.taxIncl' : 'totals.taxExcl'),
+  });
   const grossProfit = totals.totalMinor - totals.cogsMinor;
   return (
     <View style={styles.block}>
-      <Row label="Subtotal" value={formatMoney(totals.subtotalMinor, currency)} />
+      <Row label={t('totals.subtotal')} value={formatMoney(totals.subtotalMinor, currency)} />
       {totals.discountMinor > 0 && (
-        <Row label="Discount" value={`−${formatMoney(totals.discountMinor, currency)}`} accent={colors.positive} />
+        <Row label={t('totals.discount')} value={`−${formatMoney(totals.discountMinor, currency)}`} accent={colors.positive} />
       )}
       <Row label={taxLabel} value={formatMoney(totals.taxMinor, currency)} />
       <View style={styles.totalRow}>
-        <Text style={styles.totalLabel}>TOTAL</Text>
+        <Text style={styles.totalLabel}>{t('totals.total')}</Text>
         <NumberText style={styles.totalValue}>{formatMoney(totals.totalMinor, currency)}</NumberText>
       </View>
       {totals.subtotalMinor > 0 && (
         <View style={styles.marginRow}>
-          <Text style={styles.marginLabel}>Gross margin (FIFO)</Text>
+          <Text style={styles.marginLabel}>{t('totals.grossMargin')}</Text>
           <NumberText style={styles.marginValue}>
             {totals.marginPct}% · {formatMoney(grossProfit, currency)}
           </NumberText>

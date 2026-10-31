@@ -7,6 +7,7 @@ import type { SQLiteDatabase } from 'expo-sqlite';
 import { getDb } from '../db/database';
 import { reorderSuggestion, stockStatus } from '../lib/stock';
 import { uuidv4 } from '../lib/ids';
+import type { ParsedProductRow } from '../lib/productCsv';
 import { enqueueOpInTx } from './outboxRepository';
 import type {
   Category,
@@ -21,6 +22,7 @@ const PRODUCT_COLS = `
   p.id, p.outlet_id AS outletId, p.sku, p.name, p.category_id AS categoryId,
   p.unit_type AS unitType, p.is_weighed AS isWeighed, p.barcode,
   p.carton_barcode AS cartonBarcode, p.carton_size AS cartonSize,
+  p.supplier_id AS supplierId,
   p.cost_minor AS costMinor, p.price_minor AS priceMinor,
   p.tax_category AS taxCategory, p.min_qty AS minQty, p.max_qty AS maxQty,
   p.velocity_class AS velocityClass, p.description, p.active,
@@ -137,8 +139,11 @@ export async function findByBarcode(barcode: string): Promise<ProductWithStock |
   const row = await db.getFirstAsync<RawProduct & { stockQty: number } | null>(
     `SELECT ${PRODUCT_COLS}, ${STOCK_QTY_SQL} AS stockQty
        FROM product p LEFT JOIN stock_view sv ON sv.product_id = p.id
-      WHERE p.active = 1 AND (p.barcode = ? OR p.carton_barcode = ?)`,
-    [barcode, barcode],
+      WHERE p.active = 1 AND (
+        p.barcode = ? OR p.carton_barcode = ? OR LOWER(p.sku) = LOWER(?)
+        OR p.barcode = '0' || ? OR p.carton_barcode = '0' || ?
+      )`,
+    [barcode, barcode, barcode, barcode, barcode],
   );
   if (!row) return null;
   return { ...mapProduct(row), stockQty: row.stockQty, status: stockStatus(row.stockQty, row.minQty, true) };
@@ -174,6 +179,8 @@ export interface ProductInput {
   barcode: string | null;
   cartonBarcode: string | null;
   cartonSize: number;
+  /** FR-313 (M6): linked supplier id (per-supplier SKU link); null = none. */
+  supplierId: string | null;
   costMinor: number;
   priceMinor: number;
   taxCategory: string;
@@ -193,14 +200,14 @@ export async function createProduct(input: ProductInput): Promise<Product> {
   await db.runAsync(
     `INSERT INTO product
       (id, outlet_id, sku, name, category_id, unit_type, is_weighed, barcode, carton_barcode,
-       carton_size, cost_minor, price_minor, tax_category, min_qty, max_qty, velocity_class,
-       description, active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       carton_size, supplier_id, cost_minor, price_minor, tax_category, min_qty, max_qty,
+       velocity_class, description, active, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id, outlet.id, input.sku, input.name, input.categoryId, input.unitType,
       input.isWeighed ? 1 : 0, input.barcode, input.cartonBarcode, input.cartonSize,
-      input.costMinor, input.priceMinor, input.taxCategory, input.minQty, input.maxQty,
-      input.velocityClass, input.description, input.active ? 1 : 0, now, now,
+      input.supplierId, input.costMinor, input.priceMinor, input.taxCategory, input.minQty,
+      input.maxQty, input.velocityClass, input.description, input.active ? 1 : 0, now, now,
     ],
   );
   // M5 (FR-502): the new product syncs as a product op. op_id = product.id —
@@ -216,14 +223,14 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Pr
   await db.runAsync(
     `UPDATE product SET
        sku = ?, name = ?, category_id = ?, unit_type = ?, is_weighed = ?,
-       barcode = ?, carton_barcode = ?, carton_size = ?, cost_minor = ?,
-       price_minor = ?, tax_category = ?, min_qty = ?, max_qty = ?,
+       barcode = ?, carton_barcode = ?, carton_size = ?, supplier_id = ?,
+       cost_minor = ?, price_minor = ?, tax_category = ?, min_qty = ?, max_qty = ?,
        velocity_class = ?, description = ?, active = ?, updated_at = ?
      WHERE id = ?`,
     [
       input.sku, input.name, input.categoryId, input.unitType, input.isWeighed ? 1 : 0,
-      input.barcode, input.cartonBarcode, input.cartonSize, input.costMinor,
-      input.priceMinor, input.taxCategory, input.minQty, input.maxQty,
+      input.barcode, input.cartonBarcode, input.cartonSize, input.supplierId,
+      input.costMinor, input.priceMinor, input.taxCategory, input.minQty, input.maxQty,
       input.velocityClass, input.description, input.active ? 1 : 0, Date.now(), id,
     ],
   );
@@ -235,6 +242,102 @@ export async function updateProduct(id: string, input: ProductInput): Promise<Pr
   const updated = await getProduct(id);
   if (!updated) throw new Error(`Product ${id} not found`);
   return updated;
+}
+
+/**
+ * FR-314 (M6): apply parsed CSV rows — upsert by SKU (case-insensitive).
+ * Unknown category NAMES are auto-created (the CSV stores names, not ids —
+ * ids are per-device). Everything runs in ONE transaction; each created or
+ * updated product enqueues its own `product` sync op in the exact shape of
+ * createProduct/updateProduct (new id for creates, fresh op id + { productId }
+ * hint for updates), so the import syncs like N manual edits.
+ */
+export interface ProductImportReport {
+  created: number;
+  updated: number;
+  categoriesCreated: string[];
+}
+
+export async function importProducts(rows: ParsedProductRow[]): Promise<ProductImportReport> {
+  const db = await getDb();
+  const report: ProductImportReport = { created: 0, updated: 0, categoriesCreated: [] };
+  await db.withTransactionAsync(async () => {
+    const outlet = await db.getFirstAsync<{ id: string }>('SELECT id FROM outlet LIMIT 1');
+    if (!outlet) throw new Error('No outlet found — DB not seeded');
+    const prods = await db.getAllAsync<{ id: string; skuLc: string }>(
+      'SELECT id, lower(sku) AS skuLc FROM product',
+    );
+    const bySku = new Map(prods.map((p) => [p.skuLc, p.id]));
+    const cats = await db.getAllAsync<{ id: string; nameLc: string }>(
+      'SELECT id, lower(name) AS nameLc FROM category',
+    );
+    const catByIdOrName = new Map(cats.map((c) => [c.nameLc, c.id]));
+
+    for (const row of rows) {
+      let categoryId: string | null = null;
+      if (row.categoryName) {
+        const key = row.categoryName.toLowerCase();
+        const existing = catByIdOrName.get(key);
+        if (existing !== undefined) {
+          categoryId = existing;
+        } else {
+          categoryId = uuidv4();
+          catByIdOrName.set(key, categoryId);
+          report.categoriesCreated.push(row.categoryName);
+          const catNow = Date.now();
+          await db.runAsync(
+            'INSERT INTO category (id, name, active, created_at, updated_at) VALUES (?, ?, 1, ?, ?)',
+            [categoryId, row.categoryName, catNow, catNow],
+          );
+          // M6 (schema v3): the imported category must reach the other
+          // devices BEFORE their products reference it (pull order is
+          // categories → products; FIFO pushes the category first).
+          await enqueueOpInTx(db, 'category', categoryId);
+        }
+      }
+      const now = Date.now();
+      const isWeighed = row.unitType === 'kg' ? 1 : 0;
+      const existingId = bySku.get(row.sku.toLowerCase());
+      if (existingId !== undefined) {
+        bySku.delete(row.sku.toLowerCase());
+        await db.runAsync(
+          `UPDATE product SET
+             name = ?, category_id = ?, unit_type = ?, is_weighed = ?,
+             barcode = ?, carton_barcode = ?, carton_size = ?,
+             cost_minor = ?, price_minor = ?, min_qty = ?, max_qty = ?,
+             velocity_class = ?, description = ?, active = ?, updated_at = ?
+           WHERE id = ?`,
+          [
+            row.name, categoryId, row.unitType, isWeighed,
+            row.barcode, row.cartonBarcode, row.cartonSize,
+            row.costMinor, row.priceMinor, row.minQty, row.maxQty,
+            row.velocityClass, row.description, row.active ? 1 : 0, now, existingId,
+          ],
+        );
+        report.updated++;
+        await enqueueOpInTx(db, 'product', uuidv4(), JSON.stringify({ productId: existingId }));
+      } else {
+        const id = uuidv4();
+        bySku.set(row.sku.toLowerCase(), id);
+        await db.runAsync(
+          `INSERT INTO product
+             (id, outlet_id, sku, name, category_id, unit_type, is_weighed, barcode, carton_barcode,
+              carton_size, supplier_id, cost_minor, price_minor, tax_category, min_qty, max_qty,
+              velocity_class, description, active, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, 'standard', ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            id, outlet.id, row.sku, row.name, categoryId, row.unitType, isWeighed,
+            row.barcode, row.cartonBarcode, row.cartonSize,
+            row.costMinor, row.priceMinor, row.minQty, row.maxQty,
+            row.velocityClass, row.description, row.active ? 1 : 0, now, now,
+          ],
+        );
+        report.created++;
+        await enqueueOpInTx(db, 'product', id);
+      }
+    }
+  });
+  return report;
 }
 
 /** Soft delete (products are referenced by ledger rows — never hard-delete). */
@@ -257,7 +360,16 @@ export async function listCategories(): Promise<Category[]> {
 export async function createCategory(name: string): Promise<Category> {
   const db = await getDb();
   const id = uuidv4();
-  await db.runAsync('INSERT INTO category (id, name, active) VALUES (?, ?, 1)', [id, name]);
+  const now = Date.now();
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      'INSERT INTO category (id, name, active, created_at, updated_at) VALUES (?, ?, 1, ?, ?)',
+      [id, name, now, now],
+    );
+    // M6 (schema v3): categories sync like products — enqueue AT WRITE TIME
+    // (op_id = category.id; the server upserts idempotently by id, LWW).
+    await enqueueOpInTx(db, 'category', id);
+  });
   return { id, name, active: true };
 }
 

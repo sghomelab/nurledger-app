@@ -3,7 +3,7 @@
  * Bump SCHEMA_VERSION and add a migration step in database.ts when changing existing tables.
  */
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /**
  * M2: active-cart persistence (NFR-3 — every cart mutation is written to SQLite
@@ -103,10 +103,14 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT NOT NULL
 );
 
+-- M6 (schema v3): created_at/updated_at let categories sync like products
+-- (LWW + delta cursors). Pre-existing rows are backfilled by ensureM6().
 CREATE TABLE IF NOT EXISTS category (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL UNIQUE,
-  active INTEGER NOT NULL DEFAULT 1
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER,
+  updated_at INTEGER
 );
 
 -- FR-300 / FR-301 / FR-318 / FR-322
@@ -244,6 +248,20 @@ CREATE TABLE IF NOT EXISTS refund (
   pin_verified_by TEXT,
   created_at INTEGER NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_refund_sale ON refund(sale_id);
+
+-- FR-110 (M6): line-level detail — per-line restock + prorated amounts
+CREATE TABLE IF NOT EXISTS refund_line (
+  id TEXT PRIMARY KEY,
+  refund_id TEXT NOT NULL REFERENCES refund(id),
+  sale_line_id TEXT NOT NULL REFERENCES sale_line(id),
+  product_id TEXT NOT NULL,
+  qty INTEGER NOT NULL DEFAULT 0,
+  qty_g INTEGER,
+  amount_minor INTEGER NOT NULL,
+  restock INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_refund_line_refund ON refund_line(refund_id);
 
 -- FR-200..FR-204
 CREATE TABLE IF NOT EXISTS shift (
@@ -268,6 +286,15 @@ CREATE TABLE IF NOT EXISTS cash_move (
   type TEXT NOT NULL,
   amount_minor INTEGER NOT NULL,
   reason TEXT NOT NULL,
+  created_at INTEGER NOT NULL
+);
+
+-- FR-313 (M6): supplier master (lead time + per-product link)
+CREATE TABLE IF NOT EXISTS supplier (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  lead_time_days INTEGER NOT NULL DEFAULT 7,
+  notes TEXT,
   created_at INTEGER NOT NULL
 );
 
@@ -388,3 +415,42 @@ export const OUTBOX_PENDING_INDEX_SQL =
  * count-guarded user seed make this safe and cheap to repeat.
  */
 export const ENSURE_M4_SQL = APP_USER_TABLE_SQL + EXPENSE_TABLE_SQL;
+
+/**
+ * M6 self-heal pieces (re-asserted on EVERY bootstrap, see ENSURE_M4_SQL):
+ * installs at v6 with a partial early-M6 build can be missing the refund_line
+ * / supplier tables. Idempotent DDL.
+ */
+export const REFUND_LINE_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS refund_line (
+  id TEXT PRIMARY KEY,
+  refund_id TEXT NOT NULL REFERENCES refund(id),
+  sale_line_id TEXT NOT NULL REFERENCES sale_line(id),
+  product_id TEXT NOT NULL,
+  qty INTEGER NOT NULL DEFAULT 0,
+  qty_g INTEGER,
+  amount_minor INTEGER NOT NULL,
+  restock INTEGER NOT NULL DEFAULT 1
+);
+CREATE INDEX IF NOT EXISTS idx_refund_line_refund ON refund_line(refund_id);
+`;
+
+export const SUPPLIER_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS supplier (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL UNIQUE,
+  lead_time_days INTEGER NOT NULL DEFAULT 7,
+  notes TEXT,
+  created_at INTEGER NOT NULL
+);
+`;
+
+export const ENSURE_M6_SQL = REFUND_LINE_TABLE_SQL + SUPPLIER_TABLE_SQL;
+
+/**
+ * v5 → v6 (M6): FR-110 line-level refunds (`refund_line`) + FR-313 supplier
+ * master. All new tables (CREATE ... IF NOT EXISTS — idempotent). The
+ * non-idempotent `product.supplier_id` ALTER is guarded in database.ts
+ * (hasColumn), mirroring the v3 `reason` pattern.
+ */
+export const MIGRATE_V5_TO_V6_SQL = REFUND_LINE_TABLE_SQL + SUPPLIER_TABLE_SQL;

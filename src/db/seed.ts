@@ -48,7 +48,10 @@ export async function runSeed(db: SQLiteDatabase): Promise<void> {
   for (const cat of SEED_CATEGORIES) {
     const id = seedCategoryId(cat.name);
     categoryIds.set(cat.name, id);
-    await db.runAsync('INSERT INTO category (id, name, active) VALUES (?, ?, 1)', [id, cat.name]);
+    await db.runAsync(
+      'INSERT INTO category (id, name, active, created_at, updated_at) VALUES (?, ?, 1, ?, ?)',
+      [id, cat.name, now, now],
+    );
   }
 
   for (const p of SEED_PRODUCTS) {

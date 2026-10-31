@@ -11,6 +11,7 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { SupportedStorage } from '@supabase/auth-js';
 import type {
+  CategoryDeltaRow,
   CloudAdapter,
   CloudConfig,
   LedgerDeltaRow,
@@ -18,6 +19,8 @@ import type {
   ProductDeltaRow,
   PushedOp,
   PushResult,
+  RefundDeltaRow,
+  RefundLineDeltaRow,
   SaleDeltaRow,
   SaleLineDeltaRow,
   SyncPullResult,
@@ -67,6 +70,18 @@ function serviceClientFor(cfg: CloudConfig): SupabaseClient {
 
 function isoSince(ms: number): string {
   return (ms > 0 ? new Date(ms) : new Date(0)).toISOString();
+}
+
+/**
+ * Bundle-upgrade hint (v1 → v2 added the refund tables + apply_refund;
+ * v2 → v3 added the category table + apply_category). A store that has not
+ * re-run the newer bundle gets Postgres "does not exist" errors — surface an
+ * actionable message instead of a cryptic one.
+ */
+function withUpgradeHint(where: string, message: string): string {
+  return /does not exist|could not find/i.test(message)
+    ? `${where}: ${message} — the cloud schema looks outdated: re-run the setup SQL (latest version) in the Supabase SQL editor, then sync again.`
+    : `${where}: ${message}`;
 }
 
 function normBool(v: unknown): boolean {
@@ -182,11 +197,16 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
       // Strictly sequential — preserves FIFO; a failure stops the batch at that op.
       for (const op of ops) {
         const payload = JSON.parse(op.payload) as Record<string, unknown>;
-        const fn = op.entity === 'sale' ? 'apply_sale' : op.entity === 'ledger' ? 'apply_ledger' : 'apply_product';
+        const fn =
+          op.entity === 'sale' ? 'apply_sale'
+          : op.entity === 'ledger' ? 'apply_ledger'
+          : op.entity === 'refund' ? 'apply_refund'
+          : op.entity === 'category' ? 'apply_category'
+          : 'apply_product';
         const { data, error } = await c.rpc(fn, { p: payload });
         if (error) {
           const status = (error as { status?: number }).status ?? undefined;
-          throw Object.assign(new Error(`${fn} failed: ${error.message}`), { status });
+          throw Object.assign(new Error(withUpgradeHint(fn, error.message)), { status });
         }
         const r = String(data) as PushResult;
         if (!['applied', 'duplicate', 'created', 'updated', 'kept'].includes(r)) {
@@ -205,18 +225,24 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
       // same millisecond as the cursor must be re-fetched next pull. Both apply
       // modes (union / LWW) are idempotent, so re-reading the boundary row is
       // always a no-op.
-      const [productsRes, salesRes, ledgerRes] = await Promise.all([
+      const [categoriesRes, productsRes, salesRes, ledgerRes, refundsRes] = await Promise.all([
+        c.from('category').select('*').eq('outlet_id', cfg.outletId).gte('updated_at', isoSince(cursors.category)),
         c.from('product').select('*').eq('outlet_id', cfg.outletId).gte('updated_at', isoSince(cursors.product)),
         c.from('sale').select('*').eq('outlet_id', cfg.outletId).gte('updated_at', isoSince(cursors.sale)),
         c.from('stock_ledger').select('*').eq('outlet_id', cfg.outletId).gte('updated_at', isoSince(cursors.ledger)),
+        c.from('refund').select('*').eq('outlet_id', cfg.outletId).gte('updated_at', isoSince(cursors.refund)),
       ]);
+      if (categoriesRes.error) throw new Error(withUpgradeHint('pull categories', categoriesRes.error.message));
       if (productsRes.error) throw new Error(`pull products: ${productsRes.error.message}`);
       if (salesRes.error) throw new Error(`pull sales: ${salesRes.error.message}`);
       if (ledgerRes.error) throw new Error(`pull ledger: ${ledgerRes.error.message}`);
+      if (refundsRes.error) throw new Error(withUpgradeHint('pull refunds', refundsRes.error.message));
 
+      const categories = (categoriesRes.data ?? []).map(mapCategory);
       const products = (productsRes.data ?? []).map(mapProduct);
       const sales = (salesRes.data ?? []).map(mapSale);
       const ledger = (ledgerRes.data ?? []).map(mapLedger);
+      const refunds = (refundsRes.data ?? []).map(mapRefund);
 
       // Lines + payments ride on the pulled sales (they carry no updated_at).
       const saleUuids = sales.map((s) => s.uuid);
@@ -235,19 +261,35 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
         payments = payments.concat((paymentsRes.data ?? []).map(mapPayment));
       }
 
+      // Refund lines ride on the pulled refunds (same pattern).
+      const refundUuids = refunds.map((r) => r.uuid);
+      let refundLines: RefundLineDeltaRow[] = [];
+      for (let i = 0; i < refundUuids.length; i += 100) {
+        const chunk = refundUuids.slice(i, i + 100);
+        if (chunk.length === 0) continue;
+        const rlRes = await c.from('refund_line').select('*').in('refund_uuid', chunk);
+        if (rlRes.error) throw new Error(withUpgradeHint('pull refund_line', rlRes.error.message));
+        refundLines = refundLines.concat((rlRes.data ?? []).map(mapRefundLine));
+      }
+
       const max = (rows: Array<{ updatedAt: number }>): number =>
         rows.reduce((m, r) => Math.max(m, r.updatedAt), 0);
 
       return {
+        categories,
         products,
         sales,
         saleLines: lines,
         payments,
         ledger,
+        refunds,
+        refundLines,
         maxUpdatedAt: {
+          category: max(categories),
           product: max(products),
           sale: max(sales),
           ledger: max(ledger),
+          refund: max(refunds),
         },
       };
     },
@@ -255,6 +297,16 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
 }
 
 // ---------------- row mappers (snake_case Postgres → camelCase app types) ----------------
+
+function mapCategory(r: Record<string, unknown>): CategoryDeltaRow {
+  return {
+    id: String(r.id),
+    name: String(r.name),
+    createdAt: normTs(r.created_at),
+    updatedAt: normTs(r.updated_at),
+    updatedByDevice: r.updated_by_device == null ? null : String(r.updated_by_device),
+  };
+}
 
 function mapProduct(r: Record<string, unknown>): ProductDeltaRow {
   return {
@@ -347,5 +399,34 @@ function mapLedger(r: Record<string, unknown>): LedgerDeltaRow {
     deviceId: r.device_id == null ? null : String(r.device_id),
     createdAt: normTs(r.created_at),
     updatedAt: normTs(r.updated_at),
+  };
+}
+
+function mapRefund(r: Record<string, unknown>): RefundDeltaRow {
+  return {
+    id: String(r.id),
+    uuid: String(r.uuid),
+    saleUuid: String(r.sale_uuid),
+    outletId: String(r.outlet_id),
+    deviceId: r.device_id == null ? null : String(r.device_id),
+    userId: r.user_id == null ? null : String(r.user_id),
+    reasonCode: String(r.reason_code),
+    restock: normBool(r.restock),
+    amountMinor: normInt(r.amount_minor) ?? 0,
+    createdAt: normTs(r.created_at),
+    updatedAt: normTs(r.updated_at),
+  };
+}
+
+function mapRefundLine(r: Record<string, unknown>): RefundLineDeltaRow {
+  return {
+    id: String(r.id),
+    refundUuid: String(r.refund_uuid),
+    saleLineId: String(r.sale_line_id),
+    productId: String(r.product_id),
+    qty: normInt(r.qty) ?? 0,
+    qtyG: normInt(r.qty_g),
+    amountMinor: normInt(r.amount_minor) ?? 0,
+    restock: normBool(r.restock),
   };
 }

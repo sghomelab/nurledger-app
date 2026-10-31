@@ -7,7 +7,7 @@
  */
 
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
-import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, MIGRATE_V3_TO_V4_SQL, MIGRATE_V4_TO_V5_SQL, ENSURE_M4_SQL, SCHEMA_SQL, SCHEMA_VERSION, OUTBOX_PENDING_INDEX_SQL, STOCK_VIEW_SQL } from './schema';
+import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, MIGRATE_V3_TO_V4_SQL, MIGRATE_V4_TO_V5_SQL, MIGRATE_V5_TO_V6_SQL, ENSURE_M4_SQL, ENSURE_M6_SQL, SCHEMA_SQL, SCHEMA_VERSION, OUTBOX_PENDING_INDEX_SQL, STOCK_VIEW_SQL } from './schema';
 import { runSeed, isSeeded, ensureDefaultUsers } from './seed';
 import { uuidv4 } from '../lib/ids';
 
@@ -65,6 +65,12 @@ export async function getDb(): Promise<SQLiteDatabase> {
             // installs the early broken migration left half-done self-heal.
             await database.execAsync(MIGRATE_V4_TO_V5_SQL);
           }
+          if (current < 6) {
+            // M6: refund_line (FR-110) + supplier (FR-313) — new tables only.
+            // The non-idempotent product.supplier_id ALTER runs in ensureM6()
+            // below (every bootstrap) so fresh + upgraded installs converge.
+            await database.execAsync(MIGRATE_V5_TO_V6_SQL);
+          }
           await database.runAsync('INSERT OR REPLACE INTO schema_meta (id, v) VALUES (1, ?)', [
             SCHEMA_VERSION,
           ]);
@@ -84,6 +90,10 @@ export async function getDb(): Promise<SQLiteDatabase> {
       // lacks `qty_g` — the register then fails with "no such column: qty_g".
       // Re-assert the guarded ALTERs + index on EVERY bootstrap (idempotent).
       await ensureM5(database);
+
+      // M6 self-heal: re-assert the refund_line/supplier tables and the
+      // guarded product.supplier_id ALTER on EVERY bootstrap (idempotent).
+      await ensureM6(database);
 
       // FR-200: shift = {device, cashier} pair — stable device identity
       // (created once on first run; persists across restarts).
@@ -146,4 +156,25 @@ async function ensureM5(db: SQLiteDatabase): Promise<void> {
   // every stock read). Runs AFTER the ALTERs because the view references
   // stock_ledger.qty_g_delta. Cheap: one DROP + one CREATE per launch.
   await db.execAsync(STOCK_VIEW_SQL);
+}
+
+/** M6 self-heal: re-assert the new tables + the guarded supplier_id ALTER. */
+async function ensureM6(db: SQLiteDatabase): Promise<void> {
+  await db.execAsync(ENSURE_M6_SQL);
+  if (!(await hasColumn(db, 'product', 'supplier_id'))) {
+    await db.execAsync('ALTER TABLE product ADD COLUMN supplier_id TEXT;');
+  }
+  // Category sync (cloud schema v3): the timestamps are what make categories
+  // LWW-syncable. ADD COLUMN is not idempotent → guard; the NULL backfill
+  // stamps legacy rows once (idempotent — no NULLs remain afterwards).
+  if (!(await hasColumn(db, 'category', 'created_at'))) {
+    await db.execAsync('ALTER TABLE category ADD COLUMN created_at INTEGER;');
+    await db.execAsync('ALTER TABLE category ADD COLUMN updated_at INTEGER;');
+  }
+  await db.runAsync(
+    `UPDATE category
+        SET created_at = COALESCE(created_at, ?), updated_at = COALESCE(updated_at, ?)
+      WHERE updated_at IS NULL`,
+    [Date.now(), Date.now()],
+  );
 }

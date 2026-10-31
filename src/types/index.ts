@@ -23,6 +23,21 @@ export interface Category {
   active: boolean;
 }
 
+/** FR-313 (M6): supplier master — lead time + per-product link. */
+export interface Supplier {
+  id: string;
+  name: string;
+  /** Typical delivery time in days (reorder-planning hint). */
+  leadTimeDays: number;
+  notes: string | null;
+  createdAt: number;
+}
+
+/** Supplier with the count of ACTIVE products currently linked to it. */
+export interface SupplierWithCounts extends Supplier {
+  productCount: number;
+}
+
 export type UnitType = 'each' | 'kg' | 'carton';
 export type VelocityClass = 'A' | 'B' | 'C';
 
@@ -40,6 +55,8 @@ export interface Product {
   cartonBarcode: string | null;
   /** FR-318: 1 carton = N base units. */
   cartonSize: number;
+  /** FR-313 (M6): linked supplier (per-supplier SKU link); null = none. */
+  supplierId: string | null;
   /** Last/average cost for display & reporting (ADR-003). */
   costMinor: number;
   /** Owner-set stable selling price (ADR-003). */

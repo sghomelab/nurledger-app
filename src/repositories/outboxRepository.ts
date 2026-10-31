@@ -78,14 +78,14 @@ export async function pendingCountByEntity(): Promise<Record<SyncEntity, number>
   const rows = await db.getAllAsync<{ entity: SyncEntity; n: number }>(
     'SELECT entity, COUNT(*) AS n FROM outbox WHERE uploaded_at IS NULL GROUP BY entity',
   );
-  const out: Record<SyncEntity, number> = { sale: 0, ledger: 0, product: 0 };
+  const out: Record<SyncEntity, number> = { sale: 0, ledger: 0, product: 0, refund: 0, category: 0 };
   for (const r of rows) out[r.entity] = r.n;
   return out;
 }
 
 // ---------------- delta cursors ----------------
 
-export type CursorTable = 'product' | 'sale' | 'ledger';
+export type CursorTable = 'product' | 'sale' | 'ledger' | 'refund' | 'category';
 
 export async function getCursor(table: CursorTable): Promise<number> {
   const db = await getDb();
@@ -221,6 +221,71 @@ export async function buildSalePayload(saleRef: string, payloadHint: string | nu
   });
 }
 
+/**
+ * Rebuild the `apply_refund` payload (M6, FR-110) from local immutable rows.
+ * op_id = refund.uuid. The restock ledger rows (ref_type='refund',
+ * ref_id=refund.id) ride along exactly like the sale path.
+ * Returns null when the refund no longer exists (poison op → skip + mark).
+ */
+export async function buildRefundPayload(refundRef: string, payloadHint: string | null, tenantOutletId?: string): Promise<string | null> {
+  const db = await getDb();
+  void payloadHint; // the stored hint is debug-only; op_id IS the refund uuid
+  const refund = await db.getFirstAsync<Record<string, unknown> | null>(
+    `SELECT id, uuid, sale_id AS saleId, reason_code AS reasonCode, restock,
+            amount_minor AS amountMinor, pin_verified_by AS pinVerifiedBy, created_at AS createdAt
+       FROM refund WHERE uuid = ? OR id = ?`,
+    [refundRef, refundRef],
+  );
+  if (!refund) return null;
+
+  // The local refund header has no outlet/device columns — the outlet id is
+  // single-tenant (this device's), the device id is the settings row.
+  const outlet = await db.getFirstAsync<{ id: string }>('SELECT id FROM outlet LIMIT 1');
+  const dev = await db.getFirstAsync<{ value: string } | null>(
+    "SELECT value FROM settings WHERE key = 'device_id'",
+  );
+  const sale = await db.getFirstAsync<{ uuid: string } | null>(
+    'SELECT uuid FROM sale WHERE id = ?', [String(refund['saleId'])],
+  );
+  if (!sale) return null; // sale vanished — integrity surprise; treat as poison
+
+  const localRefundId = String(refund['id']);
+  const lines = await db.getAllAsync<Record<string, unknown>>(
+    `SELECT id, sale_line_id AS saleLineId, product_id AS productId, qty,
+            qty_g AS qtyG, amount_minor AS amountMinor, restock
+       FROM refund_line WHERE refund_id = ? ORDER BY rowid`,
+    [localRefundId],
+  );
+  const ledgerRows = await db.getAllAsync<RawLedgerRow>(
+    `SELECT ${LEDGER_COLS} FROM stock_ledger WHERE ref_type = 'refund' AND ref_id = ? ORDER BY rowid`,
+    [localRefundId],
+  );
+
+  const g = (r: Record<string, unknown>, k: string) => r[k];
+  return JSON.stringify({
+    uuid: g(refund, 'uuid'), id: g(refund, 'id'),
+    sale_uuid: sale.uuid,
+    outlet_id: tenantOutletId ?? outlet?.id ?? null,
+    device_id: dev?.value ?? null,
+    user_id: g(refund, 'pinVerifiedBy') ?? null,
+    reason_code: g(refund, 'reasonCode'),
+    restock: !!g(refund, 'restock'),
+    amount_minor: g(refund, 'amountMinor'),
+    created_at: g(refund, 'createdAt'),
+    lines: lines.map((l) => ({
+      id: g(l, 'id'), sale_line_id: g(l, 'saleLineId'), product_id: g(l, 'productId'),
+      qty: g(l, 'qty'), qty_g: g(l, 'qtyG') ?? null,
+      amount_minor: g(l, 'amountMinor'), restock: !!g(l, 'restock'),
+    })),
+    ledger_rows: ledgerRows.map((r) => ({
+      op_id: r.opId, id: r.id, product_id: r.productId, lot_id: r.lotId, type: r.type,
+      qty_delta: r.qtyDelta, qty_g_delta: r.qtyGDelta, unit_cost_minor: r.unitCostMinor,
+      cogs_minor: r.cogsMinor, ref_type: r.refType, ref_id: r.refId, reason: r.reason,
+      device_id: r.deviceId, created_by: r.createdBy, created_at: r.createdAt,
+    })),
+  });
+}
+
 /** Rebuild the `apply_ledger` payload for a standalone move (op_id = sync_op_id). */
 export async function buildLedgerPayload(syncOpId: string, tenantOutletId?: string): Promise<string | null> {
   const db = await getDb();
@@ -265,6 +330,35 @@ export async function buildProductPayload(productRef: string, payloadHint: strin
     tax_category: g(p, 'taxCategory'), min_qty: g(p, 'minQty'), max_qty: g(p, 'maxQty'),
     velocity_class: g(p, 'velocityClass') ?? null, description: g(p, 'description') ?? null,
     active: !!g(p, 'active'), created_at: g(p, 'createdAt'), updated_at: g(p, 'updatedAt'),
+    updated_by_device: dev?.value ?? 'unknown',
+  });
+}
+
+/**
+ * Rebuild the `apply_category` payload (LWW fields + this device as editor).
+ * op_id = category.id (categories are create-only today — no edit path, so
+ * no fresh-op-id/hint variant like product edits need).
+ */
+export async function buildCategoryPayload(categoryRef: string, payloadHint: string | null, tenantOutletId?: string): Promise<string | null> {
+  const db = await getDb();
+  void payloadHint; // the stored hint is debug-only; op_id IS the category id
+  const c = await db.getFirstAsync<Record<string, unknown> | null>(
+    `SELECT id, name, created_at AS createdAt, updated_at AS updatedAt
+       FROM category WHERE id = ?`,
+    [categoryRef],
+  );
+  if (!c) return null;
+  const outlet = await db.getFirstAsync<{ id: string }>('SELECT id FROM outlet LIMIT 1');
+  const dev = await db.getFirstAsync<{ value: string } | null>(
+    "SELECT value FROM settings WHERE key = 'device_id'",
+  );
+  const g = (r: Record<string, unknown>, k: string) => r[k];
+  return JSON.stringify({
+    id: g(c, 'id'),
+    outlet_id: tenantOutletId ?? outlet?.id ?? null,
+    name: g(c, 'name'),
+    created_at: g(c, 'createdAt') ?? 0,
+    updated_at: g(c, 'updatedAt') ?? 0,
     updated_by_device: dev?.value ?? 'unknown',
   });
 }
@@ -321,6 +415,35 @@ export async function backfillOnce(): Promise<number> {
 
   await db.runAsync(
     "INSERT OR REPLACE INTO settings (key, value) VALUES ('cloud.backfill_v1', '1')",
+  );
+  return n;
+}
+
+/**
+ * Schema-v3 backfill: enqueue `category` ops for every local category that has
+ * no outbox op yet. Needed because categories created BEFORE v3 (seed
+ * categories, CSV-imported ones) predate the category outbox entity. Idempotent
+ * like backfillOnce(): per-op op_id dedup (category.id) + a settings flag.
+ */
+export async function backfillCategoriesOnce(): Promise<number> {
+  const db = await getDb();
+  const flag = await db.getFirstAsync<{ value: string } | null>(
+    "SELECT value FROM settings WHERE key = 'cloud.backfill_v3'",
+  );
+  if (flag?.value === '1') return 0;
+
+  let n = 0;
+  const cats = await db.getAllAsync<{ id: string }>(
+    `SELECT c.id FROM category c
+      WHERE NOT EXISTS (SELECT 1 FROM outbox o WHERE o.entity = 'category' AND o.op_id = c.id)`,
+  );
+  for (const c of cats) {
+    await enqueueOpInTx(db, 'category', c.id);
+    n += 1;
+  }
+
+  await db.runAsync(
+    "INSERT OR REPLACE INTO settings (key, value) VALUES ('cloud.backfill_v3', '1')",
   );
   return n;
 }

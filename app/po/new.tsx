@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useOutlet, useProducts } from '../../src/hooks/useAppData';
 import { createPO } from '../../src/repositories/poRepository';
+import { listSuppliers } from '../../src/repositories/supplierRepository';
 import { cartonsToBase } from '../../src/lib/po';
 import { formatMoney } from '../../src/lib/money';
 import { NumberText } from '../../src/components/NumberText';
@@ -29,6 +30,8 @@ export default function NewPOScreen() {
   const { products } = useProducts();
 
   const [supplier, setSupplier] = useState('');
+  const [suppliers, setSuppliers] = useState<Awaited<ReturnType<typeof listSuppliers>>>([]);
+  const [supplierPickOpen, setSupplierPickOpen] = useState(false);
   const [lines, setLines] = useState<POLineInput[]>([]);
   const [loadedPrefill, setLoadedPrefill] = useState(!prefilledId);
   const [saving, setSaving] = useState(false);
@@ -61,9 +64,19 @@ export default function NewPOScreen() {
           expiryDate: null,
         },
       ]);
+      // FR-313: the product's linked supplier pre-fills the vendor (if free).
+      if (!supplier.trim() && p.supplierId) {
+        const s = suppliers.find((x) => x.id === p.supplierId);
+        if (s) setSupplier(s.name);
+      }
     }
     setLoadedPrefill(true);
-  }, [prefilledId, prefilledQty, loadedPrefill, products]);
+  }, [prefilledId, prefilledQty, loadedPrefill, products, suppliers, supplier]);
+
+  // FR-313: load the supplier master for the vendor picker.
+  useEffect(() => {
+    void listSuppliers().then(setSuppliers);
+  }, []);
 
   const toMinor = (s: string): number => {
     const n = Number.parseFloat(s.replace(/[^0-9.]/g, ''));
@@ -152,6 +165,12 @@ export default function NewPOScreen() {
             placeholder="e.g. Sheng Siong Wholesale"
             placeholderTextColor={colors.slate400}
           />
+          {suppliers.length > 0 && (
+            <Pressable style={styles.pickSupplierBtn} onPress={() => setSupplierPickOpen(true)}>
+              <Ionicons name="business-outline" size={14} color={colors.primary} />
+              <Text style={styles.pickSupplierText}>Pick from supplier master</Text>
+            </Pressable>
+          )}
         </Field>
         <Text style={styles.termsNote}>Terms: Net 30 (default) · one lot per received line (FEFO batches)</Text>
 
@@ -266,6 +285,22 @@ export default function NewPOScreen() {
         </Pressable>
       </View>
 
+      {supplierPickOpen && (
+        <PickerOverlay
+          title="Pick vendor"
+          rows={suppliers.map((s) => ({
+            key: s.id,
+            label: s.name,
+            sublabel: `${s.leadTimeDays}d lead · ${s.productCount} linked`,
+            onPress: () => {
+              setSupplier(s.name);
+              setSupplierPickOpen(false);
+            },
+          }))}
+          onClose={() => setSupplierPickOpen(false)}
+        />
+      )}
+
       {pickOpen && (
         <PickerOverlay
           title="Add line — pick product"
@@ -308,6 +343,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.mono, fontSize: 15, color: colors.slate900,
   },
   termsNote: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate400, marginTop: -spacing.sm, marginBottom: spacing.lg },
+  pickSupplierBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+    marginTop: 6, paddingVertical: 4, paddingHorizontal: 6, borderRadius: radius.chip,
+  },
+  pickSupplierText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.primary },
   linesTitle: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.sm },
   addLineBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,

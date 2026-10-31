@@ -10,6 +10,7 @@ import {
   paymentMethodsFor,
   type QRPrep,
 } from '../../lib/payment';
+import { useT } from '../../hooks/useT';
 import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
 import type { PaymentAllocation, PaymentMethodId } from '../../types';
 
@@ -44,16 +45,18 @@ interface Props {
  * ADR-006).
  */
 export function PaymentSheet({ totalMinor, currency, locale, onClose, onComplete }: Props) {
+  const { t } = useT();
   const [method, setMethod] = useState<Method>('cash');
   const [tender, setTender] = useState('');
   /** QR stub preparation (reference code) — required before "confirm paid". */
   const [qrPrep, setQrPrep] = useState<QRPrep | null>(null);
 
-  // Locale methods + a Split entry (even split across the first two non-QR).
+  // Locale methods (business data — NOT localized) + a Split entry
+  // (even split across the first two non-QR).
   const entries: MethodEntry[] = useMemo(() => {
     const base = paymentMethodsFor(locale).map((m) => ({ ...m, icon: m.icon as IconName }));
-    return [...base, { id: 'split' as const, label: 'Split', icon: 'swap-vertical-outline' as IconName, kind: 'other' as const }];
-  }, [locale]);
+    return [...base, { id: 'split' as const, label: t('pay.split'), icon: 'swap-vertical-outline' as IconName, kind: 'other' as const }];
+  }, [locale, t]);
 
   const activeEntry = entries.find((m) => m.id === method);
   const qrAcquirer = activeEntry?.qrAcquirer ? acquirerFor(activeEntry.qrAcquirer) : null;
@@ -100,7 +103,7 @@ export function PaymentSheet({ totalMinor, currency, locale, onClose, onComplete
   return (
     <View style={styles.wrap}>
       <View style={styles.header}>
-        <Text style={styles.headerLabel}>TOTAL DUE</Text>
+        <Text style={styles.headerLabel}>{t('pay.totalDue')}</Text>
         <NumberText style={styles.headerValue}>{formatMoney(totalMinor, currency)}</NumberText>
       </View>
 
@@ -133,7 +136,7 @@ export function PaymentSheet({ totalMinor, currency, locale, onClose, onComplete
               ))}
             </View>
             <View style={styles.tenderRow}>
-              <Text style={styles.tenderLabel}>Cash tendered</Text>
+              <Text style={styles.tenderLabel}>{t('pay.cashTendered')}</Text>
               <TextInput
                 value={tender}
                 onChangeText={setTender}
@@ -143,7 +146,7 @@ export function PaymentSheet({ totalMinor, currency, locale, onClose, onComplete
               />
             </View>
             <View style={styles.changeRow}>
-              <Text style={styles.changeLabel}>Change due</Text>
+              <Text style={styles.changeLabel}>{t('pay.changeDue')}</Text>
               <NumberText style={[styles.changeValue, change > 0 ? { color: colors.positive } : null]}>
                 {formatMoney(change, currency)}
               </NumberText>
@@ -162,7 +165,7 @@ export function PaymentSheet({ totalMinor, currency, locale, onClose, onComplete
                 </View>
               );
             })}
-            <Text style={styles.hint}>Split evenly across the first two methods (FR-107).</Text>
+            <Text style={styles.hint}>{t('pay.splitHint')}</Text>
           </View>
         )}
 
@@ -172,21 +175,21 @@ export function PaymentSheet({ totalMinor, currency, locale, onClose, onComplete
               <>
                 <Ionicons name="qr-code-outline" size={40} color={colors.slate300} />
                 <Text style={styles.stubTitle}>{activeEntry?.label}</Text>
-                <Text style={styles.hint}>Prepare the payment to show the customer a reference.</Text>
+                <Text style={styles.hint}>{t('pay.qrPrepareHint')}</Text>
                 <Pressable
                   style={styles.qrPrepareBtn}
                   onPress={() => {
                     if (qrAcquirer) setQrPrep(qrAcquirer.prepare(totalMinor, currency));
                   }}
                 >
-                  <Text style={styles.qrPrepareText}>Prepare QR</Text>
+                  <Text style={styles.qrPrepareText}>{t('pay.qrPrepare')}</Text>
                 </Pressable>
               </>
             ) : (
               <>
-                <Text style={styles.qrRefLabel}>REFERENCE</Text>
+                <Text style={styles.qrRefLabel}>{t('pay.reference')}</Text>
                 <Text style={styles.qrRef}>{qrPrep.reference}</Text>
-                <Text style={styles.qrAmount}>{formatMoney(totalMinor, currency)} due</Text>
+                <Text style={styles.qrAmount}>{t('pay.due', { amount: formatMoney(totalMinor, currency) })}</Text>
                 <Text style={styles.hint}>{qrPrep.note}</Text>
               </>
             )}
@@ -197,14 +200,12 @@ export function PaymentSheet({ totalMinor, currency, locale, onClose, onComplete
           <View style={styles.panel}>
             <Ionicons name={stubIcon} size={40} color={colors.slate300} />
             <Text style={styles.stubTitle}>
-              {method === 'card' ? 'Charge on terminal' : 'Mobile wallet'}
+              {t(method === 'card' ? 'pay.chargeTerminal' : 'pay.mobileWallet')}
             </Text>
             <Text style={styles.hint}>
-              MVP stub (ADR-006):{' '}
-              {method === 'card'
-                ? 'tender via the external card terminal'
-                : 'confirm the wallet payment at the counter'}{' '}
-              — no live acquirer is wired.
+              {t('pay.stub', {
+                detail: t(method === 'card' ? 'pay.cardDetail' : 'pay.mobileDetail'),
+              })}
             </Text>
           </View>
         )}
@@ -212,7 +213,7 @@ export function PaymentSheet({ totalMinor, currency, locale, onClose, onComplete
 
       <View style={styles.actions}>
         <Pressable style={styles.cancelBtn} onPress={onClose}>
-          <Text style={styles.cancelText}>Cancel</Text>
+          <Text style={styles.cancelText}>{t('common.cancel')}</Text>
         </Pressable>
         <Pressable
           style={[styles.completeBtn, !canComplete && { opacity: 0.5 }]}
@@ -220,7 +221,7 @@ export function PaymentSheet({ totalMinor, currency, locale, onClose, onComplete
           disabled={!canComplete}
         >
           <Text style={styles.completeText}>
-            {method === 'cash' ? 'Complete sale' : method === 'qr' && !qrPrep ? 'Prepare first' : 'Confirm paid'}
+            {method === 'cash' ? t('pay.completeSale') : method === 'qr' && !qrPrep ? t('pay.prepareFirst') : t('pay.confirmPaid')}
           </Text>
         </Pressable>
       </View>

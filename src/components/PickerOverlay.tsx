@@ -1,5 +1,6 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useT } from '../hooks/useT';
 import { colors, fonts, radius, spacing } from '../theme/tokens';
 
 export interface PickerRow {
@@ -33,6 +34,7 @@ export function PickerOverlay({
   rows: PickerRow[];
   onClose: () => void;
 }) {
+  const { t } = useT();
   return (
     <View style={styles.backdrop}>
       <View style={styles.sheet}>
@@ -61,7 +63,7 @@ export function PickerOverlay({
             </Pressable>
           ))}
           <Pressable style={styles.row} onPress={onClose} hitSlop={6}>
-            <Text style={[styles.label, styles.closeText]}>Cancel</Text>
+            <Text style={[styles.label, styles.closeText]}>{t('common.cancel')}</Text>
           </Pressable>
         </ScrollView>
       </View>

@@ -469,3 +469,222 @@ FR-603 → full. FR-604 → full (layout engine; physical print M6). FR-103/104
   (DEV-005) with label printing.
 - Standing regression: `npx tsc --noEmit` (0 errors) + `npx jest`
   (209 tests, 18 suites) green.
+
+## M6 — Release hardening (2026-10-31)
+
+**Scope (per handoff BUILD-PROMPT M6 + M-priority gaps from the M5 audit):**
+line-level refunds (FR-110/FR-111: per-line qty ≤ sold, reason code,
+per-line restock, PIN-gated), stocktake UI (FR-304), label printing (FR-317),
+supplier master (FR-313), CSV import/export (FR-314), PO print/share (FR-306
+tail), margin-compression suggestions (FR-320), i18n EN + Bahasa Melayu
+(FR-115), Play/App Store packaging **prep**. Packaging = prepare only — NO
+EAS build queued without Mas's explicit GO.
+
+### What shipped
+- **Schema v6** (self-healing, data survives): `refund_line` (line-level
+  amounts + restock flag), `supplier` (name, lead time, notes) +
+  `product.supplier_id` (guarded ALTER in `ensureM6()`), category
+  `created_at/updated_at` (guarded ALTER + NULL backfill — what makes
+  categories LWW-syncable). v5→v6 verified on a live populated DB.
+- **Refunds (FR-110/FR-111):** `src/lib/refund.ts` (pure) — the line's
+  full-refund value is `round(saleTotal × lineTotal / Σ lineTotals)` with the
+  LAST line absorbing the rounding remainder, so a full refund of the sale
+  sums to EXACTLY `sale.total_minor` (`line_total_minor` is tax-EXCLUDE; the
+  sale header carries the authoritative tax). Partial refund =
+  `round(lineFullValue × k / lineQty)`. `refundRepository` commits ONE atomic
+  transaction: refund + refund lines + (restock per line → immutable
+  `stock_ledger` row + FIFO cost-layer restore at the sold `unit_cost_minor`)
+  + `refund` outbox op, with per-line caps (you cannot refund more than was
+  sold). `app/refund/[saleId].tsx` reached from the sales-history row: per-line
+  qty ≤ sold, reason code required, restock toggle default-on; a fully
+  refunded sale shows "This sale has no refundable lines left." The Z-report
+  `refundsMinor` line (reserved in M4) is now wired.
+- **Stocktake (FR-304):** `src/lib/stocktake.ts` (pure) + `stocktakeRepository`
+  — create (all / by category, blind option), save counts save-on-blur, apply
+  in ONE atomic tx: one `adjustment` ledger row + one `ledger` outbox op per
+  non-zero variance (reason "Stocktake <local date>"), then the header is
+  applied. UI: Inventory → Stocktake — blind hides the book qty, variance is
+  computed live against the LIVE book (not a snapshot), apply is
+  `stocktake_apply`-PIN-gated, applied takes are read-only.
+- **Label printing (FR-317):** `src/lib/label.ts` (pure) — 58×40 mm label
+  (name + price + barcode SVG + code), roll58 (one label/page, `@page 58mm`)
+  and sheetA4 (3-column grid) layouts, per-product copy counts, HTML-escaped.
+  Symbology: 12-digit codes → **UPC-A bit-for-bit identical to ZXing/Zint
+  geometry** (all-L left half); otherwise Code 39 (43-char data set). 22 unit
+  tests incl. ZXing-verified bit vectors. Scan round-trip: scanners report a
+  12-digit UPC-A as EAN-13 with a leading 0 → `parseBarcodeSg` normalizes
+  13-digit leading-0 → 12-digit; `findByBarcode` also matches `sku`
+  (case-insensitive) and the '0'-prefixed form, so no-barcode items print
+  scannable Code 39 SKUs. `app/labels/index.tsx`: scope (All / category rows /
+  single product), copies stepper, paper toggle, Generate & Share →
+  `exports/*.html` → expo-sharing. Entry points: product-detail "Label" action
+  + Inventory tab "Label printing" row.
+- **Supplier master (FR-313):** CRUD (name, lead time, notes), per-supplier
+  SKU links, delete-with-links warning (unlink keeps products). PO form:
+  supplier picker (autofills the vendor name) + free-text fallback.
+- **CSV import/export (FR-314):** `src/lib/productCsv.ts` (pure) — serialize/
+  parse, RFC-4180 `splitCsv`, column mapping **by header name** (column order
+  free), strict per-row line-numbered validation, money in major units.
+  UI: Inventory → "Product data (CSV)" hub — Export (share sheet) / Import
+  (picker → preview "13 importable · 1 errors" → report → apply in ONE tx:
+  upsert by SKU case-insensitive, unknown category names auto-created, every
+  created/updated product enqueues its own outbox op — the import syncs like
+  N manual edits).
+- **PO print/share (FR-306 tail):** `buildPoText` (pure) → exports dir →
+  system share sheet (WhatsApp/email/print).
+- **Margin compression (FR-320):** `analyzeMargin` in `src/lib/stock.ts`
+  (pure) — baseline = OLDEST cost layer (the cost the price was set against,
+  spec §4.3.1), current = NEWEST layer; `compressed = current.cost >
+  baseline.cost`; suggested price = `ceil(currentCost × 100 / (100 −
+  baselineMarginPct))`. Product detail shows an amber card ("Margin
+  compressed 62% → 57% · Latest cost SGD 2.35 vs SGD 2.10 · SGD 6.19 holds
+  62% margin") with a "Use" action — `price_override`-gated, and the price is
+  NEVER auto-changed (ADR-003).
+- **i18n (FR-115):** `src/i18n/` — `en.ts` `as const` (the key set), `ms.ts`
+  typed `Record<keyof EnDict,string>` so the compiler enforces key parity,
+  pure `resolveLang`/`t`/`bindT` with `{param}` interpolation + EN fallback.
+  `useT` on `useSyncExternalStore` (module-level `cachedLang` + listeners) so
+  **every** mounted instance — including the root-layout header — re-renders
+  on the same tap. The UI language is stored DEVICE-locally
+  (`settings.ui.language`) — never the outlet's business locale (currency/tax
+  stay with the store). 14-file sweep of user-facing strings; documents,
+  labels, PO bodies, payment-method names and tax-preset labels stay English
+  by design (business data).
+- **Packaging prep (NO EAS queue):** `eas.json` profiles (development =
+  dev-client, preview = internal, production = autoIncrement), icon 1024 +
+  Android adaptive fg/bg/mono + splash assets present, `docs/PACKAGING.md`
+  (identity, profile table, **no special permissions** rationale — camera +
+  BT printer deferred to v2, Play/ASC runbook, privacy posture:
+  offline-first, BYO cloud ADR-010, no analytics/PII). Version bump to 1.0.0
+  deferred to build-GO time.
+- **Category sync (cloud schema v3) — see bug #1 below:** categories are now
+  a first-class synced entity (bundle v3, `SyncEntity` += `category`,
+  enqueue-at-write, `buildCategoryPayload`, `backfillCategoriesOnce`, pull
+  categories FIRST, pure `resolveCategoryDelta` + 9 unit tests).
+
+### Exit test — device E2E (PASSED, all 7 scenarios)
+Two emulators (A = emulator-5554, B = emulator-5556) + local Supabase
+(schema v3 re-pasted; outlet `39e044dd…`).
+- **R1 — offline refund:** per-line refund (weighed 1250 g + 1 loaf), restock
+  on, reason + PIN enforced for cashier (owner bypasses; wrong PIN rejected).
+  DB-verified: exact full-refund invariant (1113 = sale total), append-only
+  ledger, net stock 0, FIFO cost layer restored at the sold unit cost.
+- **R2 — refund syncs to server + pulls on the second device:** A's auto-retry
+  drained all 21 pending ops (2 refunds, 3 stocktake ledger rows, 15
+  products, 7 categories). Server: 2 `refund` rows (1113 customer_return /
+  650 order_mistake, restock=t), 2 `refund_line` (weighed qty_g=1250; count
+  qty=1), 2 restock `stock_ledger` rows (+1250 g; +1 @ 240). **This is what
+  exposed the category bug** — B's pull failed forever (FK). After the v3
+  fix: B's pull completed — DB-verified **7 categories** (incl. the
+  CSV-created "Imported" `b1d258d8…`), 2 refunds + 2 lines + 2 restock
+  ledger rows, all 5 cursors advanced, `cloud.last_error` cleared, banner
+  "Synced". B UI: the refunded sale (Oct 31 3:51 AM · Russet Apples · SGD
+  11.13) in Insights → sales history opens and shows "This sale has no
+  refundable lines left." A repro harness replaying B's real pull against B's
+  real DB snapshot: ALL STEPS OK.
+- **S1 — blind stocktake:** all products, blind (book hidden), 3 counted
+  variances (cheddar 22/20, sourdough 2/4, russet 4800/5000 g) + 9
+  confirmations → cashier Jun → PIN prompt (wrong 8-digit PIN rejected,
+  owner 1234 unlocks) → apply. DB: header applied, 3 `adjustment` ledger
+  rows `ref_type='stocktake'` with matching outbox op_ids, stock_view
+  updated, cheddar +2 FIFO cost layer at product.cost_minor.
+- **L1 — labels:** Beverages × 4 copies, 58mm roll → share sheet → file
+  pulled: 16 labels, 16 SVGs, correct names/prices/codes; **all 4 unique
+  barcodes ZBar-decoded** from the device file (EAN-13 "0"+code → normalized
+  back). Product-detail "Label" → single-product scope (1 × 5).
+- **C1 — CSV export → re-import:** export 12 products (share sheet; pulled
+  file: commas quoted per RFC-4180, major-unit money, category names) →
+  import a fixed 14-column file (12 seeded SKUs @ new values + 1 new SKU + 1
+  bad-price row) → "1 created · 12 updated · New categories: Imported · 1
+  row(s) skipped"; bad row reported as "line 15 · price: must be a
+  non-negative number"; no duplicate rows; outbox ops resolve (0 dangling).
+- **P1 — PO share:** PO detail → Share → share sheet with
+  `po_test_wholesale_sg_*.txt`; pulled file verified line-by-line (store/
+  supplier/terms header, "12 @ SGD 2.35 = SGD 28.20", lot + exp + received
+  12/12 annotation, "Total: SGD 28.20 (1 line, 12 units)").
+- **I1 — locale round-trip:** Settings → Language (Segmented English |
+  Bahasa Melayu) → tap Bahasa Melayu → the ENTIRE Settings screen flips live
+  incl. the root-layout header ("Store settings" → "Tetapan kedai", "Mata
+  Wang", "Jual dalam") + tab bar (Jual/Inventori(3)/Tarikh Luput/Analitik/
+  Syif) + Sell screen (Pesanan Semasa, CAJ, "Cukai (9%, termasuk)", JUMLAH,
+  banner "21 operasi menunggu — menyegerak secara autom…") → relaunch → still
+  Malay (persisted; `settings.ui.language='ms'`) → tap English → full revert
+  live incl. header.
+
+### Bugs found + fixed (this milestone — all live-verified)
+1. **Category-sync gap (R2) — the milestone's big one:** categories were
+   local-only, but `product.category_id REFERENCES category(id)` locally and
+   categories were NOT in the cloud schema. Device A's CSV import created
+   category "Imported" (`b1d258d8…`) on A only; when B pulled products, its
+   upsert for "Import Test Product" violated the FK → the pull transaction
+   rolled back → **B's entire pull batch was stranded on stale cursors,
+   forever** (every sync tick re-pulled the same delta, re-failed, re-rolled
+   back; refunds never landed on B). Fix = make categories a synced entity:
+   - **Cloud schema v3** (BYO bundle): `category` table (id, outlet_id, name,
+     created_at, updated_at, updated_by_device) + member RLS + idempotent
+     `apply_category` LWW RPC (returns created/updated/kept). **Deliberately
+     NO UNIQUE(outlet_id, name)** — two devices can create same-named
+     categories with different ids offline; a server-side unique constraint
+     would stall the FIFO drain on the second insert. Name uniqueness is a
+     CLIENT invariant (local `UNIQUE(name)`) resolved on pull.
+   - `SyncEntity`/cursors/pull += `category`; **categories pulled FIRST** so a
+     product's `category_id` can never dangle on pull.
+   - Local `category` gains `created_at/updated_at` (`ensureM6` self-heal:
+     guarded `hasColumn` ALTER + one-time NULL backfill); seed +
+     `createCategory` + CSV auto-create all write timestamps and enqueue at
+     write time.
+   - `buildCategoryPayload` (op_id = category.id — categories are
+     create-only, so no fresh-op-id/hint variant) +
+     `backfillCategoriesOnce()` (flag `cloud.backfill_v3`) for seed/CSV
+     categories that predate the entity.
+   - Pure `resolveCategoryDelta` in `src/lib/sync.ts`: LWW by id, then
+     same-name (NOCASE) collision → the LOCAL row keeps identity and the
+     remote id is **remapped** onto it (also dedupes two new same-named remote
+     rows in-batch); pulled products' `category_id` is re-keyed through the
+     remap. 9 new unit tests.
+   - Verified: v3 re-pasted → A auto-pushed its 7 categories → B's pull
+     completed end to end (R2 above) + repro harness ALL STEPS OK.
+2. **Stocktake reason date was UTC** — a 5 AM stocktake stamped *yesterday*
+   in the ledger reason. Now the local date.
+3. **SAF URI-grant percent-decoding** — the picked CSV's content URI carried
+   through an expo-router query string got percent-decoded
+   (`document%3A…` → `document:…`); AMS grant lookup is an EXACT Uri match
+   against the ENCODED string (proven via `dumpsys activity permissions`) →
+   `SecurityException` on read. Fix: `src/lib/pickedFile.ts` module-state
+   handoff (`setPickedFile` → `router.push('/import-csv')` with no params →
+   `getPickedFile`). NOTE: not a Downloads/`raw:` provider issue — the earlier
+   conclusion was wrong. (Side finding: the file must be
+   MediaStore-indexed for the picker's search to find it.)
+4. **`useT` stale header** — the first i18n wiring read language from
+   per-instance state; the root-layout header (mounted at app root) kept the
+   old language after a switch until the next navigation. Fix: module-level
+   store on `useSyncExternalStore` (`cachedLang` + listeners + `emit()`) —
+   every instance re-renders on the same tap. Device re-verified.
+5. **UPC-A scan round-trip** — scanners report a 12-digit UPC-A as EAN-13
+   with a leading 0; printed labels with raw UPC-A data were unreadable.
+   `parseBarcodeSg` now normalizes 13-digit leading-0 → 12-digit, and
+   `findByBarcode` matches `sku` (case-insensitive) + the '0'-prefixed form.
+   Bit vectors verified against ZXing/Zint.
+
+### FR touched
+FR-110/FR-111 → full (incl. sync + Z-report line). FR-304 → full. FR-317 →
+full (printable HTML via share; physical thermal output = same HTML on any
+browser/printer — no BT hardware). FR-313 → full. FR-314 → full. FR-306 →
+full (print/share tail). FR-320 → full. FR-115 → full (EN + MS; the i18n
+seam takes more locales as data files). FR-501 → full (all 7 gates live).
+FR-502 → extended (refund + category entities). FR-100 / FR-109 tail /
+FR-604 physical print → **v2** (camera + BT printer deferred — no special
+permissions in the release build; DEV-004/DEV-005 updated). FR-315 → schema
+ready, no v1 UI (S1). Packaging → prep only (docs/PACKAGING.md); NO EAS build
+queued.
+
+### Open items
+- **Shift/PO header records are not synced** (carried from M5) — the `shift`
+  framing (float, Z-report) stays per-device register state; syncing
+  closed-shift records remains v2.
+- Camera scan (FR-100) + physical ESC/POS print / re-print (FR-109/FR-604
+  tail) → v2 (BT printer + camera permissions deferred for the release build).
+- EAS store builds: prepared, not queued — awaiting Mas's explicit build GO
+  (quota check + version bump to 1.0.0 happen at build time).
+- Standing regression: `npx tsc --noEmit` (0 errors) + `npx jest`
+  (316 tests, 23 suites) green.
