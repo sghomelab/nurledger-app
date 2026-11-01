@@ -8,7 +8,7 @@
 
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
 import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, MIGRATE_V3_TO_V4_SQL, MIGRATE_V4_TO_V5_SQL, MIGRATE_V5_TO_V6_SQL, MIGRATE_V6_TO_V7_SQL, ENSURE_M4_SQL, ENSURE_M6_SQL, ENSURE_M7_SQL, SCHEMA_SQL, SCHEMA_VERSION, OUTBOX_PENDING_INDEX_SQL, STOCK_VIEW_SQL } from './schema';
-import { runSeed, isSeeded, ensureDefaultUsers } from './seed';
+import { isSeeded, ensureDefaultUsers, ensureOutlet } from './seed';
 import { uuidv4 } from '../lib/ids';
 
 const DB_NAME = 'nurledger.db';
@@ -38,8 +38,13 @@ export async function getDb(): Promise<SQLiteDatabase> {
             SCHEMA_VERSION,
           ]);
         });
+        // Fresh install: assert required infrastructure (outlet + default
+        // users) but NOT the fixture inventory — the owner chooses on the
+        // first-run screen (src/db/firstRun.ts). The `seeded_v1` flag stays
+        // unset, which is what gates that screen.
         await database.withTransactionAsync(async () => {
-          await runSeed(database);
+          await ensureOutlet(database);
+          await ensureDefaultUsers(database);
         });
       } else if (current < SCHEMA_VERSION) {
         // Forward migrations, one step per version bump.
@@ -90,6 +95,10 @@ export async function getDb(): Promise<SQLiteDatabase> {
       // one COUNT.
       await database.execAsync(ENSURE_M4_SQL);
       await ensureDefaultUsers(database);
+      // Outlet self-heal: the outlet row is required infrastructure (every
+      // read resolves currency/locale/tax through it). Count-guarded, so a
+      // healthy DB pays one COUNT.
+      await ensureOutlet(database);
 
       // M5 self-heal: the early broken v4→v5 migration (a `rowid` index that
       // SQLite rejects) can leave schema_meta at 5 while `current_order_line`
@@ -107,15 +116,7 @@ export async function getDb(): Promise<SQLiteDatabase> {
 
       // FR-200: shift = {device, cashier} pair — stable device identity
       // (created once on first run; persists across restarts).
-      const devRow = await database.getFirstAsync<{ value: string }>(
-        "SELECT value FROM settings WHERE key = 'device_id'",
-      );
-      if (!devRow) {
-        await database.runAsync(
-          "INSERT INTO settings (key, value) VALUES ('device_id', ?)",
-          [uuidv4()],
-        );
-      }
+      await ensureDeviceId(database);
 
       db = database;
       return database;
@@ -132,6 +133,20 @@ export async function getDb(): Promise<SQLiteDatabase> {
 export async function isSeededAsync(): Promise<boolean> {
   const d = await getDb();
   return isSeeded(d);
+}
+
+/**
+ * FR-200: the stable device identity (settings.device_id) — created once,
+ * persists across restarts. Idempotent; also called by the factory reset
+ * (src/db/firstRun.ts) to re-establish it after a wipe.
+ */
+export async function ensureDeviceId(db: SQLiteDatabase): Promise<void> {
+  const devRow = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM settings WHERE key = 'device_id'",
+  );
+  if (!devRow) {
+    await db.runAsync("INSERT INTO settings (key, value) VALUES ('device_id', ?)", [uuidv4()]);
+  }
 }
 
 /** Does `table` already have a column named `column`? (SQLite has no ADD COLUMN IF NOT EXISTS.) */

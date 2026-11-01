@@ -159,6 +159,16 @@ const ms: Record<keyof EnDict, string> = {
   'adjust.reason.counting': 'Pembetulan kiraan',
   'adjust.reason.quality': 'Kualiti / dikembalikan',
 
+  // ── first-run choice (FirstRunScreen) ──────────────────────────────────
+  'firstRun.title': 'Tetapkan kedai anda',
+  'firstRun.body': 'Bagaimanakah anda mahu bermula?',
+  'firstRun.sample': 'Muat data contoh',
+  'firstRun.sampleSub':
+    '11 produk dengan stok, batch dan harga — terokai aplikasi dahulu. Boleh ditetapkan semula bila-bila masa dalam Tetapan.',
+  'firstRun.empty': 'Mula kosong',
+  'firstRun.emptySub': 'Tiada produk, stok atau jualan. Tambahkan item anda sendiri dari tab Inventori.',
+  'firstRun.busy': 'Menyiapkan…',
+
   // ── settings screen ───────────────────────────────────────────────────
   'settings.title': 'Tetapan kedai',
   'settings.store': 'Kedai',
@@ -212,6 +222,13 @@ const ms: Record<keyof EnDict, string> = {
   'settings.saved': 'Disimpan',
   'settings.savedMsg': 'Tetapan kedai dikemas kini.',
   'settings.saveFailed': 'Gagal menyimpan',
+  'settings.danger': 'Zon bahaya',
+  'settings.resetData': 'Tetapkan semula semua data',
+  'settings.resetDataMsg':
+    'Memadamkan semua produk, rekod stok, jualan dan tetapan pada peranti ini, kemudian memulakan tetapan dari awal. Tidak boleh diundur.',
+  'settings.resetTitle': 'Tetapkan semula semua data?',
+  'settings.resetMsg':
+    'Semua pada peranti ini — produk, stok, jualan, sif dan tetapan — dipadamkan secara kekal, kemudian anda memilih cara untuk bermula semula. Tidak boleh diundur.',
 
   // ── picker overlay ────────────────────────────────────────────────────
   'picker.titleCurrency': 'Mata wang',

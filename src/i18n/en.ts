@@ -160,6 +160,16 @@ const en = {
   'adjust.reason.counting': 'Counting correction',
   'adjust.reason.quality': 'Quality / returned',
 
+  // ── first-run choice (FirstRunScreen) ──────────────────────────────────
+  'firstRun.title': 'Set up your store',
+  'firstRun.body': 'How would you like to start?',
+  'firstRun.sample': 'Load sample data',
+  'firstRun.sampleSub':
+    '11 products with stock, batches and prices — explore the app first. You can reset any time in Settings.',
+  'firstRun.empty': 'Start empty',
+  'firstRun.emptySub': 'No products, stock or sales. Add your own items from the Inventory tab.',
+  'firstRun.busy': 'Setting up…',
+
   // ── settings screen ───────────────────────────────────────────────────
   'settings.title': 'Store settings',
   'settings.store': 'Store',
@@ -213,6 +223,13 @@ const en = {
   'settings.saved': 'Saved',
   'settings.savedMsg': 'Store settings updated.',
   'settings.saveFailed': 'Save failed',
+  'settings.danger': 'Danger zone',
+  'settings.resetData': 'Reset all data',
+  'settings.resetDataMsg':
+    'Deletes every product, stock record, sale and setting on this device, then restarts setup from scratch. Cannot be undone.',
+  'settings.resetTitle': 'Reset all data?',
+  'settings.resetMsg':
+    'Everything on this device — products, stock, sales, shifts and settings — is permanently deleted, then you choose how to start again. This cannot be undone.',
 
   // ── picker overlay (PickerOverlay) ────────────────────────────────────
   'picker.titleCurrency': 'Currency',

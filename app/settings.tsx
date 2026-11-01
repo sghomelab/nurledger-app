@@ -8,6 +8,8 @@ import { useOutlet } from '../src/hooks/useAppData';
 import { useUsers } from '../src/hooks/useShift';
 import { useSync } from '../src/hooks/useSync';
 import { useT } from '../src/hooks/useT';
+import { getDb } from '../src/db/database';
+import { resetAllData } from '../src/db/firstRun';
 import { updateOutlet } from '../src/repositories/outletRepository';
 import {
   disconnectCloud,
@@ -235,6 +237,37 @@ export default function SettingsScreen() {
     );
   };
 
+  // ── Factory reset (Danger zone) ────────────────────────────────────────
+  // Wipes every row, re-asserts required infrastructure, and the root layout
+  // re-shows the first-run choice (sample vs empty) via its state subscription.
+  const [resetGate, setResetGate] = useState<(() => void) | null>(null);
+
+  const confirmReset = () => {
+    Alert.alert(t('settings.resetTitle'), t('settings.resetMsg'), [
+      { text: t('common.cancel') },
+      {
+        text: t('settings.resetData'),
+        style: 'destructive',
+        onPress: () =>
+          requireCloudGate(async () => {
+            const db = await getDb();
+            await resetAllData(db);
+            // No navigation needed — the root layout's onFirstRunStateChange
+            // subscription re-gates to the first-run screen on the notify.
+          }),
+      },
+    ]);
+  };
+
+  const requestReset = () => {
+    // FR-500: same 'store_settings' gate as other store-level changes.
+    if (active && roleCanAct(active.role, 'store_settings')) {
+      confirmReset();
+      return;
+    }
+    setResetGate(confirmReset);
+  };
+
   // ── Receipt width (FR-109, device-local) ─────────────────────────────────
   const [receiptWidth, setReceiptWidthState] = useState<ReceiptWidthSetting>('80mm');
   useEffect(() => {
@@ -404,6 +437,16 @@ export default function SettingsScreen() {
           </Field>
           <Text style={styles.note}>{t('settings.receiptNote')}</Text>
         </Card>
+
+        <Card>
+          <SectionTitle style={styles.dangerTitle}>{t('settings.danger')}</SectionTitle>
+          <Field label={t('settings.resetData')}>
+            <Pressable style={[styles.cloudBtn, { backgroundColor: colors.danger }]} onPress={requestReset}>
+              <Text style={styles.cloudBtnText}>{t('settings.resetData')}</Text>
+            </Pressable>
+          </Field>
+          <Text style={styles.note}>{t('settings.resetDataMsg')}</Text>
+        </Card>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -439,6 +482,20 @@ export default function SettingsScreen() {
         />
       )}
 
+      {resetGate && (
+        <PinPrompt
+          visible
+          action="store_settings"
+          users={users ?? []}
+          onSuccess={() => {
+            const job = resetGate;
+            setResetGate(null);
+            job();
+          }}
+          onCancel={() => setResetGate(null)}
+        />
+      )}
+
       {picker === 'currency' && (
         <PickerOverlay title={t('picker.titleCurrency')} rows={currencyRows} onClose={() => setPicker(null)} />
       )}
@@ -449,8 +506,8 @@ export default function SettingsScreen() {
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <Text style={styles.sectionTitle}>{children}</Text>;
+function SectionTitle({ children, style }: { children: React.ReactNode; style?: object }) {
+  return <Text style={[styles.sectionTitle, style]}>{children}</Text>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -478,6 +535,7 @@ const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.slate50 },
   content: { padding: spacing.lg, paddingBottom: 24, gap: spacing.lg },
   sectionTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.slate900, marginBottom: spacing.md },
+  dangerTitle: { color: colors.danger },
   field: { marginBottom: spacing.md },
   label: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700, marginBottom: spacing.xs + 2 },
   input: {

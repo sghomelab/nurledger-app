@@ -1,7 +1,13 @@
 /**
- * First-run seed: outlet + categories + 11 products, each with one lot and an
- * opening ledger row + FIFO cost layer (so M3 FEFO and M2 margin work from day one).
- * Guarded by settings.seeded_v1 — runs exactly once per install.
+ * First-run data:
+ * - `ensureOutlet` — the outlet row is REQUIRED infrastructure (every read in
+ *   the app resolves currency/locale/tax through it), so it is created at
+ *   bootstrap regardless of the owner's first-run choice.
+ * - `runSeed` — the FIXTURE inventory: categories + 11 products, each with one
+ *   lot and an opening ledger row + FIFO cost layer (so M3 FEFO and M2 margin
+ *   work from day one). Guarded by settings.seeded_v1 — runs exactly once per
+ *   install, and ONLY when the owner picks "Load sample data" on the
+ *   first-run screen (see src/db/firstRun.ts).
  */
 
 import type { SQLiteDatabase } from 'expo-sqlite';
@@ -33,16 +39,32 @@ export async function isSeeded(db: SQLiteDatabase): Promise<boolean> {
   return row !== null;
 }
 
+/**
+ * Ensure the outlet row exists (the store's identity: name/currency/locale/
+ * tax engine). Count-guarded and idempotent — safe on every bootstrap.
+ * Uses the SEED_OUTLET defaults as a neutral placeholder: the owner renames
+ * the store (and re-points currency/tax) in Settings; both the "sample" and
+ * "empty" first-run paths land on the same row.
+ */
+export async function ensureOutlet(db: SQLiteDatabase): Promise<void> {
+  const row = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM outlet');
+  if (row && row.n > 0) return;
+  await db.runAsync(
+    'INSERT INTO outlet (id, name, currency, locale, tax_engine, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [uuidv4(), SEED_OUTLET.name, SEED_OUTLET.currency, SEED_OUTLET.locale, SEED_OUTLET.taxEngine, Date.now()],
+  );
+}
+
 export async function runSeed(db: SQLiteDatabase): Promise<void> {
   if (await isSeeded(db)) return;
 
-  const outletId = uuidv4();
+  // The outlet is guaranteed by ensureOutlet (bootstrap + self-heal); the
+  // fixture rows reference it, so resolve the existing id instead of creating
+  // a second row. (FKs are ON — a missing outlet would fail the inserts.)
+  const outletRow = await db.getFirstAsync<{ id: string }>('SELECT id FROM outlet LIMIT 1');
+  if (!outletRow) return;
+  const outletId = outletRow.id;
   const now = Date.now();
-
-  await db.runAsync(
-    'INSERT INTO outlet (id, name, currency, locale, tax_engine, created_at) VALUES (?, ?, ?, ?, ?, ?)',
-    [outletId, SEED_OUTLET.name, SEED_OUTLET.currency, SEED_OUTLET.locale, SEED_OUTLET.taxEngine, now],
-  );
 
   const categoryIds = new Map<string, string>();
   for (const cat of SEED_CATEGORIES) {

@@ -1,31 +1,54 @@
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { loadFonts } from '../src/fonts';
 import { getDb } from '../src/db/database';
+import { isFirstRunPending, onFirstRunStateChange } from '../src/db/firstRun';
+import { FirstRunScreen } from '../src/components/FirstRunScreen';
 import { useT } from '../src/hooks/useT';
 import { colors, fonts } from '../src/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 /**
- * Root layout — brand fonts + DB bootstrap (schema + first-run seed) gate the UI.
+ * Root layout — brand fonts + DB bootstrap gate the UI.
  * Offline-first: no network involvement on startup (spec §4.2 rule 1).
+ *
+ * First-run gate: a fresh install has no `seeded_v1` flag until the owner
+ * chooses on the FirstRunScreen (sample data vs empty start —
+ * src/db/firstRun.ts). While the choice is pending the tabs are not rendered
+ * at all; a Settings → "Reset all data" wipes the flag and the subscription
+ * below re-shows the same screen.
  */
 export default function RootLayout() {
   const { t } = useT();
+  // null = still bootstrapping (splash up); true = first-run choice pending.
+  const [firstRunPending, setFirstRunPending] = useState<boolean | null>(null);
 
   useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
     (async () => {
       try {
         await loadFonts();
-        await getDb();
+        const db = await getDb();
+        setFirstRunPending(await isFirstRunPending(db));
+        // Re-gate on first-run state changes (factory reset from Settings).
+        unsubscribe = onFirstRunStateChange(async () => {
+          const d = await getDb();
+          setFirstRunPending(await isFirstRunPending(d));
+        });
       } finally {
         await SplashScreen.hideAsync().catch(() => {});
       }
     })();
+    return () => {
+      unsubscribe?.();
+    };
   }, []);
+
+  if (firstRunPending === null) return null; // splash still covering
+  if (firstRunPending) return <FirstRunScreen />;
 
   return (
     <>
