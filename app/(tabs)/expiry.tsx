@@ -103,7 +103,7 @@ export default function ExpiryTab() {
               <SummaryCard label="Other" value={String(summary.otherQty)} color={colors.slate500} icon="albums-outline" />
               <SummaryCard label="Batches" value={String(summary.batchCount)} color={colors.primary} icon="pricetags-outline" />
             </View>
-          ) : null
+          ) : undefined
         }
         ListEmptyComponent={
           loaded ? (
@@ -112,7 +112,7 @@ export default function ExpiryTab() {
               <Text style={styles.emptyTitle}>No expiry risk</Text>
               <Text style={styles.emptySub}>No batches with remaining stock to track.</Text>
             </View>
-          ) : null
+          ) : undefined
         }
         refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.slate300} onRefresh={() => void onRefresh()} />}
       />

@@ -97,7 +97,7 @@ export default function StocktakeListScreen() {
       </View>
 
       <FlatList
-        data={items}
+        data={items ?? []}
         keyExtractor={(it) => it.id}
         contentContainerStyle={{ paddingBottom: 96 }}
         refreshControl={<RefreshControl refreshing={false} tintColor={colors.slate300} onRefresh={() => void load()} />}

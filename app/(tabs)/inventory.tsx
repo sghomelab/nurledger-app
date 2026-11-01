@@ -34,7 +34,7 @@ export default function InventoryTab() {
     }, [reload]),
   );
 
-  const list = products?.filter((p) => (lowOnly ? p.status === 'low_stock' || p.status === 'depleted' || p.status === 'sold_out' : true)) ?? null;
+  const list = products?.filter((p) => (lowOnly ? p.status === 'low_stock' || p.status === 'depleted' || p.status === 'sold_out' : true)) ?? [];
 
   return (
     <View style={styles.wrap}>

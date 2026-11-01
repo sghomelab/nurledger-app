@@ -7,7 +7,6 @@
     "icon": "./assets/icon.png",
     "scheme": "nurledger",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nurlogic.nurledger",
@@ -33,12 +32,17 @@
       "expo-router",
       "expo-font",
       "expo-sqlite",
-      "expo-system-ui"
-    ],
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#4F46E5"
-    }
+      "expo-system-ui",
+      "expo-sharing",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#4F46E5"
+        }
+      ],
+      "expo-status-bar"
+    ]
   }
 }

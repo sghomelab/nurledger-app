@@ -33,7 +33,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: t('tab.sell'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="cart" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="cart" size={size} color={color as string} />,
         }}
       />
       <Tabs.Screen
@@ -42,28 +42,28 @@ export default function TabLayout() {
           title: t('tab.inventory'),
           tabBarBadge: lowStock > 0 ? lowStock : undefined,
           tabBarBadgeStyle: { backgroundColor: colors.warning },
-          tabBarIcon: ({ color, size }) => <Ionicons name="cube" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="cube" size={size} color={color as string} />,
         }}
       />
       <Tabs.Screen
         name="expiry"
         options={{
           title: t('tab.expiry'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="hourglass-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="hourglass-outline" size={size} color={color as string} />,
         }}
       />
       <Tabs.Screen
         name="insights"
         options={{
           title: t('tab.insights'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="stats-chart" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="stats-chart" size={size} color={color as string} />,
         }}
       />
       <Tabs.Screen
         name="shift"
         options={{
           title: t('tab.shift'),
-          tabBarIcon: ({ color, size }) => <Ionicons name="cash-outline" size={size} color={color} />,
+          tabBarIcon: ({ color, size }) => <Ionicons name="cash-outline" size={size} color={color as string} />,
         }}
       />
     </Tabs>
