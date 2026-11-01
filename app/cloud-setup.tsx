@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { Card, Screen } from '../src/components/Screen';
 import { getCloudAdapter } from '../src/hooks/useSync';
+import { useT } from '../src/hooks/useT';
 import { getOutlet } from '../src/repositories/outletRepository';
 import { saveCloudConfig } from '../src/repositories/cloudConfigRepository';
 import { CLOUD_SCHEMA_SQL, CLOUD_SCHEMA_VERSION } from '../src/lib/cloud/schemaSql';
@@ -48,16 +49,17 @@ import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens'
 
 type Step = 'creds' | 'sql' | 'account' | 'store';
 
-const STEP_LABELS: Array<[Step, string]> = [
-  ['creds', 'Connection'],
-  ['sql', 'Run the SQL'],
-  ['account', 'Owner account'],
-  ['store', 'Connect'],
-];
-
 export default function CloudSetupScreen() {
   const router = useRouter();
+  const { t } = useT();
   const adapter = getCloudAdapter();
+
+  const STEP_LABELS: Array<[Step, string]> = [
+    ['creds', t('cloudsetup.step.creds')],
+    ['sql', t('cloudsetup.step.sql')],
+    ['account', t('cloudsetup.step.account')],
+    ['store', t('cloudsetup.step.connect')],
+  ];
 
   const [step, setStep] = useState<Step>('creds');
   const [url, setUrl] = useState('');
@@ -89,7 +91,7 @@ export default function CloudSetupScreen() {
   /** Step 1 → 2/3: reachable? what schema version is deployed? */
   const checkConnection = useCallback(async () => {
     if (!url.trim() || !anonKey.trim() || !serviceKey.trim()) {
-      setError('Project URL, anon key and service_role key are all required.');
+      setError(t('cloudsetup.err.missingKeys'));
       return;
     }
     setBusy(true);
@@ -100,17 +102,15 @@ export default function CloudSetupScreen() {
       const v = await adapter.schemaVersion(cfg());
       if (v === null) {
         setUpgrading(false);
-        setNote('Backend reachable — but the schema is not deployed yet.');
+        setNote(t('cloudsetup.note.noSchema'));
         setStep('sql');
       } else if (v < CLOUD_SCHEMA_VERSION) {
         setUpgrading(true);
-        setNote(
-          `Backend reachable — it runs schema v${v}, but this app needs v${CLOUD_SCHEMA_VERSION}. Run the updated script below (safe to re-run — it never touches existing data).`,
-        );
+        setNote(t('cloudsetup.note.upgrade', { old: v, new: CLOUD_SCHEMA_VERSION }));
         setStep('sql');
       } else {
         setUpgrading(false);
-        setNote('Backend reachable and the Nurledger schema is deployed.');
+        setNote(t('cloudsetup.note.deployed'));
         setStep('account');
       }
     } catch (e) {
@@ -118,7 +118,7 @@ export default function CloudSetupScreen() {
     } finally {
       setBusy(false);
     }
-  }, [adapter, cfg]);
+  }, [adapter, cfg, t]);
 
   /** Step 2 → 3: re-check the schema after the owner ran the SQL. */
   const checkSchema = useCallback(async () => {
@@ -132,8 +132,8 @@ export default function CloudSetupScreen() {
       } else {
         setError(
           v === null
-            ? 'Schema still not detected. Make sure the SQL Editor query finished without errors, then check again.'
-            : `Still on schema v${v} — the script below adds v${CLOUD_SCHEMA_VERSION}. Make sure the SQL Editor query finished without errors, then check again.`,
+            ? t('cloudsetup.err.schemaNotDetected')
+            : t('cloudsetup.err.schemaOld', { old: v, new: CLOUD_SCHEMA_VERSION }),
         );
       }
     } catch (e) {
@@ -141,12 +141,12 @@ export default function CloudSetupScreen() {
     } finally {
       setBusy(false);
     }
-  }, [adapter, cfg]);
+  }, [adapter, cfg, t]);
 
   /** Step 3: create the owner account (or sign in after email confirmation). */
   const createAccount = useCallback(async () => {
     if (!email.trim() || password.length < 6) {
-      setError('Enter the owner email and a password (min 6 characters).');
+      setError(t('cloudsetup.err.missingAccount'));
       return;
     }
     setBusy(true);
@@ -161,9 +161,7 @@ export default function CloudSetupScreen() {
       const r = await adapter.signUp(cfg(), email.trim(), password);
       if (r.needsConfirm) {
         setAwaitingSignIn(true);
-        setNote(
-          'Account created — confirm the email link Supabase just sent, then tap “Sign in”.',
-        );
+        setNote(t('cloudsetup.note.confirmEmail'));
       } else {
         setStep('store');
       }
@@ -172,14 +170,14 @@ export default function CloudSetupScreen() {
       // Existing account (re-run of the wizard) → fall back to sign-in.
       if (/already registered|already been registered/i.test(msg)) {
         setAwaitingSignIn(true);
-        setNote('This email already has an account — sign in instead.');
+        setNote(t('cloudsetup.note.existingAccount'));
       } else {
         fail(new Error(msg));
       }
     } finally {
       setBusy(false);
     }
-  }, [adapter, cfg, email, password, awaitingSignIn]);
+  }, [adapter, cfg, email, password, awaitingSignIn, t]);
 
   /** Step 4: provision outlet + membership (create-or-join), persist the connection. */
   const connect = useCallback(async () => {
@@ -187,7 +185,7 @@ export default function CloudSetupScreen() {
     setError(null);
     try {
       const outlet = await getOutlet();
-      if (!outlet) throw new Error('Local outlet missing — the DB was not seeded');
+      if (!outlet) throw new Error(t('cloudsetup.err.noOutlet'));
       const tenantId = await adapter.provisionStore(cfg(), {
         id: outlet.id,
         name: outlet.name,
@@ -204,10 +202,10 @@ export default function CloudSetupScreen() {
       });
       const joined = tenantId !== outlet.id;
       Alert.alert(
-        'Connected',
+        t('cloudsetup.connected'),
         joined
-          ? 'This device joined the store already linked to this backend. Sync is OFF — turn it on in Settings → Cloud sync when you are ready.'
-          : 'Your backend is linked. Sync is OFF — turn it on in Settings → Cloud sync when you are ready.',
+          ? t('cloudsetup.connectedJoined')
+          : t('cloudsetup.connectedNew'),
         [{ text: 'OK', onPress: () => router.back() }],
       );
     } catch (e) {
@@ -215,19 +213,22 @@ export default function CloudSetupScreen() {
     } finally {
       setBusy(false);
     }
-  }, [adapter, cfg, email, router]);
+  }, [adapter, cfg, email, router, t]);
 
   const outlet = useOutletLite();
 
   const stepIndex = STEP_LABELS.findIndex(([s]) => s === step);
   const primary =
     step === 'creds'
-      ? { label: 'Check connection', run: checkConnection }
+      ? { label: t('cloudsetup.checkConnection'), run: checkConnection }
       : step === 'sql'
-        ? { label: 'I’ve run it — check setup', run: checkSchema }
+        ? { label: t('cloudsetup.checkSetup'), run: checkSchema }
         : step === 'account'
-          ? { label: awaitingSignIn ? 'Sign in' : 'Create owner account', run: createAccount }
-          : { label: 'Create store & connect', run: connect };
+          ? {
+              label: awaitingSignIn ? t('cloudsetup.signIn') : t('cloudsetup.createAccount'),
+              run: createAccount,
+            }
+          : { label: t('cloudsetup.connect'), run: connect };
 
   return (
     <Screen>
@@ -271,13 +272,9 @@ export default function CloudSetupScreen() {
 
         {step === 'creds' && (
           <Card>
-            <Text style={styles.cardTitle}>Your Supabase project</Text>
-            <Text style={styles.hint}>
-              BYO cloud: create a FREE Supabase project (supabase.com) and paste its
-              credentials here. Your data lives in YOUR project — Nurledger never operates
-              or accesses it.
-            </Text>
-            <Field label="Project URL">
+            <Text style={styles.cardTitle}>{t('cloudsetup.yourProject')}</Text>
+            <Text style={styles.hint}>{t('cloudsetup.yourProjectHint')}</Text>
+            <Field label={t('cloudsetup.projectUrl')}>
               <TextInput
                 style={styles.input}
                 value={url}
@@ -288,7 +285,7 @@ export default function CloudSetupScreen() {
                 keyboardType="url"
               />
             </Field>
-            <Field label="anon / public key">
+            <Field label={t('cloudsetup.anonKey')}>
               <TextInput
                 style={styles.inputMono}
                 value={anonKey}
@@ -300,7 +297,7 @@ export default function CloudSetupScreen() {
                 numberOfLines={2}
               />
             </Field>
-            <Field label="service_role key">
+            <Field label={t('cloudsetup.serviceKey')}>
               <TextInput
                 style={styles.inputMono}
                 value={serviceKey}
@@ -311,12 +308,9 @@ export default function CloudSetupScreen() {
                 multiline
                 numberOfLines={2}
               />
-              <Text style={styles.keyNote}>
-                Used only on this device, only to verify your schema. It never leaves the
-                phone.
-              </Text>
+              <Text style={styles.keyNote}>{t('cloudsetup.keyNote')}</Text>
             </Field>
-            <Field label="Owner email">
+            <Field label={t('cloudsetup.ownerEmail')}>
               <TextInput
                 style={styles.input}
                 value={email}
@@ -327,12 +321,12 @@ export default function CloudSetupScreen() {
                 keyboardType="email-address"
               />
             </Field>
-            <Field label="Owner password">
+            <Field label={t('cloudsetup.ownerPassword')}>
               <TextInput
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="min 6 characters"
+                placeholder={t('cloudsetup.minChars')}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -345,20 +339,11 @@ export default function CloudSetupScreen() {
           <Card>
             <Text style={styles.cardTitle}>
               {upgrading
-                ? `Run the updated setup SQL (schema v${CLOUD_SCHEMA_VERSION} — upgrade)`
-                : `Run the setup SQL (schema v${CLOUD_SCHEMA_VERSION})`}
+                ? t('cloudsetup.sqlTitleUpgrade', { v: CLOUD_SCHEMA_VERSION })
+                : t('cloudsetup.sqlTitle', { v: CLOUD_SCHEMA_VERSION })}
             </Text>
-            {upgrading && (
-              <Text style={styles.hint}>
-                Your project already runs an older version of the setup. This updated
-                script adds the new tables and rules — re-running it is safe and it
-                NEVER touches your existing data.
-              </Text>
-            )}
-            <Text style={styles.hint}>
-              1. Open your project → <Text style={styles.link}>SQL Editor</Text> → New query.
-              2. Paste this bundle and press Run. 3. Come back and check.
-            </Text>
+            {upgrading && <Text style={styles.hint}>{t('cloudsetup.sqlUpgradeHint')}</Text>}
+            <Text style={styles.hint}>{t('cloudsetup.sqlSteps')}</Text>
             <View style={styles.sqlBox}>
               <ScrollView nestedScrollEnabled horizontal style={styles.sqlScroll}>
                 <Text style={styles.sqlText}>{CLOUD_SCHEMA_SQL}</Text>
@@ -368,24 +353,20 @@ export default function CloudSetupScreen() {
               style={[styles.copyBtn, busy && { opacity: 0.6 }]}
               onPress={async () => {
                 await Clipboard.setStringAsync(CLOUD_SCHEMA_SQL);
-                Alert.alert('Copied', 'SQL bundle copied — paste it into the SQL Editor.');
+                Alert.alert(t('cloudsetup.copied'), t('cloudsetup.copiedMsg'));
               }}
             >
               <Ionicons name="copy-outline" size={16} color={colors.white} />
-              <Text style={styles.copyText}>Copy SQL</Text>
+              <Text style={styles.copyText}>{t('cloudsetup.copySql')}</Text>
             </Pressable>
           </Card>
         )}
 
         {step === 'account' && (
           <Card>
-            <Text style={styles.cardTitle}>Owner account</Text>
-            <Text style={styles.hint}>
-              Creates the store’s owner login in YOUR project (it is how this device — and
-              any second device — signs in to sync). Cashiers keep using their local PINs;
-              this account is for sync only.
-            </Text>
-            <Field label="Email">
+            <Text style={styles.cardTitle}>{t('cloudsetup.accountTitle')}</Text>
+            <Text style={styles.hint}>{t('cloudsetup.accountHint')}</Text>
+            <Field label={t('cloudsetup.email')}>
               <TextInput
                 style={styles.input}
                 value={email}
@@ -396,12 +377,12 @@ export default function CloudSetupScreen() {
                 keyboardType="email-address"
               />
             </Field>
-            <Field label="Password">
+            <Field label={t('cloudsetup.password')}>
               <TextInput
                 style={styles.input}
                 value={password}
                 onChangeText={setPassword}
-                placeholder="min 6 characters"
+                placeholder={t('cloudsetup.minChars')}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
@@ -412,11 +393,8 @@ export default function CloudSetupScreen() {
 
         {step === 'store' && outlet && (
           <Card>
-            <Text style={styles.cardTitle}>Link this store</Text>
-            <Text style={styles.hint}>
-              Creates the outlet record and makes the signed-in owner a member, then saves
-              the connection on this device.
-            </Text>
+            <Text style={styles.cardTitle}>{t('cloudsetup.storeTitle')}</Text>
+            <Text style={styles.hint}>{t('cloudsetup.storeHint')}</Text>
             <View style={styles.storeRow}>
               <Ionicons name="storefront-outline" size={20} color={colors.primary} />
               <View style={{ flex: 1 }}>
@@ -433,7 +411,7 @@ export default function CloudSetupScreen() {
       <View style={styles.footer}>
         {step !== 'creds' && (
           <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
-            <Text style={styles.backText}>Cancel</Text>
+            <Text style={styles.backText}>{t('common.cancel')}</Text>
           </Pressable>
         )}
         <Pressable
@@ -441,7 +419,7 @@ export default function CloudSetupScreen() {
           onPress={() => void primary.run()}
           disabled={busy}
         >
-          <Text style={styles.primaryText}>{busy ? 'Working…' : primary.label}</Text>
+          <Text style={styles.primaryText}>{busy ? t('cloudsetup.working') : primary.label}</Text>
         </Pressable>
       </View>
     </Screen>
@@ -508,7 +486,6 @@ const styles = StyleSheet.create({
   noteText: { flex: 1, fontFamily: fonts.sans, fontSize: typography.caption, color: colors.primary },
   cardTitle: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900, marginBottom: 6 },
   hint: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500, lineHeight: 17, marginBottom: spacing.md },
-  link: { fontFamily: fonts.sansSemiBold, color: colors.primary },
   field: { marginBottom: spacing.md },
   fieldLabel: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700, marginBottom: 4 },
   input: {

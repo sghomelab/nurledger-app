@@ -230,6 +230,65 @@ const ms: Record<keyof EnDict, string> = {
   'settings.resetMsg':
     'Semua pada peranti ini — produk, stok, jualan, sif dan tetapan — dipadamkan secara kekal, kemudian anda memilih cara untuk bermula semula. Tidak boleh diundur.',
 
+  // ── cloud setup wizard (cloud-setup) ───────────────────────────────────
+  'cloudsetup.title': 'Sambungkan backend anda',
+  'cloudsetup.step.creds': 'Sambungan',
+  'cloudsetup.step.sql': 'Jalankan SQL',
+  'cloudsetup.step.account': 'Akaun pemilik',
+  'cloudsetup.step.connect': 'Sambung',
+  'cloudsetup.err.missingKeys': 'URL projek, kunci anon dan kunci service_role semuanya diperlukan.',
+  'cloudsetup.note.noSchema': 'Backend boleh dihubungi — tetapi schema belum dipasang.',
+  'cloudsetup.note.upgrade':
+    'Backend boleh dihubungi — ia menggunakan schema v{old}, tetapi aplikasi ini memerlukan v{new}. Jalankan skrip yang dikemas kini di bawah (selamat dijalankan semula — ia tidak menyentuh data sedia ada).',
+  'cloudsetup.note.deployed': 'Backend boleh dihubungi dan schema Nurledger telah dipasang.',
+  'cloudsetup.err.schemaNotDetected':
+    'Schema masih tidak dikesan. Pastikan query SQL Editor selesai tanpa ralat, kemudian semak semula.',
+  'cloudsetup.err.schemaOld':
+    'Masih pada schema v{old} — skrip di bawah menambah v{new}. Pastikan query SQL Editor selesai tanpa ralat, kemudian semak semula.',
+  'cloudsetup.err.missingAccount': 'Masukkan emel pemilik dan kata laluan (min 6 aksara).',
+  'cloudsetup.note.confirmEmail':
+    'Akaun dibuat — sahkan pautan emel yang baru dihantar Supabase, kemudian ketuk “Log masuk”.',
+  'cloudsetup.note.existingAccount': 'Emel ini sudah mempunyai akaun — log masuk sahaja.',
+  'cloudsetup.err.noOutlet': 'Kedai tempatan tiada — DB tidak disemai',
+  'cloudsetup.connected': 'Disambungkan',
+  'cloudsetup.connectedJoined':
+    'Peranti ini menyertai kedai yang sudah dipautkan kepada backend ini. Segerak OFF — hidupkan dalam Tetapan → Segerak awan bila anda bersedia.',
+  'cloudsetup.connectedNew':
+    'Backend anda telah dipautkan. Segerak OFF — hidupkan dalam Tetapan → Segerak awan bila anda bersedia.',
+  'cloudsetup.checkConnection': 'Semak sambungan',
+  'cloudsetup.checkSetup': 'Saya sudah jalankan — semak tetapan',
+  'cloudsetup.createAccount': 'Cipta akaun pemilik',
+  'cloudsetup.signIn': 'Log masuk',
+  'cloudsetup.connect': 'Cipta kedai & sambung',
+  'cloudsetup.working': 'Menyiapkan…',
+  'cloudsetup.copySql': 'Salin SQL',
+  'cloudsetup.copied': 'Disalin',
+  'cloudsetup.copiedMsg': 'Bundel SQL disalin — tampalkannya ke SQL Editor.',
+  'cloudsetup.yourProject': 'Projek Supabase anda',
+  'cloudsetup.yourProjectHint':
+    'Awan BYO: cipta projek Supabase PERCUMA (supabase.com) dan tampalkan kelayakannya di sini. Data anda berada dalam PROJEK ANDA — Nurledger tidak pernah mengendalikannya atau memaksanya.',
+  'cloudsetup.projectUrl': 'URL projek',
+  'cloudsetup.anonKey': 'kunci anon / awam',
+  'cloudsetup.serviceKey': 'kunci service_role',
+  'cloudsetup.ownerEmail': 'Emel pemilik',
+  'cloudsetup.ownerPassword': 'Kata laluan pemilik',
+  'cloudsetup.keyNote': 'Digunakan hanya pada peranti ini, hanya untuk mengesahkan schema anda. Ia tidak keluar dari telefon.',
+  'cloudsetup.sqlTitle': 'Jalankan SQL tetapan (schema v{v})',
+  'cloudsetup.sqlTitleUpgrade': 'Jalankan SQL tetapan yang dikemas kini (schema v{v} — kemas kini)',
+  'cloudsetup.sqlUpgradeHint':
+    'Projek anda sudah menjalankan versi lama tetapan. Skrip yang dikemas kini ini menambah jadual dan peraturan baharu — menjalankannya semula adalah selamat dan ia TIDAK PERNAH menyentuh data sedia ada anda.',
+  'cloudsetup.sqlSteps':
+    '1. Buka projek anda → SQL Editor → Query baharu. 2. Tampalkan bundel ini dan tekan Run. 3. Kembali dan semak.',
+  'cloudsetup.accountTitle': 'Akaun pemilik',
+  'cloudsetup.accountHint':
+    'Mencipta log masuk pemilik kedai dalam PROJEK ANDA (inilah cara peranti ini — dan peranti kedua — log masuk untuk segerak). Kasir terus menggunakan PIN tempatan mereka; akaun ini adalah untuk segerak sahaja.',
+  'cloudsetup.email': 'Emel',
+  'cloudsetup.password': 'Kata laluan',
+  'cloudsetup.storeTitle': 'Pautkan kedai ini',
+  'cloudsetup.storeHint':
+    'Mencipta rekod kedai dan menjadikan pemilik yang log masuk sebagai ahli, kemudian menyimpan sambungan pada peranti ini.',
+  'cloudsetup.minChars': 'min 6 aksara',
+
   // ── picker overlay ────────────────────────────────────────────────────
   'picker.titleCurrency': 'Mata wang',
   'picker.titleTax': 'Cukai',

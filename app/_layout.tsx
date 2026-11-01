@@ -62,7 +62,7 @@ export default function RootLayout() {
         <Stack.Screen name="po/new" options={{ ...headerOptions, title: 'New PO' }} />
         <Stack.Screen name="po/[id]" options={{ ...headerOptions, title: 'PO' }} />
         <Stack.Screen name="settings" options={{ ...headerOptions, title: t('settings.title') }} />
-        <Stack.Screen name="cloud-setup" options={{ ...headerOptions, title: 'Connect your backend' }} />
+        <Stack.Screen name="cloud-setup" options={{ ...headerOptions, title: t('cloudsetup.title') }} />
       </Stack>
     </>
   );

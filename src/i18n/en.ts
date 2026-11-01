@@ -231,6 +231,66 @@ const en = {
   'settings.resetMsg':
     'Everything on this device — products, stock, sales, shifts and settings — is permanently deleted, then you choose how to start again. This cannot be undone.',
 
+  // ── cloud setup wizard (cloud-setup) ───────────────────────────────────
+  'cloudsetup.title': 'Connect your backend',
+  'cloudsetup.step.creds': 'Connection',
+  'cloudsetup.step.sql': 'Run the SQL',
+  'cloudsetup.step.account': 'Owner account',
+  'cloudsetup.step.connect': 'Connect',
+  'cloudsetup.err.missingKeys': 'Project URL, anon key and service_role key are all required.',
+  'cloudsetup.note.noSchema': 'Backend reachable — but the schema is not deployed yet.',
+  'cloudsetup.note.upgrade':
+    'Backend reachable — it runs schema v{old}, but this app needs v{new}. Run the updated script below (safe to re-run — it never touches existing data).',
+  'cloudsetup.note.deployed': 'Backend reachable and the Nurledger schema is deployed.',
+  'cloudsetup.err.schemaNotDetected':
+    'Schema still not detected. Make sure the SQL Editor query finished without errors, then check again.',
+  'cloudsetup.err.schemaOld':
+    'Still on schema v{old} — the script below adds v{new}. Make sure the SQL Editor query finished without errors, then check again.',
+  'cloudsetup.err.missingAccount': 'Enter the owner email and a password (min 6 characters).',
+  'cloudsetup.note.confirmEmail':
+    'Account created — confirm the email link Supabase just sent, then tap “Sign in”.',
+  'cloudsetup.note.existingAccount': 'This email already has an account — sign in instead.',
+  'cloudsetup.err.noOutlet': 'Local outlet missing — the DB was not seeded',
+  'cloudsetup.connected': 'Connected',
+  'cloudsetup.connectedJoined':
+    'This device joined the store already linked to this backend. Sync is OFF — turn it on in Settings → Cloud sync when you are ready.',
+  'cloudsetup.connectedNew':
+    'Your backend is linked. Sync is OFF — turn it on in Settings → Cloud sync when you are ready.',
+  'cloudsetup.checkConnection': 'Check connection',
+  'cloudsetup.checkSetup': 'I’ve run it — check setup',
+  'cloudsetup.createAccount': 'Create owner account',
+  'cloudsetup.signIn': 'Sign in',
+  'cloudsetup.connect': 'Create store & connect',
+  'cloudsetup.working': 'Working…',
+  'cloudsetup.copySql': 'Copy SQL',
+  'cloudsetup.copied': 'Copied',
+  'cloudsetup.copiedMsg': 'SQL bundle copied — paste it into the SQL Editor.',
+  'cloudsetup.yourProject': 'Your Supabase project',
+  'cloudsetup.yourProjectHint':
+    'BYO cloud: create a FREE Supabase project (supabase.com) and paste its credentials here. Your data lives in YOUR project — Nurledger never operates or accesses it.',
+  'cloudsetup.projectUrl': 'Project URL',
+  'cloudsetup.anonKey': 'anon / public key',
+  'cloudsetup.serviceKey': 'service_role key',
+  'cloudsetup.ownerEmail': 'Owner email',
+  'cloudsetup.ownerPassword': 'Owner password',
+  'cloudsetup.keyNote':
+    'Used only on this device, only to verify your schema. It never leaves the phone.',
+  'cloudsetup.sqlTitle': 'Run the setup SQL (schema v{v})',
+  'cloudsetup.sqlTitleUpgrade': 'Run the updated setup SQL (schema v{v} — upgrade)',
+  'cloudsetup.sqlUpgradeHint':
+    'Your project already runs an older version of the setup. This updated script adds the new tables and rules — re-running it is safe and it NEVER touches your existing data.',
+  'cloudsetup.sqlSteps':
+    '1. Open your project → SQL Editor → New query. 2. Paste this bundle and press Run. 3. Come back and check.',
+  'cloudsetup.accountTitle': 'Owner account',
+  'cloudsetup.accountHint':
+    'Creates the store’s owner login in YOUR project (it is how this device — and any second device — signs in to sync). Cashiers keep using their local PINs; this account is for sync only.',
+  'cloudsetup.email': 'Email',
+  'cloudsetup.password': 'Password',
+  'cloudsetup.storeTitle': 'Link this store',
+  'cloudsetup.storeHint':
+    'Creates the outlet record and makes the signed-in owner a member, then saves the connection on this device.',
+  'cloudsetup.minChars': 'min 6 characters',
+
   // ── picker overlay (PickerOverlay) ────────────────────────────────────
   'picker.titleCurrency': 'Currency',
   'picker.titleTax': 'Tax',
