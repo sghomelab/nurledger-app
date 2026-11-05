@@ -1,3 +1,4 @@
+import { clampLineDiscount } from '../../lib/sale';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NumberText } from '../NumberText';
@@ -25,7 +26,7 @@ interface Props {
  */
 export function CartLineRow({ line, currency, onQty, onRemove, onSetPrice, onSetDiscount }: Props) {
   const { t } = useT();
-  const lineTotal = line.unitPriceMinor * line.qty - Math.max(0, line.discountMinor);
+  const lineTotal = line.unitPriceMinor * line.qty - clampLineDiscount(line);
   const weighed = line.qtyG != null;
   return (
     <View style={styles.row}>
