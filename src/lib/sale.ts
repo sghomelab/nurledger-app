@@ -77,6 +77,11 @@ export function paymentCoversTotal(
   return paid >= totalMinor;
 }
 
+/** A line's discount clamped to [0, its own gross] (minor). */
+export function clampLineDiscount(l: Pick<CartLine, 'unitPriceMinor' | 'qty' | 'discountMinor'>): number {
+  return Math.min(Math.max(0, l.discountMinor), Math.max(0, l.unitPriceMinor * l.qty));
+}
+
 export interface SaleTotals {
   subtotalMinor: number;
   lineDiscountMinor: number;
@@ -110,7 +115,10 @@ export function computeTotals(
   taxEngine: TaxEngine,
 ): SaleTotals {
   const subtotalMinor = lines.reduce((s, l) => s + l.unitPriceMinor * l.qty, 0);
-  const lineDiscountMinor = lines.reduce((s, l) => s + Math.max(0, l.discountMinor), 0);
+  // A line discount can never exceed its own line's gross: an over-large
+  // discount used to drive the line negative and silently discount OTHER
+  // lines (sale total understated, negative sale_line.line_total_minor).
+  const lineDiscountMinor = lines.reduce((s, l) => s + clampLineDiscount(l), 0);
   const grossAfterLineDiscount = Math.max(0, subtotalMinor - lineDiscountMinor);
 
   const order = Math.min(Math.max(0, orderDiscountMinor), grossAfterLineDiscount);
@@ -118,7 +126,7 @@ export function computeTotals(
   const byCategory = new Map<string, number>();
   for (const l of lines) {
     const lineGross = l.unitPriceMinor * l.qty;
-    const afterLine = Math.max(0, lineGross - Math.max(0, l.discountMinor));
+    const afterLine = Math.max(0, lineGross - clampLineDiscount(l));
     // PR-2026-11 (CR-10): prorate by post-line-discount net amounts. Prorating
     // by pre-discount gross (the old base) assigned order-discount shares to
     // lines whose own discount had already removed their net — the shares were

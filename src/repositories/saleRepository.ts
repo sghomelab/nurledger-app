@@ -9,7 +9,7 @@
 
 import { getDb } from '../db/database';
 import { uuidv4 } from '../lib/ids';
-import { computeTotals, paymentCoversTotal, type SaleTotals } from '../lib/sale';
+import { clampLineDiscount, computeTotals, paymentCoversTotal, type SaleTotals } from '../lib/sale';
 import { taxEngineFor } from '../lib/tax';
 import { applySaleInTx } from './stockRepository';
 import { clearActiveOrderInTx } from './orderRepository';
@@ -99,7 +99,7 @@ export async function completeSale(input: CompleteSaleInput): Promise<SaleReceip
         cogsMinor: cogs.cogsMinor,
         unitCostMinor: cogs.unitCostMinor,
         lotId: cogs.lotId,
-        lineTotalMinor: line.unitPriceMinor * line.qty - Math.max(0, line.discountMinor),
+        lineTotalMinor: line.unitPriceMinor * line.qty - clampLineDiscount(line),
       });
     }
 
@@ -121,7 +121,7 @@ export async function completeSale(input: CompleteSaleInput): Promise<SaleReceip
           discount_minor, tax_minor, line_total_minor, unit_cost_minor, cogs_minor, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`,
         [uuidv4(), saleId, lc.line.productId, lc.lotId, lc.line.qty, lc.line.qtyG ?? null, lc.line.unitPriceMinor,
-         Math.max(0, lc.line.discountMinor), lc.lineTotalMinor, lc.unitCostMinor, lc.cogsMinor, now],
+         clampLineDiscount(lc.line), lc.lineTotalMinor, lc.unitCostMinor, lc.cogsMinor, now],
       );
     }
 

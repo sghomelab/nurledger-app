@@ -447,6 +447,24 @@ export async function applySaleInTx(
 ): Promise<SaleMoveResult> {
   // Weighed (FR-103): the ledger delta is in grams; the unit qty stays 0.
   const grams = input.qtyG ?? null;
+  if (grams != null) {
+    // Authoritative in-transaction oversell guard for WEIGHED lines. The unit
+    // path gets one for free (FIFO layers run short); weighed stock has no
+    // layers, and the cart's pre-check compares each line to a stale snapshot
+    // (two 800 g lines against 1,000 g both passed → -600 g committed).
+    // Returning `short` makes completeSale throw → the whole sale rolls back.
+    const row = await db.getFirstAsync<{ g: number }>(
+      'SELECT COALESCE(SUM(qty_g_delta), 0) AS g FROM stock_ledger WHERE product_id = ? AND qty_g_delta IS NOT NULL',
+      [input.productId],
+    );
+    const onHand = row ? row.g : 0;
+    if (grams > onHand) {
+      return {
+        cogsMinor: 0, unitCostMinor: null, lotId: null,
+        short: true, shortageQty: grams - Math.max(0, onHand), syncOpId: null,
+      };
+    }
+  }
   return applyStockMoveInTx(db, {
     productId: input.productId,
     qtyDelta: grams != null ? 0 : -input.qty,
