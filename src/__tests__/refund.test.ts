@@ -45,8 +45,12 @@ describe('lineFullRefundValues', () => {
     expect(values.reduce((a, b) => a + b, 0)).toBe(2889);
   });
 
-  it('throws when the sale has no weight', () => {
-    expect(() => lineFullRefundValues([{ lineTotalMinor: 0 }], 0)).toThrow();
+  it('throws when the sale has no weight but a non-zero total (inconsistent data)', () => {
+    expect(() => lineFullRefundValues([{ lineTotalMinor: 0 }], 500)).toThrow();
+  });
+
+  it('a fully-discounted sale (total 0) refunds 0 per line so goods can still be restocked', () => {
+    expect(lineFullRefundValues([{ lineTotalMinor: 0 }, { lineTotalMinor: 0 }], 0)).toEqual([0, 0]);
   });
 });
 

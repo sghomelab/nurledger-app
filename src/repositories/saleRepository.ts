@@ -35,9 +35,35 @@ export interface SaleReceipt {
   totals: SaleTotals;
 }
 
+/**
+ * Domain-boundary validation (the repository, not the UI, is what guarantees
+ * the ledger and the money columns stay sane — and what gets synced to the
+ * cloud, which stores whatever it is sent). Found by probing: qty -5 conjured
+ * stock + a negative line, qty 2.5 wrote fractional stock, unit price -500
+ * wrote a negative line. All integers, no negatives, units > 0.
+ */
+export function assertValidSaleInput(input: Pick<CompleteSaleInput, 'lines' | 'payments' | 'orderDiscountMinor'>): void {
+  const int = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n);
+  for (const l of input.lines) {
+    if (l.qtyG != null) {
+      if (!int(l.qtyG) || l.qtyG <= 0) throw new Error(`Invalid weight for ${l.name}`);
+      if (!int(l.qty) || l.qty <= 0) throw new Error(`Invalid quantity for ${l.name}`);
+    } else if (!int(l.qty) || l.qty <= 0) {
+      throw new Error(`Invalid quantity for ${l.name}`);
+    }
+    if (!int(l.unitPriceMinor) || l.unitPriceMinor < 0) throw new Error(`Invalid price for ${l.name}`);
+    if (!int(l.discountMinor)) throw new Error(`Invalid discount for ${l.name}`);
+  }
+  if (!int(input.orderDiscountMinor)) throw new Error('Invalid order discount');
+  for (const p of input.payments) {
+    if (!int(p.amountMinor) || p.amountMinor < 0) throw new Error('Invalid payment amount');
+  }
+}
+
 export async function completeSale(input: CompleteSaleInput): Promise<SaleReceipt> {
   const db = await getDb();
   if (input.lines.length === 0) throw new Error('Cannot complete an empty sale');
+  assertValidSaleInput(input);
 
   const taxEngine = taxEngineFor(input.taxEngineId);
   const totals = computeTotals(input.lines, input.orderDiscountMinor, taxEngine);

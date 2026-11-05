@@ -20,6 +20,19 @@
  * Timestamps in RPC payloads are EPOCH MILLISECONDS (JSON numbers/strings),
  * converted with `to_timestamp(x/1000.0)`.
  *
+ * **v6 — second review pass (all verified on a real Postgres engine):** (1) a
+ * DIRECT v3→v5 upgrade aborted (`column "synced_at" does not exist`) because
+ * five `CREATE INDEX … (outlet_id, synced_at)` sat inside the table sections,
+ * before the ALTER that adds the column — the post-ALTER copies are kept;
+ * (2) `apply_product` / `apply_category` looked rows up by id only, so a member
+ * of outlet A could overwrite outlet B's row and read it back through
+ * `product_audit` — now rejected; (3) grants/revokes are scoped to this
+ * bundle's own objects (v5 rewrote privileges on EVERY table in `public`),
+ * EXECUTE is revoked from PUBLIC as well as anon, and the SECURITY DEFINER
+ * functions pin `search_path = public, pg_temp`; (4) `stock_view` filters on
+ * `is_member(outlet_id)` so it is caller-scoped on any Postgres version (no
+ * `security_invoker` / PG15 requirement).
+ *
  * **v5 — security + fresh-deploy fixes (PR-2026-11 review, verified on a real
  * Postgres engine):** (1) the v4 `ALTER TABLE … synced_at` block ran BEFORE the
  * tables existed, so a FRESH deploy aborted with `relation public.category
@@ -42,7 +55,7 @@
  * time fell behind peers' already-advanced cursors — silent data loss.
  */
 
-export const CLOUD_SCHEMA_VERSION = 5;
+export const CLOUD_SCHEMA_VERSION = 6;
 
 export const CLOUD_SCHEMA_SQL = `
 -- =============================================================
@@ -76,7 +89,7 @@ CREATE TABLE IF NOT EXISTS public.org_member (
 -- Membership helper (DEFINER: bypasses RLS on org_member → no recursion).
 -- Param is named p_org_id to avoid colliding with the org_member.org_id column.
 CREATE OR REPLACE FUNCTION public.is_member(p_org_id text) RETURNS boolean
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.org_member
     WHERE org_id = p_org_id AND user_id = auth.uid()
@@ -102,7 +115,6 @@ CREATE TABLE IF NOT EXISTS public.category (
   synced_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_category_outlet_updated ON public.category (outlet_id, updated_at);
-CREATE INDEX IF NOT EXISTS idx_category_outlet_synced ON public.category (outlet_id, synced_at);
 
 -- ------------------------------------------------------------------
 -- Products (LWW via apply_product; NO direct UPDATE/DELETE)
@@ -132,7 +144,6 @@ CREATE TABLE IF NOT EXISTS public.product (
   synced_at timestamptz NOT NULL DEFAULT now(),
   UNIQUE (outlet_id, sku)
 );
-CREATE INDEX IF NOT EXISTS idx_product_outlet_synced ON public.product (outlet_id, synced_at);
 
 CREATE TABLE IF NOT EXISTS public.product_audit (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -167,7 +178,6 @@ CREATE TABLE IF NOT EXISTS public.sale (
   synced_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_sale_outlet_updated ON public.sale (outlet_id, updated_at);
-CREATE INDEX IF NOT EXISTS idx_sale_outlet_synced ON public.sale (outlet_id, synced_at);
 
 CREATE TABLE IF NOT EXISTS public.sale_line (
   id text PRIMARY KEY,
@@ -222,7 +232,6 @@ CREATE TABLE IF NOT EXISTS public.stock_ledger (
   synced_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_ledger_outlet_product ON public.stock_ledger (outlet_id, product_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_ledger_outlet_synced ON public.stock_ledger (outlet_id, synced_at);
 
 -- Server-recomputed stock projection (never stored in place).
 CREATE OR REPLACE VIEW public.stock_view AS
@@ -230,6 +239,7 @@ SELECT product_id,
        COALESCE(SUM(CASE WHEN qty_delta IS NOT NULL THEN qty_delta ELSE 0 END), 0)  AS qty,
        COALESCE(SUM(CASE WHEN qty_g_delta IS NOT NULL THEN qty_g_delta ELSE 0 END), 0) AS qty_g
 FROM public.stock_ledger
+WHERE public.is_member(outlet_id)   -- v5.1: caller-scoped on ANY Postgres (views run as owner)
 GROUP BY product_id;
 
 -- ------------------------------------------------------------------
@@ -253,7 +263,6 @@ CREATE TABLE IF NOT EXISTS public.refund (
   synced_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_refund_outlet_updated ON public.refund (outlet_id, updated_at);
-CREATE INDEX IF NOT EXISTS idx_refund_outlet_synced ON public.refund (outlet_id, synced_at);
 
 CREATE TABLE IF NOT EXISTS public.refund_line (
   id text PRIMARY KEY,
@@ -290,7 +299,7 @@ CREATE INDEX IF NOT EXISTS idx_refund_outlet_synced   ON public.refund (outlet_i
 
 -- Apply a SALE (header + lines + payments + ledger rows). Keyed by uuid.
 CREATE OR REPLACE FUNCTION public.apply_sale(p jsonb) RETURNS text
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   r record;
   sale_uuid text := p->>'uuid';
@@ -346,7 +355,7 @@ END; $$;
 
 -- Apply a STANDALONE ledger row (adjustment / waste / expiry / PO receive).
 CREATE OR REPLACE FUNCTION public.apply_ledger(p jsonb) RETURNS text
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   outlet_id text := p->>'outlet_id';
   created_t timestamptz := to_timestamp((p->>'created_at')::numeric / 1000.0);
@@ -369,7 +378,7 @@ END; $$;
 -- exactly like apply_sale. The sale_uuid FK enforces sale-first ordering
 -- (the FIFO outbox pushes the sale op before its refund op anyway).
 CREATE OR REPLACE FUNCTION public.apply_refund(p jsonb) RETURNS text
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   r record;
   refund_uuid text := p->>'uuid';
@@ -415,7 +424,7 @@ END; $$;
 
 -- Apply a PRODUCT edit: LWW by updated_at (device-id tie-break) + audit row.
 CREATE OR REPLACE FUNCTION public.apply_product(p jsonb) RETURNS text
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   outlet_id text := p->>'outlet_id';
   prod_id   text := p->>'id';
@@ -427,6 +436,11 @@ BEGIN
   IF NOT public.is_member(outlet_id) THEN RAISE EXCEPTION 'not a member of this outlet'; END IF;
 
   SELECT * INTO e FROM public.product WHERE id = prod_id;
+  -- v5.1: an id that belongs to ANOTHER outlet must never be updated or audited
+  -- through this caller's membership (cross-tenant overwrite + audit leak).
+  IF FOUND AND e.outlet_id IS DISTINCT FROM outlet_id THEN
+    RAISE EXCEPTION 'product id belongs to another outlet';
+  END IF;
 
   IF NOT FOUND THEN
     BEGIN
@@ -523,7 +537,7 @@ END; $$;
 -- Apply a CATEGORY: LWW by updated_at (device-id tie-break), same rules as
 -- apply_product (categories have no audit table — name-only rows, M6).
 CREATE OR REPLACE FUNCTION public.apply_category(p jsonb) RETURNS text
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE
   outlet_id text := p->>'outlet_id';
   cat_id    text := p->>'id';
@@ -535,6 +549,9 @@ BEGIN
   IF NOT public.is_member(outlet_id) THEN RAISE EXCEPTION 'not a member of this outlet'; END IF;
 
   SELECT * INTO e FROM public.category WHERE id = cat_id;
+  IF FOUND AND e.outlet_id IS DISTINCT FROM outlet_id THEN
+    RAISE EXCEPTION 'category id belongs to another outlet';
+  END IF;
 
   IF NOT FOUND THEN
     INSERT INTO public.category (id, outlet_id, name, created_at, updated_at, updated_by_device, synced_at)
@@ -620,17 +637,30 @@ DROP POLICY IF EXISTS "refund_line_select_members" ON public.refund_line;
 CREATE POLICY "refund_line_select_members" ON public.refund_line FOR SELECT USING (public.is_member(outlet_id));
 
 -- PostgREST access (no-ops on stock Supabase, required for local/self-hosted).
+-- v5.1: grants/revokes are scoped to THIS bundle's objects only. The v5 form
+-- (ALL TABLES IN SCHEMA public) also rewrote privileges on every unrelated
+-- table in the owner's project: it cut anon off other apps' tables and left
+-- unrelated RLS-less tables readable by every signed-in user.
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated, service_role;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated, service_role;
+GRANT SELECT ON public.cloud_schema_meta, public.outlet, public.org_member, public.category,
+  public.product, public.product_audit, public.sale, public.sale_line, public.payment,
+  public.stock_ledger, public.refund, public.refund_line, public.stock_view
+  TO authenticated, service_role;
 
--- v5: nothing in this schema is for unauthenticated callers (the anon key is
--- public). Stock Supabase default privileges grant anon ALL on new tables, and
--- views bypass RLS — so revoke explicitly and make the view caller-scoped.
+-- Nothing here is for unauthenticated callers (the anon key is public). Stock
+-- Supabase default privileges grant anon ALL on new tables, and EXECUTE on new
+-- functions is granted to PUBLIC — revoke from both, for these objects only.
 ALTER TABLE public.cloud_schema_meta ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
-REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon;
-ALTER VIEW public.stock_view SET (security_invoker = true);
+REVOKE ALL ON public.cloud_schema_meta, public.outlet, public.org_member, public.category,
+  public.product, public.product_audit, public.sale, public.sale_line, public.payment,
+  public.stock_ledger, public.refund, public.refund_line, public.stock_view
+  FROM anon, PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.is_member(text), public.apply_sale(jsonb), public.apply_ledger(jsonb),
+  public.apply_refund(jsonb), public.apply_product(jsonb), public.apply_category(jsonb)
+  FROM anon, PUBLIC;
+GRANT EXECUTE ON FUNCTION public.is_member(text), public.apply_sale(jsonb), public.apply_ledger(jsonb),
+  public.apply_refund(jsonb), public.apply_product(jsonb), public.apply_category(jsonb)
+  TO authenticated, service_role;
 
 -- Mark this bundle applied LAST so a failed run never records the new version.
 INSERT INTO public.cloud_schema_meta (version) VALUES (${CLOUD_SCHEMA_VERSION}) ON CONFLICT DO NOTHING;

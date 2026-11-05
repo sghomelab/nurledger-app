@@ -65,7 +65,12 @@ export function lineFullRefundValues(
   saleTotalMinor: number,
 ): number[] {
   const weight = lines.reduce((sum, l) => sum + l.lineTotalMinor, 0);
-  if (weight <= 0) throw new Error('Sale has no refundable weight');
+  if (weight <= 0) {
+    // A fully-discounted sale (total 0) has nothing to pay back, but its goods
+    // can still be returned/restocked: every line's refundable value is 0.
+    if (saleTotalMinor === 0) return lines.map(() => 0);
+    throw new Error('Sale has no refundable weight');
+  }
   const values = lines.map((l) =>
     Math.round((saleTotalMinor * l.lineTotalMinor) / weight),
   );

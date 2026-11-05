@@ -17,7 +17,7 @@ import {
   summarizeRadar,
   type LayerInput,
 } from '../lib/stock';
-import { uuidv4 } from '../lib/ids';
+import { deterministicId, uuidv4 } from '../lib/ids';
 import { cogsForWeight } from '../lib/weighed';
 import { enqueueOpInTx } from './outboxRepository';
 import type {
@@ -513,3 +513,146 @@ export async function expiryRadar(
 }
 
 export type { SQLiteDatabase };
+
+
+// ---------------------------------------------------------------------------
+// Sync: keep FIFO cost layers consistent with PULLED ledger rows
+// ---------------------------------------------------------------------------
+
+/** A ledger row as pulled from the cloud (already mapped by the adapter). */
+export interface RemoteLedgerRow {
+  rowId: string;
+  opId: string;
+  productId: string;
+  lotId: string | null;
+  type: string;
+  qtyDelta: number | null;
+  qtyGDelta: number | null;
+  unitCostMinor: number | null;
+  cogsMinor: number | null;
+  refType: string | null;
+  refId: string | null;
+  reason: string | null;
+  deviceId: string | null;
+  createdAt: number;
+}
+
+/**
+ * Apply ONE pulled ledger row inside the caller's transaction: insert it
+ * (union by id / sync_op_id — an own echo or a replay is a no-op) AND mirror
+ * its effect on this device's FIFO cost layers.
+ *
+ * Why: the sale oversell guard for unit products consumes cost layers, which
+ * only ever saw LOCAL activity. A peer's receipt left the ledger positive with
+ * no layers (product unsellable here: "Insufficient stock" at 10 on hand); a
+ * peer's sale left the layers full (a stale cart could oversell → ledger < 0).
+ * Stock-in → new layer at the row's unit cost; stock-out → FIFO consumption,
+ * depleting to 0 (never negative) when local layers are short. Weighed rows
+ * (qty_g_delta) have no layers.
+ *
+ * Returns true when the row was new (and therefore applied).
+ */
+export async function applyRemoteLedgerRowInTx(
+  db: SQLiteDatabase,
+  outletId: string,
+  r: RemoteLedgerRow,
+): Promise<boolean> {
+  const exists = await db.getFirstAsync<{ n: number }>(
+    'SELECT 1 AS n FROM stock_ledger WHERE id = ? OR sync_op_id = ? LIMIT 1',
+    [r.rowId, r.opId],
+  );
+  if (exists) return false;
+
+  await db.runAsync(
+    `INSERT INTO stock_ledger (id, outlet_id, product_id, lot_id, type, qty_delta,
+       qty_g_delta, unit_cost_minor, cogs_minor, ref_type, ref_id, reason,
+       device_id, sync_op_id, created_at, created_by)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      r.rowId, outletId, r.productId, r.lotId, r.type, r.qtyDelta, r.qtyGDelta,
+      r.unitCostMinor, r.cogsMinor, r.refType, r.refId, r.reason, r.deviceId,
+      r.opId, r.createdAt, null,
+    ],
+  );
+
+  const delta = r.qtyDelta ?? 0;
+  if (delta === 0) return true;
+
+  if (delta > 0) {
+    let unitCost = r.unitCostMinor;
+    if (unitCost == null) {
+      const p = await db.getFirstAsync<{ cost_minor: number }>('SELECT cost_minor FROM product WHERE id = ?', [r.productId]);
+      unitCost = p ? p.cost_minor : 0;
+    }
+    await db.runAsync(
+      `INSERT OR IGNORE INTO cost_layer (id, outlet_id, product_id, unit_cost_minor, qty_remaining, ref_type, ref_id, received_at)
+       VALUES (?, ?, ?, ?, ?, 'sync', ?, ?)`,
+      [deterministicId(`nurledger:sync-layer:${r.rowId}`), outletId, r.productId, unitCost, delta, r.rowId, r.createdAt],
+    );
+    return true;
+  }
+
+  await consumeLayersInTx(db, r.productId, -delta);
+  return true;
+}
+
+/** Consume `qty` from a product's FIFO layers; depletes to 0 when short (never negative). */
+async function consumeLayersInTx(db: SQLiteDatabase, productId: string, qty: number): Promise<void> {
+  const layers = await db.getAllAsync<LayerInput>(
+    `SELECT id, unit_cost_minor AS unitCostMinor, qty_remaining AS qtyRemaining, received_at AS receivedAt
+       FROM cost_layer WHERE product_id = ?`,
+    [productId],
+  );
+  const result = consumeFifo(layers, qty);
+  const remaining = applyConsumption(layers, result);
+  for (const c of result.consumed) {
+    await db.runAsync('UPDATE cost_layer SET qty_remaining = ? WHERE id = ?', [remaining.get(c.layerId) ?? 0, c.layerId]);
+  }
+}
+
+const LAYERS_RECONCILED_KEY = 'sync.layers_reconciled_v1';
+
+/**
+ * One-time repair for devices that pulled ledger rows BEFORE
+ * applyRemoteLedgerRowInTx existed: for every unit product, bring the layer
+ * total to the ledger on-hand. Short layers get one catch-up layer at the
+ * latest known unit cost (falling back to the product cost); excess layers are
+ * consumed FIFO. Idempotent and flagged in settings so it runs once.
+ */
+export async function reconcileCostLayersOnce(): Promise<number> {
+  const db = await getDb();
+  const done = await db.getFirstAsync<{ value: string }>('SELECT value FROM settings WHERE key = ?', [LAYERS_RECONCILED_KEY]);
+  if (done) return 0;
+  let fixed = 0;
+  await db.withTransactionAsync(async () => {
+    const outlet = await db.getFirstAsync<{ id: string }>('SELECT id FROM outlet LIMIT 1');
+    if (!outlet) return;
+    const rows = await db.getAllAsync<{ id: string; cost_minor: number; ledger: number; layers: number }>(
+      `SELECT p.id, p.cost_minor,
+              COALESCE((SELECT SUM(qty_delta) FROM stock_ledger WHERE product_id = p.id AND qty_delta IS NOT NULL), 0) AS ledger,
+              COALESCE((SELECT SUM(qty_remaining) FROM cost_layer WHERE product_id = p.id), 0) AS layers
+         FROM product p WHERE COALESCE(p.is_weighed, 0) = 0`,
+    );
+    for (const r of rows) {
+      const gap = r.ledger - r.layers;
+      if (gap === 0) continue;
+      fixed++;
+      if (gap > 0) {
+        const last = await db.getFirstAsync<{ unit_cost_minor: number | null }>(
+          `SELECT unit_cost_minor FROM stock_ledger WHERE product_id = ? AND qty_delta > 0 AND unit_cost_minor IS NOT NULL
+            ORDER BY created_at DESC, rowid DESC LIMIT 1`,
+          [r.id],
+        );
+        await db.runAsync(
+          `INSERT OR IGNORE INTO cost_layer (id, outlet_id, product_id, unit_cost_minor, qty_remaining, ref_type, ref_id, received_at)
+           VALUES (?, ?, ?, ?, ?, 'sync', 'reconcile', ?)`,
+          [deterministicId(`nurledger:reconcile-layer:${r.id}`), outlet.id, r.id, last?.unit_cost_minor ?? r.cost_minor, gap, Date.now()],
+        );
+      } else {
+        await consumeLayersInTx(db, r.id, -gap);
+      }
+    }
+    await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [LAYERS_RECONCILED_KEY, '1']);
+  });
+  return fixed;
+}

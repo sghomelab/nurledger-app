@@ -17,6 +17,7 @@ import { useT } from '../src/hooks/useT';
 import { getOutlet } from '../src/repositories/outletRepository';
 import { saveCloudConfig } from '../src/repositories/cloudConfigRepository';
 import { CLOUD_SCHEMA_SQL, CLOUD_SCHEMA_VERSION } from '../src/lib/cloud/schemaSql';
+import { isSecureBackendUrl } from '../src/lib/cloud/url';
 import type { CloudConfig } from '../src/lib/cloud/types';
 import { taxEngineLabel } from '../src/lib/currency';
 import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens';
@@ -48,12 +49,6 @@ import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens'
  */
 
 type Step = 'creds' | 'sql' | 'account' | 'store';
-
-/** Credentials + the service key must never travel over cleartext. */
-function isSecureUrl(raw: string): boolean {
-  const u = raw.trim();
-  return /^https:\/\//i.test(u) || /^http:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)(:\d+)?(\/|$)/i.test(u);
-}
 
 export default function CloudSetupScreen() {
   const router = useRouter();
@@ -100,7 +95,7 @@ export default function CloudSetupScreen() {
       setError(t('cloudsetup.err.missingKeys'));
       return;
     }
-    if (!isSecureUrl(url)) {
+    if (!isSecureBackendUrl(url)) {
       setError(t('cloudsetup.err.insecureUrl'));
       return;
     }

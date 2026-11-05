@@ -65,6 +65,7 @@ import {
   setCursor,
 } from '../repositories/outboxRepository';
 import { getDeviceId } from '../repositories/shiftRepository';
+import { applyRemoteLedgerRowInTx, reconcileCostLayersOnce } from '../repositories/stockRepository';
 
 const DRAIN_BATCH = 20;
 const DRAIN_MAX_ROUNDS = 50; // safety cap: 1000 ops per sync tick
@@ -422,19 +423,11 @@ async function applyPullLocally(pull: SyncPullResult): Promise<{ skipped: string
     }
 
     // --- ledger rows: union by row UUID / op id (stock is NEVER client-merged) ---
+    // Each NEW row also mirrors onto the local FIFO cost layers (see
+    // applyRemoteLedgerRowInTx) so the register's oversell guard stays truthful
+    // for stock received / sold on a peer.
     for (const l of pull.ledger) {
-      await db.runAsync(
-        `INSERT INTO stock_ledger (id, outlet_id, product_id, lot_id, type, qty_delta,
-           qty_g_delta, unit_cost_minor, cogs_minor, ref_type, ref_id, reason,
-           device_id, sync_op_id, created_at, created_by)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (id) DO NOTHING`,
-        [
-          l.rowId, outletId, l.productId, l.lotId, l.type, l.qtyDelta, l.qtyGDelta,
-          l.unitCostMinor, l.cogsMinor, l.refType, l.refId, l.reason, l.deviceId,
-          l.opId, l.createdAt, null,
-        ],
-      );
+      await applyRemoteLedgerRowInTx(db, outletId, l);
     }
   });
   return { skipped };
@@ -454,6 +447,10 @@ function syncTick(): Promise<void> {
       // predate the category outbox entity; without this, the other devices
       // could never see them and product pulls would dangle on category_id).
       await backfillCategoriesOnce();
+
+      // One-time: devices that pulled ledger rows before layer mirroring existed
+      // carry layer/ledger drift — repair it before the first guarded sale.
+      await reconcileCostLayersOnce();
 
       // Phase 1 — PUSH (FIFO drain).
       for (let round = 0; round < DRAIN_MAX_ROUNDS; round++) {
