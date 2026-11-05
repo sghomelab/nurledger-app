@@ -49,6 +49,12 @@ import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens'
 
 type Step = 'creds' | 'sql' | 'account' | 'store';
 
+/** Credentials + the service key must never travel over cleartext. */
+function isSecureUrl(raw: string): boolean {
+  const u = raw.trim();
+  return /^https:\/\//i.test(u) || /^http:\/\/(localhost|127\.0\.0\.1|10\.0\.2\.2)(:\d+)?(\/|$)/i.test(u);
+}
+
 export default function CloudSetupScreen() {
   const router = useRouter();
   const { t } = useT();
@@ -92,6 +98,10 @@ export default function CloudSetupScreen() {
   const checkConnection = useCallback(async () => {
     if (!url.trim() || !anonKey.trim() || !serviceKey.trim()) {
       setError(t('cloudsetup.err.missingKeys'));
+      return;
+    }
+    if (!isSecureUrl(url)) {
+      setError(t('cloudsetup.err.insecureUrl'));
       return;
     }
     setBusy(true);

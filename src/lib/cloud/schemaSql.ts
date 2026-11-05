@@ -20,6 +20,18 @@
  * Timestamps in RPC payloads are EPOCH MILLISECONDS (JSON numbers/strings),
  * converted with `to_timestamp(x/1000.0)`.
  *
+ * **v5 — security + fresh-deploy fixes (PR-2026-11 review, verified on a real
+ * Postgres engine):** (1) the v4 `ALTER TABLE … synced_at` block ran BEFORE the
+ * tables existed, so a FRESH deploy aborted with `relation public.category
+ * does not exist` — it now runs after every CREATE TABLE; (2) `apply_product`'s
+ * duplicate-SKU handler used `WHERE outlet_id = outlet_id` (ambiguous plpgsql
+ * variable vs column → runtime error that stalled the client's FIFO drain);
+ * (3) the `member_insert_self` / `outlet_insert_first` policies let ANY signed-in
+ * user (the anon key is public, sign-up is open) add themselves to a store and
+ * read/write it — removed (owner provisioning uses the service key and bypasses
+ * RLS anyway); (4) `stock_view` and every table were readable by `anon` —
+ * `anon` is now revoked and the view is `security_invoker`.
+ *
  * **v4 — `synced_at` (PR-2026-11, CR-02):** every synced table carries a
  * server-stamped `synced_at timestamptz` (set to `now()` on every RPC write).
  * Delta-pull cursors query `synced_at`, NOT `updated_at`. The split exists
@@ -30,7 +42,7 @@
  * time fell behind peers' already-advanced cursors — silent data loss.
  */
 
-export const CLOUD_SCHEMA_VERSION = 4;
+export const CLOUD_SCHEMA_VERSION = 5;
 
 export const CLOUD_SCHEMA_SQL = `
 -- =============================================================
@@ -41,23 +53,6 @@ CREATE TABLE IF NOT EXISTS public.cloud_schema_meta (
   version int PRIMARY KEY,
   applied_at timestamptz NOT NULL DEFAULT now()
 );
-INSERT INTO public.cloud_schema_meta (version) VALUES (${CLOUD_SCHEMA_VERSION}) ON CONFLICT DO NOTHING;
-
--- v4 upgrade (no-op on a fresh v4 deploy): add the server-stamped delta
--- cursor column to every synced table. Existing rows backfill with the
--- upgrade time — every device re-pulls once after the upgrade; both apply
--- modes (union / LWW) are idempotent, so the re-pull is harmless (it
--- converges any state the backdated-timestamp bug had stranded).
-ALTER TABLE public.category     ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE public.product      ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE public.sale         ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE public.stock_ledger ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
-ALTER TABLE public.refund       ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
-CREATE INDEX IF NOT EXISTS idx_category_outlet_synced ON public.category (outlet_id, synced_at);
-CREATE INDEX IF NOT EXISTS idx_product_outlet_synced  ON public.product (outlet_id, synced_at);
-CREATE INDEX IF NOT EXISTS idx_sale_outlet_synced     ON public.sale (outlet_id, synced_at);
-CREATE INDEX IF NOT EXISTS idx_ledger_outlet_synced   ON public.stock_ledger (outlet_id, synced_at);
-CREATE INDEX IF NOT EXISTS idx_refund_outlet_synced   ON public.refund (outlet_id, synced_at);
 
 -- ------------------------------------------------------------------
 -- Tenant: outlet + membership (single outlet per BYO project, ADR-007)
@@ -273,6 +268,22 @@ CREATE TABLE IF NOT EXISTS public.refund_line (
 );
 CREATE INDEX IF NOT EXISTS idx_refund_line_refund ON public.refund_line (refund_uuid);
 
+-- v4 upgrade (no-op on a fresh deploy; MUST stay after every CREATE TABLE): add the server-stamped delta
+-- cursor column to every synced table. Existing rows backfill with the
+-- upgrade time — every device re-pulls once after the upgrade; both apply
+-- modes (union / LWW) are idempotent, so the re-pull is harmless (it
+-- converges any state the backdated-timestamp bug had stranded).
+ALTER TABLE public.category     ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.product      ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.sale         ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.stock_ledger ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
+ALTER TABLE public.refund       ADD COLUMN IF NOT EXISTS synced_at timestamptz NOT NULL DEFAULT now();
+CREATE INDEX IF NOT EXISTS idx_category_outlet_synced ON public.category (outlet_id, synced_at);
+CREATE INDEX IF NOT EXISTS idx_product_outlet_synced  ON public.product (outlet_id, synced_at);
+CREATE INDEX IF NOT EXISTS idx_sale_outlet_synced     ON public.sale (outlet_id, synced_at);
+CREATE INDEX IF NOT EXISTS idx_ledger_outlet_synced   ON public.stock_ledger (outlet_id, synced_at);
+CREATE INDEX IF NOT EXISTS idx_refund_outlet_synced   ON public.refund (outlet_id, synced_at);
+
 -- =============================================================
 -- RPCs (idempotent, member-checked, write paths)
 -- =============================================================
@@ -441,7 +452,7 @@ BEGIN
       -- exception would stall the client's FIFO drain on this op forever.
       -- (The losing device's local row is superseded; full cross-device
       -- identity reconciliation of such rows is deferred to M6.)
-      SELECT * INTO e FROM public.product WHERE outlet_id = outlet_id AND sku = p->>'sku';
+      SELECT * INTO e FROM public.product WHERE product.outlet_id = p->>'outlet_id' AND product.sku = p->>'sku';
       IF NOT FOUND THEN
         RAISE EXCEPTION 'product insert for % violated (outlet_id, sku) but no row was found', p->>'sku';
       END IF;
@@ -565,15 +576,17 @@ ALTER TABLE public.refund_line ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "outlet_select_members" ON public.outlet;
 CREATE POLICY "outlet_select_members" ON public.outlet FOR SELECT
   USING (id IN (SELECT org_id FROM public.org_member WHERE user_id = auth.uid()));
--- One outlet per BYO project: first authenticated user creates it.
+-- v5: the outlet is created ONLY by the owner's provisioning step (service
+-- key, bypasses RLS). The old "first authenticated user creates it" policy is
+-- dropped (sign-up is open on a Supabase project).
 DROP POLICY IF EXISTS "outlet_insert_first" ON public.outlet;
-CREATE POLICY "outlet_insert_first" ON public.outlet FOR INSERT
-  WITH CHECK (auth.uid() IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.outlet));
 
 DROP POLICY IF EXISTS "member_select_self" ON public.org_member;
 CREATE POLICY "member_select_self" ON public.org_member FOR SELECT USING (user_id = auth.uid());
+-- v5: NO self-insert policy. It let any signed-in user join any outlet id and
+-- then read/write the store. Membership rows are created only by provisioning
+-- (service key). Dropped on upgrade:
 DROP POLICY IF EXISTS "member_insert_self" ON public.org_member;
-CREATE POLICY "member_insert_self" ON public.org_member FOR INSERT WITH CHECK (user_id = auth.uid());
 DROP POLICY IF EXISTS "member_delete_self" ON public.org_member;
 CREATE POLICY "member_delete_self" ON public.org_member FOR DELETE USING (user_id = auth.uid());
 
@@ -608,6 +621,17 @@ CREATE POLICY "refund_line_select_members" ON public.refund_line FOR SELECT USIN
 
 -- PostgREST access (no-ops on stock Supabase, required for local/self-hosted).
 GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT SELECT ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
-GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role;
+GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated, service_role;
+GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA public TO authenticated, service_role;
+
+-- v5: nothing in this schema is for unauthenticated callers (the anon key is
+-- public). Stock Supabase default privileges grant anon ALL on new tables, and
+-- views bypass RLS — so revoke explicitly and make the view caller-scoped.
+ALTER TABLE public.cloud_schema_meta ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
+REVOKE ALL ON ALL FUNCTIONS IN SCHEMA public FROM anon;
+ALTER VIEW public.stock_view SET (security_invoker = true);
+
+-- Mark this bundle applied LAST so a failed run never records the new version.
+INSERT INTO public.cloud_schema_meta (version) VALUES (${CLOUD_SCHEMA_VERSION}) ON CONFLICT DO NOTHING;
 `;

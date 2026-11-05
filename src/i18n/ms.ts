@@ -241,6 +241,7 @@ const ms: Record<keyof EnDict, string> = {
   'cloudsetup.step.sql': 'Jalankan SQL',
   'cloudsetup.step.account': 'Akaun pemilik',
   'cloudsetup.step.connect': 'Sambung',
+  'cloudsetup.err.insecureUrl': 'URL backend mesti bermula dengan https://',
   'cloudsetup.err.missingKeys': 'URL projek, kunci anon dan kunci service_role semuanya diperlukan.',
   'cloudsetup.note.noSchema': 'Backend boleh dihubungi — tetapi schema belum dipasang.',
   'cloudsetup.note.upgrade':

@@ -242,6 +242,7 @@ const en = {
   'cloudsetup.step.sql': 'Run the SQL',
   'cloudsetup.step.account': 'Owner account',
   'cloudsetup.step.connect': 'Connect',
+  'cloudsetup.err.insecureUrl': 'Backend URL must start with https://',
   'cloudsetup.err.missingKeys': 'Project URL, anon key and service_role key are all required.',
   'cloudsetup.note.noSchema': 'Backend reachable — but the schema is not deployed yet.',
   'cloudsetup.note.upgrade':

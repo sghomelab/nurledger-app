@@ -113,6 +113,8 @@ function normTs(v: unknown): number {
  */
 const PULL_PAGE_SIZE = 500;
 const PULL_MAX_PAGES = 100;
+/** Parent ids per child-row query (keeps the `in (...)` URL short; rows are paged anyway). */
+const PULL_CHILD_CHUNK = 50;
 
 type PagedQuery = (from: number, to: number) => Promise<{ data: unknown[] | null; error: { message: string } | null }>;
 
@@ -136,6 +138,9 @@ async function pullAllPages<T>(
   }
   throw new Error(`${label}: exceeded ${PULL_MAX_PAGES * PULL_PAGE_SIZE}-row page cap — retry sync`);
 }
+
+/** Test seam: exported so the paging contract can be unit-tested without a network. */
+export const __pullAllPagesForTest = pullAllPages;
 
 export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
   return {
@@ -293,31 +298,34 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
       ]);
 
       // Lines + payments ride on the pulled sales (they carry no updated_at).
+      // Child rows are paged to exhaustion per chunk: PostgREST caps a response
+      // at ~1,000 rows, and 100 sales x >10 lines silently exceeded it — the
+      // truncated lines were never re-pulled because the sale cursor advanced.
+      const childQuery = (table: string, col: string, ids: string[]): PagedQuery => (from, to) =>
+        Promise.resolve(
+          c.from(table).select('*').in(col, ids).order('id', { ascending: true }).range(from, to),
+        );
       const saleUuids = sales.map((s) => s.uuid);
       let lines: SaleLineDeltaRow[] = [];
       let payments: PaymentDeltaRow[] = [];
-      for (let i = 0; i < saleUuids.length; i += 100) {
-        const chunk = saleUuids.slice(i, i + 100);
-        if (chunk.length === 0) continue;
-        const [linesRes, paymentsRes] = await Promise.all([
-          c.from('sale_line').select('*').in('sale_uuid', chunk),
-          c.from('payment').select('*').in('sale_uuid', chunk),
+      for (let i = 0; i < saleUuids.length; i += PULL_CHILD_CHUNK) {
+        const chunk = saleUuids.slice(i, i + PULL_CHILD_CHUNK);
+        const [l, pm] = await Promise.all([
+          pullAllPages(childQuery('sale_line', 'sale_uuid', chunk), 'pull sale_line', mapLine),
+          pullAllPages(childQuery('payment', 'sale_uuid', chunk), 'pull payment', mapPayment),
         ]);
-        if (linesRes.error) throw new Error(`pull sale_line: ${linesRes.error.message}`);
-        if (paymentsRes.error) throw new Error(`pull payment: ${paymentsRes.error.message}`);
-        lines = lines.concat((linesRes.data ?? []).map(mapLine));
-        payments = payments.concat((paymentsRes.data ?? []).map(mapPayment));
+        lines = lines.concat(l);
+        payments = payments.concat(pm);
       }
 
       // Refund lines ride on the pulled refunds (same pattern).
       const refundUuids = refunds.map((r) => r.uuid);
       let refundLines: RefundLineDeltaRow[] = [];
-      for (let i = 0; i < refundUuids.length; i += 100) {
-        const chunk = refundUuids.slice(i, i + 100);
-        if (chunk.length === 0) continue;
-        const rlRes = await c.from('refund_line').select('*').in('refund_uuid', chunk);
-        if (rlRes.error) throw new Error(withUpgradeHint('pull refund_line', rlRes.error.message));
-        refundLines = refundLines.concat((rlRes.data ?? []).map(mapRefundLine));
+      for (let i = 0; i < refundUuids.length; i += PULL_CHILD_CHUNK) {
+        const chunk = refundUuids.slice(i, i + PULL_CHILD_CHUNK);
+        refundLines = refundLines.concat(
+          await pullAllPages(childQuery('refund_line', 'refund_uuid', chunk), 'pull refund_line', mapRefundLine, true),
+        );
       }
 
       const max = (rows: Array<{ syncedAt: number }>): number =>
