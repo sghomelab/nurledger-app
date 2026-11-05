@@ -58,15 +58,20 @@ export function isFirstRunPending(db: SQLiteDatabase): Promise<boolean> {
  */
 export async function completeFirstRun(db: SQLiteDatabase, mode: FirstRunMode): Promise<void> {
   if (await isSeeded(db)) return;
-  if (mode === 'sample') {
-    await runSeed(db);
-  } else {
-    await db.runAsync("INSERT OR REPLACE INTO settings (key, value) VALUES ('seeded_v1', '1')");
-    // The 'empty' path never ran the seed, so assert the user seed here too
-    // (idempotent — bootstrap already ran it; this keeps runSeed the ONLY
-    // other place users get created).
-    await ensureDefaultUsers(db);
-  }
+  // One transaction: the fixture + the `seeded_v1` flag land together or not
+  // at all. Without it a mid-seed kill/throw left a half-loaded fixture with
+  // the flag unset, so the retry re-seeded on top of it.
+  await db.withTransactionAsync(async () => {
+    if (mode === 'sample') {
+      await runSeed(db);
+    } else {
+      await db.runAsync("INSERT OR REPLACE INTO settings (key, value) VALUES ('seeded_v1', '1')");
+      // The 'empty' path never ran the seed, so assert the user seed here too
+      // (idempotent — bootstrap already ran it; this keeps runSeed the ONLY
+      // other place users get created).
+      await ensureDefaultUsers(db);
+    }
+  });
   notify();
 }
 
@@ -78,7 +83,9 @@ export async function completeFirstRun(db: SQLiteDatabase, mode: FirstRunMode): 
  */
 export async function resetAllData(db: SQLiteDatabase): Promise<void> {
   const tables = await db.getAllAsync<{ name: string }>(
-    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+    // schema_meta is the migration version table, not user data: wiping it
+    // would make the DB look pre-versioning on the next bootstrap.
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name <> 'schema_meta'",
   );
   // PRAGMA foreign_keys is a no-op mid-transaction → toggle it outside.
   await db.runAsync('PRAGMA foreign_keys = OFF;');

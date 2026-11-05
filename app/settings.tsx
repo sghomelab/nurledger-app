@@ -11,6 +11,7 @@ import { useT } from '../src/hooks/useT';
 import { getDb } from '../src/db/database';
 import { resetAllData } from '../src/db/firstRun';
 import { updateOutlet } from '../src/repositories/outletRepository';
+import { pendingCount } from '../src/repositories/outboxRepository';
 import {
   disconnectCloud,
   getCloudConfig,
@@ -205,7 +206,9 @@ export default function SettingsScreen() {
       void job();
       return;
     }
-    setCloudGate(job);
+    // Functional form: a bare `setCloudGate(job)` would be treated as a state
+    // updater, running `job` immediately and skipping the PIN prompt.
+    setCloudGate(() => job);
   };
 
   const toggleSync = (on: boolean) => {
@@ -242,8 +245,19 @@ export default function SettingsScreen() {
   // re-shows the first-run choice (sample vs empty) via its state subscription.
   const [resetGate, setResetGate] = useState<(() => void) | null>(null);
 
-  const confirmReset = () => {
-    Alert.alert(t('settings.resetTitle'), t('settings.resetMsg'), [
+  const confirmReset = async () => {
+    // Unsynced outbox ops are deleted by the reset — say so before it happens.
+    let pending = 0;
+    try {
+      pending = await pendingCount();
+    } catch {
+      pending = 0;
+    }
+    const msg =
+      (pending > 0 ? t('settings.resetPending', { n: pending }) : '') +
+      t('settings.resetMsg') +
+      t('settings.resetSideEffects');
+    Alert.alert(t('settings.resetTitle'), msg, [
       { text: t('common.cancel') },
       {
         text: t('settings.resetData'),
@@ -262,10 +276,10 @@ export default function SettingsScreen() {
   const requestReset = () => {
     // FR-500: same 'store_settings' gate as other store-level changes.
     if (active && roleCanAct(active.role, 'store_settings')) {
-      confirmReset();
+      void confirmReset();
       return;
     }
-    setResetGate(confirmReset);
+    setResetGate(() => () => void confirmReset());
   };
 
   // ── Receipt width (FR-109, device-local) ─────────────────────────────────

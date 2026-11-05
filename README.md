@@ -56,7 +56,7 @@ Full requirements: `/home/mars/.hermes/projects/03-nurlogic/nurledger/spec/nurle
 
 ## Stack
 
-- Expo SDK 57 · React Native 0.86 · expo-router · **expo-sqlite** (offline-first, ADR-002)
+- Expo SDK 58 · React Native 0.88 · expo-router · **expo-sqlite** (offline-first, ADR-002)
 - Money: integer minor units + ISO currency (ADR-004) · Costing: FIFO layers (ADR-003)
 - Design: Plus Jakarta Sans + JetBrains Mono, indigo-600/emerald-600/amber-500/rose-500/slate
 

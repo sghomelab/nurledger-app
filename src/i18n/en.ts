@@ -169,6 +169,9 @@ const en = {
   'firstRun.empty': 'Start empty',
   'firstRun.emptySub': 'No products, stock or sales. Add your own items from the Inventory tab.',
   'firstRun.busy': 'Setting up…',
+  'firstRun.failed': 'Setup failed. Nothing was changed — please try again.',
+  'app.bootFailed': 'The app could not start its database.',
+  'app.retry': 'Try again',
 
   // ── settings screen ───────────────────────────────────────────────────
   'settings.title': 'Store settings',
@@ -228,6 +231,8 @@ const en = {
   'settings.resetDataMsg':
     'Deletes every product, stock record, sale and setting on this device, then restarts setup from scratch. Cannot be undone.',
   'settings.resetTitle': 'Reset all data?',
+  'settings.resetPending': '{n} change(s) have NOT synced to your cloud and will be lost. ',
+  'settings.resetSideEffects': ' The Owner PIN goes back to 1234, the language to English, and cloud sync is disconnected.',
   'settings.resetMsg':
     'Everything on this device — products, stock, sales, shifts and settings — is permanently deleted, then you choose how to start again. This cannot be undone.',
 

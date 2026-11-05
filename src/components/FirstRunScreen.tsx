@@ -21,10 +21,12 @@ import { colors, fonts, radius, spacing } from '../theme/tokens';
 export function FirstRunScreen() {
   const { t } = useT();
   const [busy, setBusy] = useState<FirstRunMode | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const choose = async (mode: FirstRunMode) => {
     if (busy) return;
     setBusy(mode);
+    setFailed(false);
     try {
       const db = await getDb();
       await completeFirstRun(db, mode);
@@ -35,7 +37,9 @@ export function FirstRunScreen() {
       // Otherwise the root layout re-gates (state-change notify) and this
       // screen unmounts — no manual navigation here.
     } catch {
-      // Defensive: bootstrap guarantees the db is open. Let the user retry.
+      // The choice is transactional, so nothing was half-applied: tell the
+      // user and let them retry instead of silently re-arming the buttons.
+      setFailed(true);
       setBusy(null);
     }
   };
@@ -49,6 +53,7 @@ export function FirstRunScreen() {
         </View>
         <Text style={styles.title}>{t('firstRun.title')}</Text>
         <Text style={styles.body}>{t('firstRun.body')}</Text>
+        {failed ? <Text style={styles.error}>{t('firstRun.failed')}</Text> : null}
 
         <Pressable
           style={[styles.option, busy !== null && styles.optionDisabled]}
@@ -87,6 +92,7 @@ export function FirstRunScreen() {
 }
 
 const styles = StyleSheet.create({
+  error: { color: colors.danger, fontFamily: fonts.sansBold, fontSize: 13, marginBottom: spacing.md },
   wrap: { flex: 1, backgroundColor: colors.slate50, justifyContent: 'center', padding: spacing.lg },
   card: { gap: spacing.md },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },

@@ -168,6 +168,9 @@ const ms: Record<keyof EnDict, string> = {
   'firstRun.empty': 'Mula kosong',
   'firstRun.emptySub': 'Tiada produk, stok atau jualan. Tambahkan item anda sendiri dari tab Inventori.',
   'firstRun.busy': 'Menyiapkan…',
+  'firstRun.failed': 'Persediaan gagal. Tiada apa diubah — sila cuba lagi.',
+  'app.bootFailed': 'Aplikasi tidak dapat memulakan pangkalan datanya.',
+  'app.retry': 'Cuba lagi',
 
   // ── settings screen ───────────────────────────────────────────────────
   'settings.title': 'Tetapan kedai',
@@ -227,6 +230,8 @@ const ms: Record<keyof EnDict, string> = {
   'settings.resetDataMsg':
     'Memadamkan semua produk, rekod stok, jualan dan tetapan pada peranti ini, kemudian memulakan tetapan dari awal. Tidak boleh diundur.',
   'settings.resetTitle': 'Tetapkan semula semua data?',
+  'settings.resetPending': '{n} perubahan BELUM disegerakkan ke awan anda dan akan hilang. ',
+  'settings.resetSideEffects': ' PIN Pemilik kembali kepada 1234, bahasa kepada Inggeris, dan penyegerakan awan diputuskan.',
   'settings.resetMsg':
     'Semua pada peranti ini — produk, stok, jualan, sif dan tetapan — dipadamkan secara kekal, kemudian anda memilih cara untuk bermula semula. Tidak boleh diundur.',
 

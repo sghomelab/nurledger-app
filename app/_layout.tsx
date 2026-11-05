@@ -1,3 +1,4 @@
+import { Pressable, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -26,27 +27,57 @@ export default function RootLayout() {
   // null = still bootstrapping (splash up); true = first-run choice pending.
   const [firstRunPending, setFirstRunPending] = useState<boolean | null>(null);
 
+  const [bootFailed, setBootFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
   useEffect(() => {
+    let cancelled = false;
     let unsubscribe: (() => void) | null = null;
     (async () => {
       try {
         await loadFonts();
         const db = await getDb();
-        setFirstRunPending(await isFirstRunPending(db));
+        const pending = await isFirstRunPending(db);
+        if (cancelled) return;
+        setFirstRunPending(pending);
         // Re-gate on first-run state changes (factory reset from Settings).
         unsubscribe = onFirstRunStateChange(async () => {
           const d = await getDb();
           setFirstRunPending(await isFirstRunPending(d));
         });
+        // Unmounted while awaiting → drop the listener we just added.
+        if (cancelled) unsubscribe();
+      } catch {
+        // A failed bootstrap used to leave a permanent blank screen.
+        if (!cancelled) setBootFailed(true);
       } finally {
         await SplashScreen.hideAsync().catch(() => {});
       }
     })();
     return () => {
+      cancelled = true;
       unsubscribe?.();
     };
-  }, []);
+  }, [attempt]);
 
+  if (bootFailed) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: colors.slate50 }}>
+        <Text style={{ fontFamily: fonts.sansBold, fontSize: 16, color: colors.slate900, textAlign: 'center' }}>
+          {t('app.bootFailed')}
+        </Text>
+        <Pressable
+          style={{ marginTop: 16, paddingVertical: 12, paddingHorizontal: 20, borderRadius: 12, backgroundColor: colors.primary }}
+          onPress={() => {
+            setBootFailed(false);
+            setAttempt((n) => n + 1);
+          }}
+        >
+          <Text style={{ fontFamily: fonts.sansBold, color: colors.white }}>{t('app.retry')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
   if (firstRunPending === null) return null; // splash still covering
   if (firstRunPending) return <FirstRunScreen />;
 
