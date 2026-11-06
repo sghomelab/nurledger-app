@@ -19,8 +19,8 @@ const secureMock = require('expo-secure-store');
 import { uuidv4 } from '../lib/ids';
 
 let raw: any;
-function mk() {
-  raw = new DatabaseSync(':memory:');
+function mk(path = ':memory:') {
+  raw = new DatabaseSync(path);
   raw.exec('PRAGMA foreign_keys = ON;'); raw.exec(SCHEMA_SQL);
   raw.exec('ALTER TABLE product ADD COLUMN supplier_id TEXT;');
   raw.exec('CREATE TABLE IF NOT EXISTS schema_meta (id INTEGER PRIMARY KEY, v INTEGER NOT NULL);');
@@ -109,6 +109,24 @@ d('Supabase session storage is in the keystore, not SQLite', () => {
     expect(await sdkStorage.getItem('sb-x-auth-token')).toBeNull();
     expect(Object.keys(secureMock.__dump())).toEqual([]);
     expect(q("select * from settings where key like 'sb:%'")).toEqual([]);
+  });
+
+  it('after migration the old token bytes are gone from the db FILE (free pages + WAL), not just the live rows', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fs = require('fs'), os = require('os'), path = require('path');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'nl-scrub-'));
+    const file = path.join(dir, 'app.db');
+    try {
+      mockDB = mk(file);
+      raw.exec('PRAGMA journal_mode = WAL;');
+      const BIG = 'tavyxgjrh7fq-' + 'x'.repeat(2000);
+      raw.prepare('INSERT INTO settings (key,value) VALUES (?,?)').run('sb:sb-x-auth-token', BIG);
+      const all = () => ['', '-wal'].map((e) => { try { return fs.readFileSync(file + e).toString('latin1'); } catch { return ''; } }).join('');
+      expect(all()).toContain('tavyxgjrh7fq');            // sanity: it really is on disk
+      expect(await sdkStorage.getItem('sb-x-auth-token')).toBe(BIG);
+      expect(all()).not.toContain('tavyxgjrh7fq');
+      raw.close();
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
   });
 
   it('a factory reset (resetAllData) also clears the keystore session', async () => {

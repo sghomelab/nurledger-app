@@ -174,8 +174,26 @@ const legacySdkStorage = {
   },
   async removeItem(key: string) {
     await deleteSetting(`sb:${key}`);
+    await scrubDeletedPages();
   },
 };
+
+/**
+ * A SQLite DELETE only unlinks the cell: the old bytes (here, a refresh token)
+ * stay in free pages of the db file and the WAL until overwritten. After
+ * removing plaintext session rows, rewrite the file (VACUUM) and truncate the
+ * WAL so the token is really gone. Best effort — a failure (e.g. db busy) must
+ * not block sign-in; the live rows are already deleted.
+ */
+export async function scrubDeletedPages(): Promise<void> {
+  try {
+    const db = await getDb();
+    await db.execAsync('VACUUM;');
+    await db.execAsync('PRAGMA wal_checkpoint(TRUNCATE);');
+  } catch {
+    /* best effort */
+  }
+}
 
 const secureKv = createSecureKv(expoSecureBackend, legacySdkStorage);
 
@@ -197,4 +215,5 @@ export async function clearStoredSession(): Promise<void> {
   await clearSecureSession();
   const db = await getDb();
   await db.runAsync("DELETE FROM settings WHERE key LIKE 'sb:%'");
+  await scrubDeletedPages();
 }
