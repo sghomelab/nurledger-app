@@ -61,6 +61,35 @@ CloudAdapter (src/lib/cloud/types.ts)
   stored cursors (turning off then on loses nothing).
 - **Disconnect** removes the connection; all local data and the queue remain.
 
+### Rejected ops (outbox quarantine, schema v8)
+
+The drain is strictly FIFO, so one op the server will *never* accept used to
+stall every op behind it forever. Now:
+
+- Only a **positively identified per-record rejection** counts
+  (`classifyPushFailure`): Postgres integrity (`23xxx`), data-exception
+  (`22xxx`) or a custom `RAISE` (`P0001`) about the record. The RPC adapter
+  reports *which* op failed (`failedOpId`) and which ops before it the server
+  confirmed (`uploadedOpIds` → marked uploaded).
+- **Never** quarantined: transport errors, 5xx/408/429, `57014`
+  statement_timeout, deadlocks, and whole-connection problems (`not
+  authenticated`, `not a member`, `42501`, `PGRST*`, 401/403/404 — outdated
+  schema, expired session). Anything unrecognised is treated as retry.
+- A rejected op is retried once per tick; after **3** identical rejections
+  (`QUARANTINE_AFTER_ATTEMPTS`) it gets `quarantined_at` and drops out of the
+  drain, so the queue behind it flows. Source rows are never touched.
+- **Circuit breaker:** at **5** quarantined ops (`MAX_QUARANTINED_OPS`) no more
+  are set aside and the engine surfaces "server keeps rejecting uploads" —
+  that pattern means a systemic fault (outdated cloud schema), not bad records.
+- UI: a red, tappable banner on the register and a **Rejected uploads** block
+  in Settings → Cloud sync with the server's reason, **Retry rejected**
+  (re-queues in the ORIGINAL order, counters reset) and **Discard…**
+  (`discarded_at`; confirm, PIN-gated; rows kept for audit, never drained).
+- `pendingCount` excludes quarantined ops; `unsyncedCount` (waiting +
+  quarantined, not discarded) is what the factory-reset warning uses.
+- Dependencies: if a quarantined sale has a refund queued behind it, the refund
+  will be rejected too (FK) and quarantined with it; Retry restores both in order.
+
 This makes "local only" a clean rollback at three levels, all lossless:
 
 | Level | Action | Result |

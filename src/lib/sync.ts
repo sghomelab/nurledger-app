@@ -134,6 +134,70 @@ export function isRetryableError(status: number | undefined, networkError: boole
   return status >= 500;
 }
 
+/**
+ * What a failed push means (outbox quarantine):
+ *  - 'retry'      transport / 5xx / 408 / 429 — try again later, nothing is wrong with the op.
+ *  - 'connection' the SESSION, permissions or deployed schema is wrong; it affects
+ *                 EVERY op, so never blame (or set aside) one op.
+ *  - 'op'         the server understood the request and REJECTED this record's
+ *                 content (constraint / validation / FK). Retrying the identical
+ *                 payload can never succeed → eligible for quarantine after
+ *                 QUARANTINE_AFTER_ATTEMPTS confirmations.
+ */
+export type PushFailureKind = 'retry' | 'connection' | 'op';
+
+export interface PushFailureInfo {
+  /** HTTP status if known (supabase-js RPC errors usually do NOT carry it). */
+  status?: number;
+  /** PostgREST / Postgres SQLSTATE code (e.g. '23503', 'P0001', 'PGRST202'). */
+  code?: string;
+  message?: string;
+}
+
+/**
+ * Classify a failed push. The Postgres/PostgREST `code` is the primary signal
+ * (supabase-js RPC errors carry `code` but not the HTTP status); `status` is a
+ * fallback. ANYTHING UNRECOGNISED is 'retry' — quarantine must only ever follow
+ * a positively identified per-record rejection.
+ *
+ * Note `RAISE EXCEPTION` without an ERRCODE is P0001, which the apply_* RPCs
+ * use both for per-record rejections ('product id belongs to another outlet')
+ * and for session problems ('not authenticated', 'not a member of this
+ * outlet') — the latter are 'connection' and must never set an op aside.
+ */
+export function classifyPushFailure(info: PushFailureInfo): PushFailureKind {
+  const code = (info.code ?? '').toUpperCase();
+  const msg = info.message ?? '';
+  const status = info.status;
+
+  // Transient server-side conditions (statement_timeout 57014, deadlock 40P01,
+  // serialization 40001, connection/resource classes 08/53/57/58).
+  if (/^(40|08|53|57|58)/.test(code)) return 'retry';
+  if (status != null && (status === 408 || status === 429 || status >= 500)) return 'retry';
+
+  // Whole-connection problems: auth/permission, missing function/table (outdated schema).
+  if (code === '42501' || code === '42883' || code === '42P01' || code.startsWith('PGRST')) return 'connection';
+  if (code === 'P0001' && /not authenticated|not a member|only the store owner/i.test(msg)) return 'connection';
+  if (status === 401 || status === 403 || status === 404) return 'connection';
+
+  // Positively a per-record rejection: integrity (23xxx) / data exception (22xxx)
+  // / a custom RAISE (P0001) about this record's content.
+  if (code.startsWith('23') || code.startsWith('22') || code === 'P0001') return 'op';
+  if (code === '' && (status === 400 || status === 409 || status === 422)) return 'op';
+
+  return 'retry';
+}
+
+/** A rejected op is set aside after this many identical rejections (one per sync tick). */
+export const QUARANTINE_AFTER_ATTEMPTS = 3;
+/**
+ * Circuit breaker: once this many ops sit in quarantine the cause is almost
+ * certainly systemic (outdated server schema, bad deploy), not per-record —
+ * stop setting more aside and surface the error instead (the owner fixes the
+ * cause, then "Retry rejected").
+ */
+export const MAX_QUARANTINED_OPS = 5;
+
 // ---------------------------------------------------------------------------
 // Last-write-wins (products) — acceptance: "product edits LWW with audit row"
 // ---------------------------------------------------------------------------

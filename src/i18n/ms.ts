@@ -33,6 +33,14 @@ const ms: Record<keyof EnDict, string> = {
   'sync.queuedOff': '{n} operasi menunggu · Segerak ditutup',
   'sync.queuedOffShort': '{n} operasi menunggu · segerak tutup',
   'sync.off': 'Segerak ditutup — jualan bergilir di tempat',
+  'sync.rejected': '{n} rekod ditolak oleh pelayan anda — ketik untuk semak',
+  'settings.rejectedTitle': 'Muat naik ditolak',
+  'settings.rejectedNote': 'Pelayan anda menolak {n} rekod. Tiada yang hilang — ia masih ada pada peranti ini dan baki giliran terus disegerakkan. Betulkan puncanya (contohnya kemas kini skema awan) dan cuba semula, atau buang untuk berhenti mencuba.',
+  'settings.rejectedRetry': 'Cuba semula yang ditolak',
+  'settings.rejectedDiscard': 'Buang…',
+  'settings.rejectedDiscardTitle': 'Berhenti memuat naik rekod ini?',
+  'settings.rejectedDiscardBody': '{n} rekod tidak akan disegerakkan dari peranti ini. Tiada yang dipadam secara setempat, tetapi peranti lain dan awan tidak akan melihatnya.',
+  'settings.rejectedDiscardConfirm': 'Buang',
 
   // ── sell / register ───────────────────────────────────────────────────
   'sell.scanPlaceholder': 'Imbas atau taip barcode + Enter',

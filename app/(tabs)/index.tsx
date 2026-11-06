@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState, type ComponentProps } from 'react';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { Alert, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../../src/hooks/useCart';
@@ -84,8 +84,16 @@ export default function SellTab() {
    *  - connected + sync ON: Syncing… / N queued / Synced / error.
    *  - connected + sync OFF + backlog: “N ops queued · Sync off”.
    */
-  const syncBanner = useMemo<{ icon: ComponentProps<typeof Ionicons>['name']; color: string; bg: string; text: string } | null>(() => {
+  const syncBanner = useMemo<{ icon: ComponentProps<typeof Ionicons>['name']; color: string; bg: string; text: string; onPress?: () => void } | null>(() => {
     if (!sync.connected) return null;
+    // Server-rejected records need a human decision — highest priority, tappable.
+    if (sync.quarantined > 0) {
+      return {
+        icon: 'alert-circle-outline', color: colors.danger, bg: colors.dangerSoft,
+        text: t('sync.rejected', { n: sync.quarantined }),
+        onPress: () => router.push('/settings'),
+      };
+    }
     if (sync.enabled) {
       if (sync.syncing) return { icon: 'sync-outline', color: '#B45309', bg: colors.warningSoft, text: t('sync.syncing') };
       if (sync.pending > 0) {
@@ -102,7 +110,7 @@ export default function SellTab() {
       return { icon: 'cloud-offline-outline', color: '#B45309', bg: colors.warningSoft, text: t('sync.queuedOff', { n: sync.pending }) };
     }
     return null;
-  }, [sync.connected, sync.enabled, sync.syncing, sync.pending, sync.lastError, sync.lastSyncedAt, t]);
+  }, [sync.connected, sync.enabled, sync.syncing, sync.pending, sync.quarantined, sync.lastError, sync.lastSyncedAt, t]);
 
   /**
    * PIN gate (FR-500 / DEV-003): run `job` directly when the active user's role
@@ -325,12 +333,17 @@ export default function SellTab() {
 
       {/* M5 (FR-503): sync status banner (replaces the old "offline queue" hint) */}
       {syncBanner && (
-        <View style={[styles.pendingBanner, { backgroundColor: syncBanner.bg }]}>
+        <Pressable
+          style={[styles.pendingBanner, { backgroundColor: syncBanner.bg }]}
+          onPress={syncBanner.onPress}
+          disabled={!syncBanner.onPress}
+          accessibilityRole={syncBanner.onPress ? 'button' : undefined}
+        >
           <Ionicons name={syncBanner.icon} size={14} color={syncBanner.color} />
           <Text style={[styles.pendingText, { color: syncBanner.color }]} numberOfLines={1}>
             {syncBanner.text}
           </Text>
-        </View>
+        </Pressable>
       )}
 
       {/* M4 (FR-200): register locked until a shift is open */}

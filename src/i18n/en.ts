@@ -34,6 +34,14 @@ const en = {
   'sync.queuedOff': '{n} ops queued · Sync off',
   'sync.queuedOffShort': '{n} ops queued · sync off',
   'sync.off': 'Sync off — sales queue locally',
+  'sync.rejected': '{n} record(s) rejected by your server — tap to review',
+  'settings.rejectedTitle': 'Rejected uploads',
+  'settings.rejectedNote': 'Your server refused {n} record(s). Nothing is lost — they are still on this device and the rest of the queue keeps syncing. Fix the cause (for example update the cloud schema) and retry, or discard to stop trying.',
+  'settings.rejectedRetry': 'Retry rejected',
+  'settings.rejectedDiscard': 'Discard…',
+  'settings.rejectedDiscardTitle': 'Stop uploading these records?',
+  'settings.rejectedDiscardBody': '{n} record(s) will never sync from this device. Nothing is deleted locally, but your other devices and the cloud will not see them.',
+  'settings.rejectedDiscardConfirm': 'Discard',
 
   // ── sell / register (tabs/index) ──────────────────────────────────────
   'sell.scanPlaceholder': 'Scan or type barcode + Enter',
