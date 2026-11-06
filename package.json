@@ -8,6 +8,7 @@
     "ios": "expo run:ios",
     "typecheck": "tsc --noEmit",
     "test": "jest",
+    "test:strict": "node scripts/check-no-skipped.mjs",
     "test:cloud-schema": "node --experimental-strip-types --no-warnings scripts/verify-cloud-schema.mjs"
   },
   "dependencies": {
