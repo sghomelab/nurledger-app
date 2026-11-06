@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useOutlet } from '../src/hooks/useAppData';
 import { useUsers } from '../src/hooks/useShift';
-import { useSync } from '../src/hooks/useSync';
+import { getCloudAdapter, useSync } from '../src/hooks/useSync';
 import { useT } from '../src/hooks/useT';
 import { getDb } from '../src/db/database';
 import { resetAllData } from '../src/db/firstRun';
@@ -210,6 +210,19 @@ export default function SettingsScreen() {
     // updater, running `job` immediately and skipping the PIN prompt.
     setCloudGate(() => job);
   };
+
+  /** Owner-only (PIN-gated like other cloud changes): mint a single-use join code. */
+  const inviteDevice = () =>
+    requireCloudGate(async () => {
+      try {
+        const cfg = await getCloudConfig();
+        if (!cfg) return;
+        const code = await getCloudAdapter().createInvite(cfg, 24);
+        Alert.alert(t('settings.inviteTitle'), t('settings.inviteBody', { code, hours: 24 }));
+      } catch (e) {
+        Alert.alert(t('settings.inviteFailed'), e instanceof Error ? e.message : String(e));
+      }
+    });
 
   const toggleSync = (on: boolean) => {
     requireCloudGate(async () => {
@@ -422,6 +435,11 @@ export default function SettingsScreen() {
                       : t('sync.off')}
                 </Text>
                 {sync.lastError && <Text style={styles.cloudError}>{sync.lastError}</Text>}
+              </View>
+              <View style={styles.cloudBtns}>
+                <Pressable style={[styles.cloudBtn, { flex: 1 }]} onPress={inviteDevice}>
+                  <Text style={styles.cloudBtnText}>{t('settings.inviteDevice')}</Text>
+                </Pressable>
               </View>
               <View style={styles.cloudBtns}>
                 <Pressable

@@ -17,9 +17,9 @@ import { CLOUD_SCHEMA_SQL, CLOUD_SCHEMA_VERSION } from '../lib/cloud/schemaSql';
 
 const SYNCED_TABLES = ['category', 'product', 'sale', 'stock_ledger', 'refund'] as const;
 
-describe('cloud schema bundle (v6 — synced_at cursor + security)', () => {
+describe('cloud schema bundle (v7 — synced_at cursor + security + provisioning)', () => {
   it('declares exactly the version the wizard gates on', () => {
-    expect(CLOUD_SCHEMA_VERSION).toBe(6);
+    expect(CLOUD_SCHEMA_VERSION).toBe(7);
     expect(CLOUD_SCHEMA_SQL).toContain(`NURLEDGER BYO SCHEMA v${CLOUD_SCHEMA_VERSION}`);
     expect(CLOUD_SCHEMA_SQL).toContain(`INSERT INTO public.cloud_schema_meta (version) VALUES (${CLOUD_SCHEMA_VERSION})`);
   });

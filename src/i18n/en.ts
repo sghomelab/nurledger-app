@@ -243,7 +243,7 @@ const en = {
   'cloudsetup.step.account': 'Owner account',
   'cloudsetup.step.connect': 'Connect',
   'cloudsetup.err.insecureUrl': 'Backend URL must start with https://',
-  'cloudsetup.err.missingKeys': 'Project URL, anon key and service_role key are all required.',
+  'cloudsetup.err.missingKeys': 'Project URL and anon key are both required.',
   'cloudsetup.note.noSchema': 'Backend reachable — but the schema is not deployed yet.',
   'cloudsetup.note.upgrade':
     'Backend reachable — it runs schema v{old}, but this app needs v{new}. Run the updated script below (safe to re-run — it never touches existing data).',
@@ -276,11 +276,8 @@ const en = {
     'BYO cloud: create a FREE Supabase project (supabase.com) and paste its credentials here. Your data lives in YOUR project — Nurledger never operates or accesses it.',
   'cloudsetup.projectUrl': 'Project URL',
   'cloudsetup.anonKey': 'anon / public key',
-  'cloudsetup.serviceKey': 'service_role key',
   'cloudsetup.ownerEmail': 'Owner email',
   'cloudsetup.ownerPassword': 'Owner password',
-  'cloudsetup.keyNote':
-    'Used only on this device, only to verify your schema. It never leaves the phone.',
   'cloudsetup.sqlTitle': 'Run the setup SQL (schema v{v})',
   'cloudsetup.sqlTitleUpgrade': 'Run the updated setup SQL (schema v{v} — upgrade)',
   'cloudsetup.sqlUpgradeHint':
@@ -294,7 +291,19 @@ const en = {
   'cloudsetup.password': 'Password',
   'cloudsetup.storeTitle': 'Link this store',
   'cloudsetup.storeHint':
-    'Creates the outlet record and makes the signed-in owner a member, then saves the connection on this device.',
+    'Creates the store (or joins it with an invite code) and saves the connection on this device. Your service_role key is never needed or stored.',
+  'cloudsetup.mode.create': 'New store',
+  'cloudsetup.mode.join': 'Join with invite code',
+  'cloudsetup.mode.createHint': 'First device of a new store. You will paste a setup SQL once; it registers a one-time claim code held only on this phone.',
+  'cloudsetup.mode.joinHint': 'Another phone of an existing store. Ask the owner for an invite code (Settings → Cloud sync → Invite a device).',
+  'cloudsetup.inviteCode': 'Invite code',
+  'cloudsetup.err.inviteRequired': 'Enter the invite code from the store owner.',
+  'cloudsetup.err.joinNeedsUpgrade': 'This store is not on the latest setup yet. Ask the owner to open the setup wizard on their phone and run the SQL once, then try again.',
+  'cloudsetup.note.claimRetry': 'The store was not claimed by this setup. Paste the SQL below once more (it is safe to re-run), then continue.',
+  'settings.inviteDevice': 'Invite a device',
+  'settings.inviteTitle': 'Invite code',
+  'settings.inviteBody': 'On the other phone choose Settings → Cloud sync → Connect → "Join with invite code" and enter:\n\n{code}\n\nValid for {hours} hours, works once.',
+  'settings.inviteFailed': 'Could not create an invite code',
   'cloudsetup.minChars': 'min 6 characters',
 
   // ── picker overlay (PickerOverlay) ────────────────────────────────────

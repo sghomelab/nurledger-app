@@ -242,7 +242,7 @@ const ms: Record<keyof EnDict, string> = {
   'cloudsetup.step.account': 'Akaun pemilik',
   'cloudsetup.step.connect': 'Sambung',
   'cloudsetup.err.insecureUrl': 'URL backend mesti bermula dengan https://',
-  'cloudsetup.err.missingKeys': 'URL projek, kunci anon dan kunci service_role semuanya diperlukan.',
+  'cloudsetup.err.missingKeys': 'URL projek dan kunci anon diperlukan.',
   'cloudsetup.note.noSchema': 'Backend boleh dihubungi — tetapi schema belum dipasang.',
   'cloudsetup.note.upgrade':
     'Backend boleh dihubungi — ia menggunakan schema v{old}, tetapi aplikasi ini memerlukan v{new}. Jalankan skrip yang dikemas kini di bawah (selamat dijalankan semula — ia tidak menyentuh data sedia ada).',
@@ -275,10 +275,8 @@ const ms: Record<keyof EnDict, string> = {
     'Awan BYO: cipta projek Supabase PERCUMA (supabase.com) dan tampalkan kelayakannya di sini. Data anda berada dalam PROJEK ANDA — Nurledger tidak pernah mengendalikannya atau memaksanya.',
   'cloudsetup.projectUrl': 'URL projek',
   'cloudsetup.anonKey': 'kunci anon / awam',
-  'cloudsetup.serviceKey': 'kunci service_role',
   'cloudsetup.ownerEmail': 'Emel pemilik',
   'cloudsetup.ownerPassword': 'Kata laluan pemilik',
-  'cloudsetup.keyNote': 'Digunakan hanya pada peranti ini, hanya untuk mengesahkan schema anda. Ia tidak keluar dari telefon.',
   'cloudsetup.sqlTitle': 'Jalankan SQL tetapan (schema v{v})',
   'cloudsetup.sqlTitleUpgrade': 'Jalankan SQL tetapan yang dikemas kini (schema v{v} — kemas kini)',
   'cloudsetup.sqlUpgradeHint':
@@ -292,7 +290,19 @@ const ms: Record<keyof EnDict, string> = {
   'cloudsetup.password': 'Kata laluan',
   'cloudsetup.storeTitle': 'Pautkan kedai ini',
   'cloudsetup.storeHint':
-    'Mencipta rekod kedai dan menjadikan pemilik yang log masuk sebagai ahli, kemudian menyimpan sambungan pada peranti ini.',
+    'Mencipta kedai (atau menyertainya dengan kod jemputan) dan menyimpan sambungan pada peranti ini. Kunci service_role anda tidak pernah diperlukan atau disimpan.',
+  'cloudsetup.mode.create': 'Kedai baharu',
+  'cloudsetup.mode.join': 'Sertai dengan kod jemputan',
+  'cloudsetup.mode.createHint': 'Peranti pertama kedai baharu. Anda akan tampal SQL persediaan sekali; ia mendaftar kod tuntutan sekali guna yang hanya ada pada telefon ini.',
+  'cloudsetup.mode.joinHint': 'Telefon lain bagi kedai sedia ada. Minta kod jemputan daripada pemilik (Tetapan → Segerak awan → Jemput peranti).',
+  'cloudsetup.inviteCode': 'Kod jemputan',
+  'cloudsetup.err.inviteRequired': 'Masukkan kod jemputan daripada pemilik kedai.',
+  'cloudsetup.err.joinNeedsUpgrade': 'Kedai ini belum menggunakan persediaan terkini. Minta pemilik membuka wizard persediaan pada telefonnya dan menjalankan SQL sekali, kemudian cuba lagi.',
+  'cloudsetup.note.claimRetry': 'Kedai tidak dituntut oleh persediaan ini. Tampal SQL di bawah sekali lagi (selamat dijalankan semula), kemudian teruskan.',
+  'settings.inviteDevice': 'Jemput peranti',
+  'settings.inviteTitle': 'Kod jemputan',
+  'settings.inviteBody': 'Pada telefon lain pilih Tetapan → Segerak awan → Sambung → "Sertai dengan kod jemputan" dan masukkan:\n\n{code}\n\nSah selama {hours} jam, hanya sekali guna.',
+  'settings.inviteFailed': 'Tidak dapat mencipta kod jemputan',
   'cloudsetup.minChars': 'min 6 aksara',
 
   // ── picker overlay ────────────────────────────────────────────────────

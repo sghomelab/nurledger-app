@@ -318,27 +318,28 @@ the shop then connects using the same details.
 ### Step 3 — Copy your project's details
 1. Open your new project.
 2. In the left menu, go to **Project settings** (the gear icon) → **API**.
-3. You'll see three things. Copy **all three**:
+3. You'll see two things. Copy **both**:
    - **Project URL** — looks like `https://abcdefg.supabase.co`
    - **anon / public key** — a long key labelled `anon public` (this is safe to share with the app)
-   - **service_role key** — a long key labelled `service_role` (**keep this private** — it's like a master password for your database)
 
-> The **service_role** key is the only sensitive one. Nurledger uses it at setup to
-> **check** that your shop database structure was created correctly (it cannot create
-> it for you — see Step 4), and then keeps it stored on your device. Don't paste it
-> anywhere else or share it.
+> **Never paste the `service_role` key into Nurledger.** It is a master password for
+> your database and the app does not need it (older versions asked for it — if you
+> ever pasted it, go to Project settings → API and **rotate/regenerate it**; current
+> versions delete the stored copy from the phone automatically).
 
 ### Step 4 — Connect it in Nurledger
 1. Open **Nurledger** on your first device.
 2. Go to **Settings** (the gear / Store card).
 3. Find **Cloud sync** — it will say **Off**.
 4. Tap **Connect your store**.
-5. Paste the three details (Project URL, anon key, service_role key) and tap **Continue**.
+5. Choose **New store** (this is your first device) and paste the two details (Project URL, anon key), then tap **Continue**.
    Nurledger checks that it can reach your project.
 
    **One manual step (about 1 minute):** Supabase does not let apps create tables in a
    project on your behalf, so you run a short setup script in the project yourself:
    1. Nurledger shows the script on screen — tap **Copy** (it is long, do not type it).
+      It ends with a one-time claim line made just for this setup: only this phone can
+      finish creating your store, nobody else who finds your project URL.
    2. Back in the Supabase dashboard, open **SQL Editor** (left menu) → **New query**.
    3. Paste the script into the editor box and tap **Run**.
    4. You should see a short success message (a few tables created).
@@ -421,7 +422,9 @@ do not have access to your data. You can verify any time by logging into
 | "Connection failed" when connecting | Re-check the **Project URL** (must end in `.supabase.co`) and that you pasted the **anon** key, not a truncated one. Make sure the project is still running (free projects pause after a week of no use — opening the project in the dashboard wakes it). |
 | Nothing is syncing after turning it On | Wait a moment, then pull to refresh / reopen Settings. Check the device has internet. The "N ops queued" line shows what's waiting. |
 | "Sync error: …" mentions a missing table | A newer app version needs the updated setup script: in Settings → Cloud sync, tap **Disconnect** (your data on the device is untouched), then **Connect your store** again — the app detects the older setup and shows the updated script. Run it in Supabase's SQL Editor (safe to re-run — it never touches existing data) and finish the reconnection. |
-| I pasted the wrong service_role key | Disconnect, then Connect again with the correct keys. (The setup is repeatable — it won't duplicate your data.) |
+| I pasted the wrong anon key | Disconnect, then Connect again with the correct details. (The setup is repeatable — it won't duplicate your data.) |
+| "Invalid claim code" at the last step | The setup script wasn't run for THIS attempt. Tap Continue again — the app shows the script once more — paste and run it in the SQL Editor, then finish. |
+| Adding a second phone | On the first phone: Settings → Cloud sync → **Invite a device** (PIN-gated). It shows a one-time code, valid 24 hours. On the second phone: Connect → **Join with invite code**, paste the URL + anon key, enter the code, and create that phone's OWN account. The owner's password is never shared. |
 | Free project paused (after ~1 week idle) | Open your project in the Supabase dashboard once; it wakes up and sync resumes. |
 | A weighed item shows the wrong weight | Re-check the scale's barcode format matches your locale's scale (Settings → the store's locale drives the barcode parser). You can always edit the weight before adding it to the order. |
 | Printed labels don't scan | Make sure you printed at 100% scale (no "fit to page"). Regenerate and print again; the barcodes are standard UPC-A/Code 39 and scan with any scanner. |

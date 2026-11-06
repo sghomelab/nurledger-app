@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -16,7 +16,9 @@ import { getCloudAdapter } from '../src/hooks/useSync';
 import { useT } from '../src/hooks/useT';
 import { getOutlet } from '../src/repositories/outletRepository';
 import { saveCloudConfig } from '../src/repositories/cloudConfigRepository';
-import { CLOUD_SCHEMA_SQL, CLOUD_SCHEMA_VERSION } from '../src/lib/cloud/schemaSql';
+import { CLOUD_SCHEMA_VERSION, schemaSqlWithClaim } from '../src/lib/cloud/schemaSql';
+import { sha256Hex } from '../src/lib/sha256';
+import { uuidv4 } from '../src/lib/ids';
 import { isSecureBackendUrl } from '../src/lib/cloud/url';
 import type { CloudConfig } from '../src/lib/cloud/types';
 import { taxEngineLabel } from '../src/lib/currency';
@@ -28,7 +30,9 @@ import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens'
  * The store brings its own (free) Supabase project. The app is a pure client —
  * there is no Nurledger-operated backend and the creator never sees store data.
  *
- *  1. **Connection** — paste the project URL + anon key + service_role key.
+ *  1. **Connection** — paste the project URL + anon key (NEVER the service_role
+ *     key: since schema v7 the app neither asks for nor stores it). Pick "New
+ *     store" or "Join with invite code".
  *     "Check" verifies reachability (auth health endpoint) and the DEPLOYED
  *     SCHEMA VERSION (`cloud_schema_meta`, max version):
  *      - not deployed → "deploy" SQL step;
@@ -65,7 +69,12 @@ export default function CloudSetupScreen() {
   const [step, setStep] = useState<Step>('creds');
   const [url, setUrl] = useState('');
   const [anonKey, setAnonKey] = useState('');
-  const [serviceKey, setServiceKey] = useState('');
+  /** New store (claim code baked into the SQL) or join an existing one (invite code). */
+  const [mode, setMode] = useState<'create' | 'join'>('create');
+  const [invite, setInvite] = useState('');
+  /** One-time claim code for THIS wizard run. Memory only — never persisted. */
+  const claim = useMemo(() => uuidv4().replace(/-/g, '').slice(0, 16).toUpperCase(), []);
+  const claimSql = useMemo(() => schemaSqlWithClaim(sha256Hex(claim)), [claim]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -80,23 +89,26 @@ export default function CloudSetupScreen() {
     (): CloudConfig => ({
       url: url.trim().replace(/\/+$/, ''),
       anonKey: anonKey.trim(),
-      serviceKey: serviceKey.trim(),
       outletId: '', // unused by wizard calls; sync uses the local outlet id
       ownerEmail: email.trim() || undefined,
     }),
-    [url, anonKey, serviceKey, email],
+    [url, anonKey, email],
   );
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e));
 
   /** Step 1 → 2/3: reachable? what schema version is deployed? */
   const checkConnection = useCallback(async () => {
-    if (!url.trim() || !anonKey.trim() || !serviceKey.trim()) {
+    if (!url.trim() || !anonKey.trim()) {
       setError(t('cloudsetup.err.missingKeys'));
       return;
     }
     if (!isSecureBackendUrl(url)) {
       setError(t('cloudsetup.err.insecureUrl'));
+      return;
+    }
+    if (mode === 'join' && !invite.trim()) {
+      setError(t('cloudsetup.err.inviteRequired'));
       return;
     }
     setBusy(true);
@@ -105,6 +117,16 @@ export default function CloudSetupScreen() {
     try {
       await adapter.ping(cfg());
       const v = await adapter.schemaVersion(cfg());
+      if (mode === 'join') {
+        // Joining never runs SQL: the owner's project must already be on v7+.
+        if (v === null || v < CLOUD_SCHEMA_VERSION) {
+          setError(t('cloudsetup.err.joinNeedsUpgrade'));
+        } else {
+          setNote(t('cloudsetup.note.deployed'));
+          setStep('account');
+        }
+        return;
+      }
       if (v === null) {
         setUpgrading(false);
         setNote(t('cloudsetup.note.noSchema'));
@@ -123,7 +145,7 @@ export default function CloudSetupScreen() {
     } finally {
       setBusy(false);
     }
-  }, [adapter, cfg, t]);
+  }, [adapter, cfg, mode, invite, url, anonKey, t]);
 
   /** Step 2 → 3: re-check the schema after the owner ran the SQL. */
   const checkSchema = useCallback(async () => {
@@ -191,17 +213,20 @@ export default function CloudSetupScreen() {
     try {
       const outlet = await getOutlet();
       if (!outlet) throw new Error(t('cloudsetup.err.noOutlet'));
-      const tenantId = await adapter.provisionStore(cfg(), {
-        id: outlet.id,
-        name: outlet.name,
-        currency: outlet.currency,
-        locale: outlet.locale,
-        taxEngine: outlet.taxEngine,
-      });
+      const tenantId = await adapter.provisionStore(
+        cfg(),
+        {
+          id: outlet.id,
+          name: outlet.name,
+          currency: outlet.currency,
+          locale: outlet.locale,
+          taxEngine: outlet.taxEngine,
+        },
+        mode === 'join' ? { invite: invite.trim() } : { claim },
+      );
       await saveCloudConfig({
         url: cfg().url,
         anonKey: cfg().anonKey,
-        serviceKey: cfg().serviceKey,
         ownerEmail: email.trim(),
         outletId: tenantId,
       });
@@ -214,11 +239,19 @@ export default function CloudSetupScreen() {
         [{ text: 'OK', onPress: () => router.back() }],
       );
     } catch (e) {
-      fail(e);
+      const msg = e instanceof Error ? e.message : String(e);
+      if (mode === 'create' && /claim code/i.test(msg)) {
+        // The project is deployed but THIS wizard run's claim was never
+        // registered (e.g. the SQL step was skipped): show the SQL again.
+        setNote(t('cloudsetup.note.claimRetry'));
+        setStep('sql');
+      } else {
+        fail(e);
+      }
     } finally {
       setBusy(false);
     }
-  }, [adapter, cfg, email, router, t]);
+  }, [adapter, cfg, email, router, t, mode, invite, claim]);
 
   const outlet = useOutletLite();
 
@@ -302,19 +335,34 @@ export default function CloudSetupScreen() {
                 numberOfLines={2}
               />
             </Field>
-            <Field label={t('cloudsetup.serviceKey')}>
-              <TextInput
-                style={styles.inputMono}
-                value={serviceKey}
-                onChangeText={setServiceKey}
-                placeholder="eyJhbGciOi…"
-                autoCapitalize="none"
-                autoCorrect={false}
-                multiline
-                numberOfLines={2}
-              />
-              <Text style={styles.keyNote}>{t('cloudsetup.keyNote')}</Text>
-            </Field>
+            <View style={styles.modeRow}>
+              {(['create', 'join'] as const).map((m) => (
+                <Pressable
+                  key={m}
+                  style={[styles.modeBtn, mode === m && styles.modeBtnActive]}
+                  onPress={() => setMode(m)}
+                >
+                  <Text style={[styles.modeText, mode === m && styles.modeTextActive]}>
+                    {m === 'create' ? t('cloudsetup.mode.create') : t('cloudsetup.mode.join')}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+            <Text style={styles.hint}>
+              {mode === 'create' ? t('cloudsetup.mode.createHint') : t('cloudsetup.mode.joinHint')}
+            </Text>
+            {mode === 'join' && (
+              <Field label={t('cloudsetup.inviteCode')}>
+                <TextInput
+                  style={styles.inputMono}
+                  value={invite}
+                  onChangeText={setInvite}
+                  placeholder="XXXX-XXXX-XXXX-XXXX"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+              </Field>
+            )}
             <Field label={t('cloudsetup.ownerEmail')}>
               <TextInput
                 style={styles.input}
@@ -351,13 +399,13 @@ export default function CloudSetupScreen() {
             <Text style={styles.hint}>{t('cloudsetup.sqlSteps')}</Text>
             <View style={styles.sqlBox}>
               <ScrollView nestedScrollEnabled horizontal style={styles.sqlScroll}>
-                <Text style={styles.sqlText}>{CLOUD_SCHEMA_SQL}</Text>
+                <Text style={styles.sqlText}>{claimSql}</Text>
               </ScrollView>
             </View>
             <Pressable
               style={[styles.copyBtn, busy && { opacity: 0.6 }]}
               onPress={async () => {
-                await Clipboard.setStringAsync(CLOUD_SCHEMA_SQL);
+                await Clipboard.setStringAsync(claimSql);
                 Alert.alert(t('cloudsetup.copied'), t('cloudsetup.copiedMsg'));
               }}
             >
@@ -456,6 +504,18 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 const styles = StyleSheet.create({
+  modeRow: { flexDirection: 'row', gap: spacing.sm },
+  modeBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: radius.control,
+    borderWidth: 1,
+    borderColor: colors.slate200,
+    alignItems: 'center',
+  },
+  modeBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  modeText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.slate700 },
+  modeTextActive: { color: colors.white },
   content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 16 },
   steps: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.xs },
   step: { alignItems: 'center', gap: 4, width: 72 },
@@ -515,7 +575,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.slate900,
   },
-  keyNote: { fontFamily: fonts.sans, fontSize: 11, color: colors.slate400, marginTop: 4 },
   sqlBox: {
     backgroundColor: colors.slate900,
     borderRadius: radius.control,

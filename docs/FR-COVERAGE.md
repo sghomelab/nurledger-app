@@ -158,7 +158,7 @@ counted cash), register re-locks (FR-200), closed shift persists with its Z-repo
 
 **BYO cloud (ADR-010, DEV-006):** each store provisions its own free Supabase
 project — the app ships the SQL bundle as data, and the creator is never a data
-custodian. Wizard: URL + anon + service keys → paste-SQL step (copy bundle →
+custodian. Wizard (v7: no service key; new store = claim code, extra device = invite code): URL + anon key → paste-SQL step (copy bundle →
 Supabase SQL Editor → `schemaDeployed` verify) → owner sign-up (or sign-in if
 already registered) → create-or-join store. Cashiers stay local-PIN (no cloud
 accounts). Sync is **OFF by default**; disconnect is lossless — the outbox and

@@ -3,10 +3,11 @@
  * `cloud.*` settings + the Supabase SDK session KV.
  *
  * BYO model: every value here belongs to the STORE's own project (its URL, its
- * anon key, its service_role key, its owner email). The app never talks to a
- * creator-operated backend. The service key is device-local only — it is used
- * for the one-time schema-deployed check (the app cannot run DDL in the store's
- * project; the owner pastes the SQL bundle, the app verifies).
+ * anon key, the signed-in user's email). The app never talks to a
+ * creator-operated backend and — since schema v7 — never asks for, stores or
+ * uses the project's `service_role` key (provisioning/joining go through
+ * SECURITY DEFINER functions guarded by claim / invite codes). A key stored by
+ * an OLDER build is deleted from the device on first read (`scrubLegacyServiceKey`).
  *
  * Sync is OFF by default: `cloud.sync_enabled` missing or '0' = off. Off = the
  * engine is idle; the outbox keeps queueing and nothing is dropped.
@@ -19,7 +20,8 @@ import type { KeyValueStorage } from '../lib/cloud/supabaseAdapter';
 const K = {
   url: 'cloud.url',
   anonKey: 'cloud.anon_key',
-  serviceKey: 'cloud.service_key',
+  /** LEGACY (pre-v7 builds stored the service_role key here). Only ever deleted. */
+  legacyServiceKey: 'cloud.service_key',
   ownerEmail: 'cloud.owner_email',
   /** The TENANT outlet id (cloud row). May differ from the local outlet id
    *  when this device joined an existing store (multi-device, ADR-007). */
@@ -49,16 +51,26 @@ async function deleteSetting(key: string): Promise<void> {
   await db.runAsync('DELETE FROM settings WHERE key = ?', [key]);
 }
 
+/**
+ * Delete a `service_role` key persisted by a pre-v7 build. Cheap (one DELETE),
+ * idempotent, and run on every config read so no code path can leave it behind.
+ * The key itself stays valid server-side: the owner should ROTATE it in the
+ * Supabase dashboard (Settings → API) — the app cannot do that for them.
+ */
+export async function scrubLegacyServiceKey(): Promise<void> {
+  await deleteSetting(K.legacyServiceKey);
+}
+
 /** The stored BYO connection, or null when not connected. */
 export async function getCloudConfig(): Promise<CloudConfig | null> {
-  const [url, anonKey, serviceKey, ownerEmail, tenantOutletId] = await Promise.all([
+  await scrubLegacyServiceKey();
+  const [url, anonKey, ownerEmail, tenantOutletId] = await Promise.all([
     getSetting(K.url),
     getSetting(K.anonKey),
-    getSetting(K.serviceKey),
     getSetting(K.ownerEmail),
     getSetting(K.outletId),
   ]);
-  if (!url || !anonKey || !serviceKey) return null;
+  if (!url || !anonKey) return null;
 
   const db = await getDb();
   const outlet = await db.getFirstAsync<{ id: string }>('SELECT id FROM outlet LIMIT 1');
@@ -67,7 +79,6 @@ export async function getCloudConfig(): Promise<CloudConfig | null> {
   return {
     url,
     anonKey,
-    serviceKey,
     // The cloud TENANT id — the local id when this device created the store,
     // the joined store's id otherwise. Fall back to the local id for
     // connections saved before the field existed.
@@ -80,14 +91,13 @@ export async function getCloudConfig(): Promise<CloudConfig | null> {
 export async function saveCloudConfig(cfg: {
   url: string;
   anonKey: string;
-  serviceKey: string;
   ownerEmail?: string;
   /** The tenant outlet id returned by provisionStore (create-or-join). */
   outletId?: string;
 }): Promise<void> {
   await setSetting(K.url, cfg.url.trim());
   await setSetting(K.anonKey, cfg.anonKey.trim());
-  await setSetting(K.serviceKey, cfg.serviceKey.trim());
+  await deleteSetting(K.legacyServiceKey); // never persisted by this build
   if (cfg.ownerEmail) await setSetting(K.ownerEmail, cfg.ownerEmail.trim());
   if (cfg.outletId) await setSetting(K.outletId, cfg.outletId.trim());
 }
@@ -100,7 +110,7 @@ export async function saveCloudConfig(cfg: {
 export async function disconnectCloud(): Promise<void> {
   await deleteSetting(K.url);
   await deleteSetting(K.anonKey);
-  await deleteSetting(K.serviceKey);
+  await deleteSetting(K.legacyServiceKey);
   await deleteSetting(K.ownerEmail);
   await deleteSetting(K.outletId);
   await deleteSetting(K.syncEnabled);

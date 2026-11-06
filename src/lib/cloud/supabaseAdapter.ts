@@ -57,17 +57,6 @@ function clientFor(cfg: CloudConfig, storage: KeyValueStorage): SupabaseClient {
   return c;
 }
 
-/** Service-role client (schema check only — never used for data). */
-function serviceClientFor(cfg: CloudConfig): SupabaseClient {
-  const key = `svc::${cfg.url}::${cfg.serviceKey}`;
-  let c = clients.get(key);
-  if (!c) {
-    c = createClient(cfg.url, cfg.serviceKey, { auth: { autoRefreshToken: false, persistSession: false } });
-    clients.set(key, c);
-  }
-  return c;
-}
-
 function isoSince(ms: number): string {
   return (ms > 0 ? new Date(ms) : new Date(0)).toISOString();
 }
@@ -202,6 +191,19 @@ async function pullAllKeysetPages<T>(
 export const __pullAllPagesForTest = pullAllPages;
 export const __pullAllKeysetPagesForTest = pullAllKeysetPages;
 
+/** PostgREST / Postgres: the RPC (function) does not exist (pre-v7 project). */
+export function isFunctionMissingError(e: { code?: string; message?: string } | null | undefined): boolean {
+  if (!e) return false;
+  if (e.code === 'PGRST202' || e.code === '42883') return true;
+  return /could not find the function|function .* does not exist/i.test(e.message ?? '');
+}
+
+/** `ABCD1234EF567890` → `ABCD-1234-EF56-7890` (display only; the server ignores dashes/case). */
+export function formatInviteCode(raw: string): string {
+  const c = raw.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  return c.replace(/(.{4})(?=.)/g, '$1-');
+}
+
 export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
   return {
     async ping(cfg) {
@@ -218,24 +220,21 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
     },
 
     async schemaVersion(cfg) {
-      const c = serviceClientFor(cfg);
-      const { data, error } = await c
-        .from('cloud_schema_meta')
-        .select('version')
-        .order('version', { ascending: false })
-        .limit(1);
+      // The anon-callable nurledger_schema_version() (v7+). Pre-v7 projects have
+      // no such function → "not deployed / needs the current SQL" → null.
+      const c = clientFor(cfg, storage);
+      const { data, error } = await c.rpc('nurledger_schema_version');
       if (error) {
-        // ONLY "the table does not exist" means a fresh project (schema not
-        // deployed yet) → null, which the wizard renders as "run the SQL step".
-        // Every other error (bad service key, network, RLS, PostgREST misconfig)
-        // must surface with its REAL text — returning null for those made the
-        // wizard say "schema not deployed" on a plain auth failure.
-        if (isTableMissingError(error)) return null;
+        // ONLY "the table / function does not exist" means a fresh or pre-v7
+        // project → null, which the wizard renders as "run the SQL step". Every
+        // other error (bad anon key, network, PostgREST misconfig) surfaces with
+        // its REAL text — returning null for those made the wizard say "schema
+        // not deployed" on a plain auth failure.
+        if (isTableMissingError(error) || isFunctionMissingError(error)) return null;
         throw new Error(`Schema check failed: ${error.message}`);
       }
-      const row = Array.isArray(data) ? data[0] : undefined;
-      const v = row ? Number((row as { version: unknown }).version) : NaN;
-      return Number.isFinite(v) ? v : null;
+      const v = Number(data);
+      return data != null && Number.isFinite(v) ? v : null;
     },
 
     async signUp(cfg, email, password) {
@@ -258,49 +257,36 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
       await c.auth.signOut();
     },
 
-    async provisionStore(cfg, outlet) {
-      // The owner account step must have signed this device in first.
+    async provisionStore(cfg, outlet, auth) {
+      // The account step must have signed this device in first.
       const c = clientFor(cfg, storage);
       const { data: userData, error: userErr } = await c.auth.getUser();
       if (userErr || !userData.user) {
-        throw new Error('Not signed in — create the owner account first');
+        throw new Error('Not signed in — create your account first');
       }
-      const svc = serviceClientFor(cfg);
-      // A BYO project is a single-tenant outlet (ADR-007). If another device
-      // already created the outlet, this device JOINS it: the cloud row is
-      // left untouched and the owner simply becomes a member of it. (The
-      // device's LOCAL outlet keeps its own id — sync maps local rows to the
-      // tenant id in the payload, and pulled rows back to the local id.)
-      const { data: existing, error: existingErr } = await svc
-        .from('outlet')
-        .select('id')
-        .limit(1)
-        .maybeSingle();
-      if (existingErr) throw new Error(`Read existing outlet: ${existingErr.message}`);
-      const tenantId = existing?.id ?? outlet.id;
-      if (!(existing && existing.id !== outlet.id)) {
-        const { error: outletErr } = await svc
-          .from('outlet')
-          .upsert(
-            {
-              id: outlet.id,
-              name: outlet.name,
-              currency: outlet.currency,
-              locale: outlet.locale,
-              tax_engine: outlet.taxEngine,
-            },
-            { onConflict: 'id' },
-          );
-        if (outletErr) throw new Error(`Create outlet: ${outletErr.message}`);
-      }
-      const { error: memberErr } = await svc
-        .from('org_member')
-        .upsert(
-          { org_id: tenantId, user_id: userData.user.id, role: 'owner' },
-          { onConflict: 'org_id,user_id' },
-        );
-      if (memberErr) throw new Error(`Register owner: ${memberErr.message}`);
-      return tenantId;
+      const { data, error } = await c.rpc('provision_store', {
+        p: {
+          outlet: {
+            id: outlet.id,
+            name: outlet.name,
+            currency: outlet.currency,
+            locale: outlet.locale,
+            tax_engine: outlet.taxEngine,
+          },
+          claim: auth.claim ?? null,
+          invite: auth.invite ?? null,
+        },
+      });
+      if (error) throw new Error(withUpgradeHint('provision_store', error.message));
+      if (typeof data !== 'string' || !data) throw new Error('provision_store returned no outlet id');
+      return data;
+    },
+
+    async createInvite(cfg, hours = 24) {
+      const c = clientFor(cfg, storage);
+      const { data, error } = await c.rpc('create_invite', { p_hours: hours });
+      if (error) throw new Error(withUpgradeHint('create_invite', error.message));
+      return formatInviteCode(String(data));
     },
 
     async pushOps(cfg, ops) {

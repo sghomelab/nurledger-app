@@ -8,9 +8,10 @@
  * changes.
  *
  * BYO model: the store's own backend. `anonKey` is safe to embed (RLS protects
- * data); `serviceKey` is used ONLY for the one-time schema-deployed check and
- * is stored in the device's local DB (the user's own key, on the user's own
- * device, talking to the user's own project — it never leaves the device).
+ * data). The app never asks for, stores or uses the `service_role` key (v7):
+ * schema checks, store provisioning and device joining go through narrow
+ * SECURITY DEFINER functions guarded by a one-time claim code (first device)
+ * or a single-use invite code (additional devices).
  */
 
 import type { SyncEntity } from '../sync';
@@ -21,8 +22,6 @@ export interface CloudConfig {
   url: string;
   /** anon/public key (safe to ship). */
   anonKey: string;
-  /** service_role key (sensitive; device-local only). */
-  serviceKey: string;
   /** The outlet this device syncs as (local outlet id, shared across devices). */
   outletId: string;
   /** Owner's auth email (for sign-in on other devices). */
@@ -209,9 +208,10 @@ export interface CloudAdapter {
   /** Reachability + auth sanity. Throws on hard failure. */
   ping(cfg: CloudConfig): Promise<boolean>;
   /**
-   * The version of the BYO schema bundle deployed in this project (checked
-   * with the service key against `cloud_schema_meta`: the max version row),
-   * or null if the schema is not deployed at all. Drives the setup wizard:
+   * The version of the BYO schema bundle deployed in this project (the
+   * `nurledger_schema_version()` function — callable with the anon key; a
+   * pre-v7 project has no such function and reads as null, i.e. "paste the
+   * current SQL"), or null if the schema is not deployed at all. Drives the setup wizard:
    * null → "deploy" step, version < CLOUD_SCHEMA_VERSION → "upgrade" step
    * (existing stores must re-paste the newer bundle — idempotent, never
    * touches data), otherwise → straight to the account step.
@@ -226,20 +226,28 @@ export interface CloudAdapter {
   signIn(cfg: CloudConfig, email: string, password: string): Promise<void>;
   signOut(cfg: CloudConfig): Promise<void>;
   /**
-   * One-time BYO provisioning (wizard final step): upsert this store's outlet
-   * row and register the CURRENTLY SIGNED-IN owner as an org_member. Runs on
-   * the service-role key because membership RLS does not yet apply.
+   * One-time BYO provisioning (wizard final step) via the `provision_store`
+   * SECURITY DEFINER function — no service key.
    *
-   * **Create-or-join** (multi-device, ADR-007 single-tenant outlet): if the
-   * project already holds an outlet row created by ANOTHER device, this device
-   * joins that tenant — the existing row is left untouched and the owner is
-   * added as a member of it.
+   * - **create** (`auth.claim`): the first device of a brand-new store. Needs
+   *   the claim code the wizard baked into the SQL the owner pasted.
+   * - **join** (`auth.invite`): an additional device. Needs a single-use,
+   *   expiring invite code created by the owner on a connected device.
+   * - An already-registered member calling again is a no-op.
    *
    * Returns the TENANT outlet id (the cloud row's id — may differ from this
-   * device's local outlet id when joining). Idempotent — re-running the
-   * wizard on the same store is a no-op.
+   * device's local outlet id when joining).
    */
-  provisionStore(cfg: CloudConfig, outlet: { id: string; name: string; currency: string; locale: string; taxEngine: string }): Promise<string>;
+  provisionStore(
+    cfg: CloudConfig,
+    outlet: { id: string; name: string; currency: string; locale: string; taxEngine: string },
+    auth: { claim?: string; invite?: string },
+  ): Promise<string>;
+  /**
+   * Owner only: mint a single-use join code (default 24 h) for one more
+   * device/person. The code is shown once; the server stores only its hash.
+   */
+  createInvite(cfg: CloudConfig, hours?: number): Promise<string>;
   /**
    * Idempotently push ops (FIFO order preserved by the caller). Returns one
    * result per op, in order. A thrown error = transport/server failure for the

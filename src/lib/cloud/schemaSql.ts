@@ -20,6 +20,15 @@
  * Timestamps in RPC payloads are EPOCH MILLISECONDS (JSON numbers/strings),
  * converted with `to_timestamp(x/1000.0)`.
  *
+ * **v7 — no service key on devices; invite codes.** The app no longer asks for,
+ * stores or uses the `service_role` key. Provisioning and joining go through
+ * SECURITY DEFINER functions: `provision_store` (first call: needs the one-time
+ * CLAIM code the wizard bakes into the SQL it shows the owner; later devices:
+ * need a single-use, expiring INVITE code), `create_invite` (owner only) and
+ * `nurledger_schema_version` (the wizard's schema check). Each device signs up
+ * its OWN account — the owner's password is never shared. Codes are stored
+ * hashed (SHA-256) in tables no client role can read.
+ *
  * **v6 — second review pass (all verified on a real Postgres engine):** (1) a
  * DIRECT v3→v5 upgrade aborted (`column "synced_at" does not exist`) because
  * five `CREATE INDEX … (outlet_id, synced_at)` sat inside the table sections,
@@ -55,7 +64,7 @@
  * time fell behind peers' already-advanced cursors — silent data loss.
  */
 
-export const CLOUD_SCHEMA_VERSION = 6;
+export const CLOUD_SCHEMA_VERSION = 7;
 
 export const CLOUD_SCHEMA_SQL = `
 -- =============================================================
@@ -576,6 +585,120 @@ BEGIN
 END; $$;
 
 -- =============================================================
+-- v7: service-key-free provisioning + invite codes
+-- =============================================================
+-- First-store claim (one row, hash only) and per-device invites (hash only).
+-- RLS on, NO policies, all client privileges revoked below: only the
+-- SECURITY DEFINER functions in this section can touch them.
+CREATE TABLE IF NOT EXISTS public.store_claim (
+  id int PRIMARY KEY DEFAULT 1 CHECK (id = 1),
+  code_hash bytea NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.store_invite (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  outlet_id text NOT NULL,
+  code_hash bytea NOT NULL UNIQUE,
+  created_by uuid,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL,
+  used_at timestamptz,
+  used_by uuid
+);
+ALTER TABLE public.store_claim ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.store_invite ENABLE ROW LEVEL SECURITY;
+
+-- Normalized code hash: case/dash/space-insensitive so "ab12-cd34" == "AB12CD34".
+CREATE OR REPLACE FUNCTION public.nurledger_hash_code(p_code text) RETURNS bytea
+LANGUAGE sql IMMUTABLE SET search_path = public, pg_temp AS $$
+  SELECT sha256(convert_to(upper(regexp_replace(coalesce(p_code, ''), '[^A-Za-z0-9]', '', 'g')), 'UTF8'));
+$$;
+
+-- The wizard's schema check (replaces the service-key read of cloud_schema_meta).
+-- Returns only a version number — nothing sensitive — so anon may call it.
+CREATE OR REPLACE FUNCTION public.nurledger_schema_version() RETURNS int
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $$
+  SELECT max(version) FROM public.cloud_schema_meta;
+$$;
+
+-- Run ONLY from the SQL editor (the wizard appends the call with the owner's
+-- one-time claim hash). Not granted to any client role.
+CREATE OR REPLACE FUNCTION public.nurledger_set_claim(p_hash text) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.outlet) THEN RETURN; END IF;   -- already claimed
+  INSERT INTO public.store_claim (id, code_hash) VALUES (1, decode(p_hash, 'hex'))
+  ON CONFLICT (id) DO UPDATE SET code_hash = excluded.code_hash, created_at = now();
+END; $$;
+
+-- Create the store (first call, needs the claim code) or join it (needs an
+-- invite code). Idempotent for existing members. Returns the tenant outlet id.
+CREATE OR REPLACE FUNCTION public.provision_store(p jsonb) RETURNS text
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_uid    uuid := auth.uid();
+  v_outlet text;
+  v_inv    uuid;
+  v_o      jsonb := p->'outlet';
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'not authenticated'; END IF;
+  SELECT o.id INTO v_outlet FROM public.outlet o ORDER BY o.created_at, o.id LIMIT 1;
+
+  IF v_outlet IS NOT NULL THEN
+    IF public.is_member(v_outlet) THEN RETURN v_outlet; END IF;
+    IF coalesce(p->>'invite', '') = '' THEN
+      RAISE EXCEPTION 'This store already exists - an invite code from the owner is required to join';
+    END IF;
+    SELECT i.id INTO v_inv FROM public.store_invite i
+     WHERE i.code_hash = public.nurledger_hash_code(p->>'invite')
+       AND i.outlet_id = v_outlet AND i.used_at IS NULL AND i.expires_at > now()
+     FOR UPDATE;
+    IF v_inv IS NULL THEN RAISE EXCEPTION 'Invalid or expired invite code'; END IF;
+    UPDATE public.store_invite SET used_at = now(), used_by = v_uid WHERE id = v_inv;
+    INSERT INTO public.org_member (org_id, user_id, role) VALUES (v_outlet, v_uid, 'member')
+    ON CONFLICT DO NOTHING;
+    RETURN v_outlet;
+  END IF;
+
+  -- No store yet: the first provisioning must present the claim code that was
+  -- baked into the SQL the owner pasted (an attacker with only the project URL
+  -- and the public anon key cannot claim an empty store).
+  IF coalesce(p->>'claim', '') = ''
+     OR NOT EXISTS (SELECT 1 FROM public.store_claim c WHERE c.code_hash = public.nurledger_hash_code(p->>'claim')) THEN
+    RAISE EXCEPTION 'Invalid claim code - re-run the setup wizard and paste the SQL it generates';
+  END IF;
+  IF v_o IS NULL OR coalesce(v_o->>'id', '') = '' THEN RAISE EXCEPTION 'outlet details required'; END IF;
+  INSERT INTO public.outlet (id, name, currency, locale, tax_engine)
+  VALUES (v_o->>'id', v_o->>'name', v_o->>'currency', v_o->>'locale', v_o->>'tax_engine');
+  INSERT INTO public.org_member (org_id, user_id, role) VALUES (v_o->>'id', v_uid, 'owner');
+  DELETE FROM public.store_claim;
+  RETURN v_o->>'id';
+END; $$;
+
+-- Owner-only: a single-use, expiring (default 24 h, max 7 days) join code for
+-- ONE more device/person. Returned once; only its hash is stored.
+CREATE OR REPLACE FUNCTION public.create_invite(p_hours int DEFAULT 24) RETURNS text
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_uid    uuid := auth.uid();
+  v_outlet text;
+  v_code   text;
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'not authenticated'; END IF;
+  SELECT m.org_id INTO v_outlet FROM public.org_member m
+   WHERE m.user_id = v_uid AND m.role = 'owner' ORDER BY m.org_id LIMIT 1;
+  IF v_outlet IS NULL THEN RAISE EXCEPTION 'only the store owner can create invite codes'; END IF;
+  DELETE FROM public.store_invite WHERE expires_at < now() - interval '7 days';
+  -- 16 hex chars = 64 random bits (first 8 hex chars of a v4 uuid are fully random).
+  v_code := upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 8)
+                  || substr(replace(gen_random_uuid()::text, '-', ''), 1, 8));
+  INSERT INTO public.store_invite (outlet_id, code_hash, created_by, expires_at)
+  VALUES (v_outlet, public.nurledger_hash_code(v_code), v_uid,
+          now() + make_interval(hours => least(greatest(coalesce(p_hours, 24), 1), 168)));
+  RETURN v_code;
+END; $$;
+
+-- =============================================================
 -- RLS (FR-506): members see their outlet's rows; writes ONLY via RPCs
 -- =============================================================
 ALTER TABLE public.outlet ENABLE ROW LEVEL SECURITY;
@@ -662,6 +785,28 @@ GRANT EXECUTE ON FUNCTION public.is_member(text), public.apply_sale(jsonb), publ
   public.apply_refund(jsonb), public.apply_product(jsonb), public.apply_category(jsonb)
   TO authenticated, service_role;
 
+-- v7 objects: tables hold only code hashes — no client role may read them.
+REVOKE ALL ON public.store_claim, public.store_invite FROM anon, authenticated, PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.nurledger_hash_code(text), public.nurledger_schema_version(),
+  public.nurledger_set_claim(text), public.provision_store(jsonb), public.create_invite(int)
+  FROM anon, authenticated, PUBLIC;
+GRANT EXECUTE ON FUNCTION public.nurledger_schema_version() TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.provision_store(jsonb), public.create_invite(int) TO authenticated, service_role;
+
 -- Mark this bundle applied LAST so a failed run never records the new version.
 INSERT INTO public.cloud_schema_meta (version) VALUES (${CLOUD_SCHEMA_VERSION}) ON CONFLICT DO NOTHING;
 `;
+
+/** SHA-256 hex must be exactly 64 lowercase hex chars (it is spliced into SQL). */
+const HEX64 = /^[0-9a-f]{64}$/;
+
+/**
+ * The bundle plus the owner's one-time CLAIM registration. The wizard shows
+ * this (not the bare bundle) when it is creating a NEW store, so only whoever
+ * holds the claim code can create the store (see provision_store). On an
+ * already-claimed project the extra call is a no-op, so re-pasting is safe.
+ */
+export function schemaSqlWithClaim(claimHashHex: string): string {
+  if (!HEX64.test(claimHashHex)) throw new Error('claim hash must be 64 hex chars');
+  return `${CLOUD_SCHEMA_SQL}\n-- One-time claim for THIS wizard run (only you hold the code).\nSELECT public.nurledger_set_claim('${claimHashHex}');\n`;
+}
