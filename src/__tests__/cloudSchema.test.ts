@@ -79,4 +79,18 @@ describe('cloud schema bundle (v7 — synced_at cursor + security + provisioning
       expect(updatedAssignments).toEqual(updatedAssignments.map(() => 'in_updated'));
     }
   });
+
+  it('every UPDATE / DELETE in the bundle has a WHERE (Supabase preloads pg safeupdate for PostgREST roles)', () => {
+    // PGlite and a postgres-role psql session do NOT run safeupdate, so the
+    // real-Postgres suite cannot see this: a bare `DELETE FROM t;` inside an
+    // RPC passed 25/25 and then failed on every real project ("DELETE requires
+    // a WHERE clause"). Static guard instead. `ON CONFLICT … DO UPDATE SET` (an
+    // upsert) and `FOR UPDATE` (a row lock) are not UPDATE statements.
+    const sql = CLOUD_SCHEMA_SQL.replace(/--[^\n]*/g, '');
+    const bad: string[] = [];
+    for (const m of sql.matchAll(/(?<!DO\s)(?<!FOR\s)\b(DELETE\s+FROM|UPDATE)\b[^;]*;/gi)) {
+      if (!/\bWHERE\b/i.test(m[0])) bad.push(m[0].replace(/\s+/g, ' ').slice(0, 80));
+    }
+    expect(bad).toEqual([]);
+  });
 });

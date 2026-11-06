@@ -77,13 +77,13 @@ describe('adapter.schemaVersion — error classification (wizard UX)', () => {
     const a = adapterFor({
       error: {
         code: 'PGRST301',
-        message: 'Invalid JWT token. Expected 12, got 5 parts.',
+        message: 'No suitable key or wrong key type',
         details: null,
         hint: null,
       },
     });
     await expect(a.schemaVersion(cfgFor())).rejects.toThrow(
-      'Schema check failed: Invalid JWT token. Expected 12, got 5 parts.',
+      'Schema check failed: No suitable key or wrong key type',
     );
   });
 

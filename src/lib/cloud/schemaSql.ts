@@ -671,7 +671,7 @@ BEGIN
   INSERT INTO public.outlet (id, name, currency, locale, tax_engine)
   VALUES (v_o->>'id', v_o->>'name', v_o->>'currency', v_o->>'locale', v_o->>'tax_engine');
   INSERT INTO public.org_member (org_id, user_id, role) VALUES (v_o->>'id', v_uid, 'owner');
-  DELETE FROM public.store_claim;
+  DELETE FROM public.store_claim WHERE id = 1;   -- WHERE is mandatory: Supabase preloads safeupdate for PostgREST roles
   RETURN v_o->>'id';
 END; $$;
 
