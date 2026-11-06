@@ -24,6 +24,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { isSeeded, runSeed, ensureOutlet, ensureDefaultUsers } from './seed';
 import { ensureDeviceId } from './database';
+import { clearSecureSession } from '../repositories/cloudConfigRepository';
 
 export type FirstRunMode = 'sample' | 'empty';
 
@@ -99,6 +100,15 @@ export async function resetAllData(db: SQLiteDatabase): Promise<void> {
     });
   } finally {
     await db.runAsync('PRAGMA foreign_keys = ON;');
+  }
+
+  // The Supabase session lives in the platform keystore, outside the tables
+  // wiped above — a factory reset must remove it too (best effort: a keystore
+  // hiccup must not leave the app half-reset).
+  try {
+    await clearSecureSession();
+  } catch (e) {
+    console.warn('[reset] could not clear the stored session', e);
   }
 
   await ensureOutlet(db);

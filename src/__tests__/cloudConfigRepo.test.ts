@@ -12,7 +12,10 @@ let mockDB: any;
 jest.mock('../db/database', () => ({ getDb: async () => mockDB, ensureDeviceId: async () => {} }));
 import { SCHEMA_SQL } from '../db/schema';
 import { ensureOutlet, ensureDefaultUsers } from '../db/seed';
-import { getCloudConfig, saveCloudConfig, disconnectCloud } from '../repositories/cloudConfigRepository';
+import { getCloudConfig, saveCloudConfig, disconnectCloud, sdkStorage } from '../repositories/cloudConfigRepository';
+import { resetAllData } from '../db/firstRun';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const secureMock = require('expo-secure-store');
 import { uuidv4 } from '../lib/ids';
 
 let raw: any;
@@ -42,6 +45,7 @@ const sum = (rows: any[], k: string) => rows.reduce((a, r) => a + r[k], 0);
 
 const d = DatabaseSync ? describe : describe.skip;
 beforeEach(async () => {
+  secureMock.__reset();
   if (!DatabaseSync) return; mockDB = mk(); await ensureOutlet(mockDB); await ensureDefaultUsers(mockDB); raw.exec("INSERT OR REPLACE INTO settings (key,value) VALUES ('seeded_v1','1')"); });
 
 
@@ -77,5 +81,39 @@ d('cloud config never holds a service_role key', () => {
     raw.exec("INSERT INTO settings (key,value) VALUES ('cloud.url','u'),('cloud.anon_key','a'),('cloud.service_key','SUPER-SECRET')");
     await disconnectCloud();
     expect(q("select key from settings where key like 'cloud.%'")).toEqual([]);
+  });
+});
+
+const TOKEN = 'REFRESH-TOKEN-' + 'z'.repeat(2500);
+
+d('Supabase session storage is in the keystore, not SQLite', () => {
+  it('setItem puts the session in the keystore and NOTHING sensitive in the settings table', async () => {
+    await sdkStorage.setItem('sb-x-auth-token', TOKEN);
+    expect(await sdkStorage.getItem('sb-x-auth-token')).toBe(TOKEN);
+    expect(JSON.stringify(q('select * from settings'))).not.toContain('REFRESH-TOKEN');
+    expect(Object.keys(secureMock.__dump()).some((k) => k.startsWith('nl.sb-x-auth-token'))).toBe(true);
+  });
+
+  it('a session left in plaintext sb:* rows by an older build is migrated and the rows are deleted', async () => {
+    raw.prepare('INSERT INTO settings (key,value) VALUES (?,?)').run('sb:sb-x-auth-token', TOKEN);
+    expect(await sdkStorage.getItem('sb-x-auth-token')).toBe(TOKEN);
+    expect(q("select * from settings where key like 'sb:%'")).toEqual([]);
+    expect(JSON.stringify(q('select * from settings'))).not.toContain('REFRESH-TOKEN');
+    expect(await sdkStorage.getItem('sb-x-auth-token')).toBe(TOKEN);
+  });
+
+  it('disconnect wipes the keystore session AND any plaintext remnant', async () => {
+    await sdkStorage.setItem('sb-x-auth-token', TOKEN);
+    raw.prepare('INSERT INTO settings (key,value) VALUES (?,?)').run('sb:sb-old-code-verifier', 'v');
+    await disconnectCloud();
+    expect(await sdkStorage.getItem('sb-x-auth-token')).toBeNull();
+    expect(Object.keys(secureMock.__dump())).toEqual([]);
+    expect(q("select * from settings where key like 'sb:%'")).toEqual([]);
+  });
+
+  it('a factory reset (resetAllData) also clears the keystore session', async () => {
+    await sdkStorage.setItem('sb-x-auth-token', TOKEN);
+    await resetAllData(mockDB);
+    expect(Object.keys(secureMock.__dump())).toEqual([]);
   });
 });

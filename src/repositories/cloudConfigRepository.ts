@@ -16,6 +16,8 @@
 import { getDb } from '../db/database';
 import type { CloudConfig } from '../lib/cloud/types';
 import type { KeyValueStorage } from '../lib/cloud/supabaseAdapter';
+import { createSecureKv } from '../lib/secureKv';
+import { expoSecureBackend } from '../lib/secureKvBackend';
 
 const K = {
   url: 'cloud.url',
@@ -117,7 +119,7 @@ export async function disconnectCloud(): Promise<void> {
   await deleteSetting(K.lastSyncedAt);
   await deleteSetting(K.lastError);
   await deleteSetting(K.lastErrorAt);
-  await deleteSetting(SB_SESSION_KEY);
+  await clearStoredSession();
 }
 
 /** Sync toggle — OFF by default (key missing = off). */
@@ -157,20 +159,42 @@ export async function getLastSyncError(): Promise<{ message: string; at: number 
 }
 
 // ---------------------------------------------------------------------------
-// Supabase SDK session storage — async KV shim over the local `settings` table
-// (zero new native deps; the SDK normally wants window.localStorage).
+// Supabase SDK session storage — the refresh token lives in the platform
+// KEYSTORE (iOS Keychain / Android Keystore), NOT in the SQLite settings table.
+// A session left in plaintext `sb:*` rows by an older build is migrated into the
+// keystore on first read and deleted from SQLite (see lib/secureKv.ts).
 // ---------------------------------------------------------------------------
 
 export const SB_SESSION_KEY = 'sb:session';
 
-export const sdkStorage: KeyValueStorage = {
+/** The legacy plaintext shim — now only a migration source / delete target. */
+const legacySdkStorage = {
   async getItem(key: string) {
     return getSetting(`sb:${key}`);
-  },
-  async setItem(key: string, value: string) {
-    await setSetting(`sb:${key}`, value);
   },
   async removeItem(key: string) {
     await deleteSetting(`sb:${key}`);
   },
 };
+
+const secureKv = createSecureKv(expoSecureBackend, legacySdkStorage);
+
+export const sdkStorage: KeyValueStorage = {
+  getItem: (key) => secureKv.getItem(key),
+  setItem: (key, value) => secureKv.setItem(key, value),
+  removeItem: (key) => secureKv.removeItem(key),
+};
+
+/**
+ * Wipe the stored session from the keystore AND any plaintext remnants
+ * (disconnect + factory reset). Safe to call when nothing is stored.
+ */
+export async function clearSecureSession(): Promise<void> {
+  await secureKv.clearAll();
+}
+
+export async function clearStoredSession(): Promise<void> {
+  await clearSecureSession();
+  const db = await getDb();
+  await db.runAsync("DELETE FROM settings WHERE key LIKE 'sb:%'");
+}
