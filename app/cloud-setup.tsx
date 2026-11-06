@@ -1,3 +1,4 @@
+import { centeredColumn } from '../src/lib/layout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
@@ -270,7 +271,7 @@ export default function CloudSetupScreen() {
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, centeredColumn]} keyboardShouldPersistTaps="handled">
         {/* Step indicator */}
         <View style={styles.steps}>
           {STEP_LABELS.map(([s, label], i) => (

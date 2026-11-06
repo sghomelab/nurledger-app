@@ -1,3 +1,4 @@
+import { ModalFrame } from '../../src/components/ModalFrame';
 import { useCallback, useMemo, useState, type ComponentProps } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { Alert, Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -7,6 +8,7 @@ import { useProducts } from '../../src/hooks/useAppData';
 import { useShift, useUsers } from '../../src/hooks/useShift';
 import { useSync } from '../../src/hooks/useSync';
 import { useT } from '../../src/hooks/useT';
+import { useLayout } from '../../src/hooks/useLayout';
 import { QuickChips } from '../../src/components/register/QuickChips';
 import { CartLineRow } from '../../src/components/register/CartLineRow';
 import { TotalsBlock } from '../../src/components/register/TotalsBlock';
@@ -49,6 +51,7 @@ export default function SellTab() {
   const { active, users } = useUsers();
   const shift = useShift();
   const { t } = useT();
+  const layout = useLayout();
 
   const [barcode, setBarcode] = useState('');
   const [search, setSearch] = useState('');
@@ -306,8 +309,9 @@ export default function SellTab() {
     Alert.alert(t('sell.cameraScan'), t('sell.cameraScanMsg'));
   }, [t]);
 
-  return (
-    <View style={styles.wrap}>
+  // Tablet: catalogue (scan, search, product grid) on the left, order on the right.
+  const topSection = (
+    <>
       {/* Scan row — prototype "Scan Item" panel; camera stub (FR-100 deferred) */}
       <View style={styles.scanRow}>
         <View style={styles.scanBox}>
@@ -372,8 +376,12 @@ export default function SellTab() {
           autoCapitalize="none"
         />
       </View>
-      <QuickChips products={filtered} onPick={(p) => void pickProduct(p)} />
+      <QuickChips products={filtered} onPick={(p) => void pickProduct(p)} grid={layout.twoPane} />
 
+    </>
+  );
+  const cartSection = (
+    <>
       {/* Current Order cart */}
       <View style={styles.cartCard}>
         <View style={styles.cartHead}>
@@ -437,20 +445,40 @@ export default function SellTab() {
         </Text>
       </Pressable>
 
+    </>
+  );
+
+  return (
+    <View style={styles.wrap}>
+      {layout.twoPane ? (
+        <View style={styles.twoPane}>
+          <View style={styles.paneCatalogue}>{topSection}</View>
+          <View style={[styles.paneCart, { width: layout.cartPaneWidth }]}>{cartSection}</View>
+        </View>
+      ) : (
+        <>
+          {topSection}
+          {cartSection}
+        </>
+      )}
+
       {/* Payment sheet (FR-107) — methods localized by outlet (FR-601) */}
       <Modal visible={payVisible} animationType="slide" onRequestClose={() => setPayVisible(false)}>
-        <PaymentSheet
-          totalMinor={totals.totalMinor}
-          currency={currency}
-          locale={cart.outlet?.locale ?? null}
-          onClose={() => setPayVisible(false)}
-          onComplete={(p, c) => void onPaymentComplete(p, c)}
-        />
+        <ModalFrame>
+          <PaymentSheet
+            totalMinor={totals.totalMinor}
+            currency={currency}
+            locale={cart.outlet?.locale ?? null}
+            onClose={() => setPayVisible(false)}
+            onComplete={(p, c) => void onPaymentComplete(p, c)}
+          />
+        </ModalFrame>
       </Modal>
 
       {/* On-screen receipt (FR-109) — rendered via the shared template engine */}
       <Modal visible={receipt !== null} animationType="slide" onRequestClose={() => setReceipt(null)}>
         {receipt && (
+          <ModalFrame>
           <ReceiptView
             receipt={receipt}
             currency={currency}
@@ -461,12 +489,14 @@ export default function SellTab() {
             width={receiptWidth}
             onDone={() => setReceipt(null)}
           />
+          </ModalFrame>
         )}
       </Modal>
 
       {/* M5 (FR-103): weighed-item weight prompt (scale pre-fill or manual kg) */}
       <Modal visible={weigh !== null} animationType="slide" onRequestClose={() => setWeigh(null)}>
         {weigh && (
+          <ModalFrame>
           <View style={styles.weighWrap}>
             <Text style={styles.weighTitle}>{t('sell.weighTitle', { name: weigh.product.name })}</Text>
             <Text style={styles.weighSub}>
@@ -508,6 +538,7 @@ export default function SellTab() {
               </Pressable>
             </View>
           </View>
+          </ModalFrame>
         )}
       </Modal>
 
@@ -544,6 +575,9 @@ export default function SellTab() {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1, backgroundColor: colors.slate50 },
+  twoPane: { flex: 1, flexDirection: 'row' },
+  paneCatalogue: { flex: 1, minWidth: 0 },
+  paneCart: { borderLeftWidth: 1, borderLeftColor: colors.slate200, paddingBottom: spacing.md },
   scanRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingTop: spacing.md },
   scanBox: {
     flex: 1,

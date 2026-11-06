@@ -1,3 +1,5 @@
+import { useLayout } from '../../src/hooks/useLayout';
+import { GridCell } from '../../src/components/GridCell';
 import { useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { FlatList, Pressable, Switch, TextInput, View, Text, StyleSheet, RefreshControl } from 'react-native';
@@ -23,6 +25,7 @@ export default function InventoryTab() {
   const { products, lowStock, search, setSearch, reload } = useProducts();
   const { outlet } = useOutlet();
   const { t } = useT();
+  const layout = useLayout();
   const [lowOnly, setLowOnly] = useState(false);
 
   // Refresh stock + the low-stock badge on every tab focus: the tab stays
@@ -107,6 +110,8 @@ export default function InventoryTab() {
       </View>
 
       <FlatList
+        key={`cols-${layout.columns}`}
+        numColumns={layout.columns}
         data={list}
         keyExtractor={(p) => p.id}
         contentContainerStyle={{ paddingBottom: 96 }}
@@ -118,11 +123,13 @@ export default function InventoryTab() {
           </View>
         }
         renderItem={({ item }) => (
-          <ProductRow
-            product={item}
-            currency={outlet?.currency ?? 'SGD'}
-            onPress={() => router.push({ pathname: '/inventory/[id]', params: { id: item.id } })}
-          />
+          <GridCell columns={layout.columns} gutter={0}>
+            <ProductRow
+              product={item}
+              currency={outlet?.currency ?? 'SGD'}
+              onPress={() => router.push({ pathname: '/inventory/[id]', params: { id: item.id } })}
+            />
+          </GridCell>
         )}
       />
 

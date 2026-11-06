@@ -1,3 +1,4 @@
+import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, RefreshControl } from 'react-native';
@@ -126,7 +127,7 @@ export default function PODetailScreen() {
   return (
     <ScrollView
       style={styles.wrap}
-      contentContainerStyle={{ paddingBottom: 120 }}
+      contentContainerStyle={[{ paddingBottom: 120 }, centeredColumn]}
       refreshControl={<RefreshControl refreshing={false} tintColor={colors.slate300} onRefresh={() => void load()} />}
     >
       <View style={styles.header}>

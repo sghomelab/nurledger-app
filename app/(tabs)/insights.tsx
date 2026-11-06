@@ -1,3 +1,4 @@
+import { wideColumn } from '../../src/lib/layout';
 import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -112,7 +113,7 @@ export default function InsightsTab() {
   }, [ins.salesHistory, currency]);
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView contentContainerStyle={[styles.content, wideColumn]}>
       {/* Period selector (prototype) */}
       <View style={styles.segment}>
         {PERIODS.map((p) => (
@@ -552,5 +553,5 @@ const styles = StyleSheet.create({
   saveBtn: { flex: 1, height: 48, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   saveText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
-  sheetBody: { backgroundColor: colors.white, borderTopLeftRadius: radius.card + 4, borderTopRightRadius: radius.card + 4, height: '60%' },
+  sheetBody: { width: '100%', maxWidth: 640, alignSelf: 'center', backgroundColor: colors.white, borderTopLeftRadius: radius.card + 4, borderTopRightRadius: radius.card + 4, height: '60%' },
 });

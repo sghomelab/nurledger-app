@@ -1,3 +1,4 @@
+import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import {
@@ -106,7 +107,7 @@ export default function SuppliersScreen() {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.sm }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[{ padding: spacing.lg, gap: spacing.sm }, centeredColumn]} keyboardShouldPersistTaps="handled">
         {loaded && suppliers.length === 0 && (
           <View style={styles.empty}>
             <Ionicons name="business-outline" size={32} color={colors.slate300} />

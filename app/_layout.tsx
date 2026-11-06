@@ -1,3 +1,4 @@
+import { AppFrame } from '../src/components/AppFrame';
 import { Pressable, Text, View } from 'react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -84,6 +85,7 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style="dark" />
+      <AppFrame>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.slate50 } }}>
         {/* Non-tab screens live outside the (tabs) group — header + back button. */}
         <Stack.Screen name="inventory/new" options={{ ...headerOptions, title: 'New product' }} />
@@ -95,6 +97,7 @@ export default function RootLayout() {
         <Stack.Screen name="settings" options={{ ...headerOptions, title: t('settings.title') }} />
         <Stack.Screen name="cloud-setup" options={{ ...headerOptions, title: t('cloudsetup.title') }} />
       </Stack>
+      </AppFrame>
     </>
   );
 }
