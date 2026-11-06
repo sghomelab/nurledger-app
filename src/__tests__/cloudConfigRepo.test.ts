@@ -12,7 +12,7 @@ let mockDB: any;
 jest.mock('../db/database', () => ({ getDb: async () => mockDB, ensureDeviceId: async () => {} }));
 import { SCHEMA_SQL } from '../db/schema';
 import { ensureOutlet, ensureDefaultUsers } from '../db/seed';
-import { getCloudConfig, saveCloudConfig, disconnectCloud, sdkStorage } from '../repositories/cloudConfigRepository';
+import { getCloudConfig, saveCloudConfig, disconnectCloud, sdkStorage, deleteCloudAccount } from '../repositories/cloudConfigRepository';
 import { resetAllData } from '../db/firstRun';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const secureMock = require('expo-secure-store');
@@ -133,5 +133,37 @@ d('Supabase session storage is in the keystore, not SQLite', () => {
     await sdkStorage.setItem('sb-x-auth-token', TOKEN);
     await resetAllData(mockDB);
     expect(Object.keys(secureMock.__dump())).toEqual([]);
+  });
+
+  describe('deleteCloudAccount (in-app account deletion)', () => {
+    const cfg = { url: 'https://x.supabase.co', anonKey: 'anon', outletId: 'T1' };
+    const mkAdapter = (impl: () => Promise<'account' | 'store_and_account'>) => ({
+      deleteAccount: jest.fn(impl),
+      signOut: jest.fn(async () => { throw new Error('user is gone'); }), // must be swallowed
+    });
+
+    it('deletes server-side FIRST, then disconnects; local sales/stock/outbox are untouched', async () => {
+      await saveCloudConfig({ url: cfg.url, anonKey: cfg.anonKey, outletId: 'T1', ownerEmail: 'o@x.co' });
+      await sdkStorage.setItem('sb-x-auth-token', TOKEN);
+      raw.prepare("INSERT INTO outbox (id, op_id, entity, payload, created_at) VALUES ('o1','op1','sale','{}',1)").run();
+      const a = mkAdapter(async () => 'store_and_account');
+      expect(await deleteCloudAccount(a as any, cfg, true)).toBe('store_and_account');
+      expect(a.deleteAccount).toHaveBeenCalledWith(cfg, true);
+      expect(await getCloudConfig()).toBeNull();
+      expect(await sdkStorage.getItem('sb-x-auth-token')).toBeNull();
+      expect(Object.keys(secureMock.__dump())).toEqual([]);
+      expect(q("select count(*) n from outbox")[0].n).toBe(1);
+      expect(q("select count(*) n from outlet")[0].n).toBe(1);
+    });
+
+    it('a FAILED server deletion changes NOTHING locally (user can retry)', async () => {
+      await saveCloudConfig({ url: cfg.url, anonKey: cfg.anonKey, outletId: 'T1' });
+      await sdkStorage.setItem('sb-x-auth-token', TOKEN);
+      const a = mkAdapter(async () => { throw new Error('offline'); });
+      await expect(deleteCloudAccount(a as any, cfg, false)).rejects.toThrow('offline');
+      expect(await getCloudConfig()).not.toBeNull();
+      expect(await sdkStorage.getItem('sb-x-auth-token')).toBe(TOKEN);
+      expect(a.signOut).not.toHaveBeenCalled();
+    });
   });
 });

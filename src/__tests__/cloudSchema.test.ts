@@ -17,9 +17,9 @@ import { CLOUD_SCHEMA_SQL, CLOUD_SCHEMA_VERSION } from '../lib/cloud/schemaSql';
 
 const SYNCED_TABLES = ['category', 'product', 'sale', 'stock_ledger', 'refund'] as const;
 
-describe('cloud schema bundle (v7 — synced_at cursor + security + provisioning)', () => {
+describe('cloud schema bundle (v8 — synced_at cursor + security + provisioning)', () => {
   it('declares exactly the version the wizard gates on', () => {
-    expect(CLOUD_SCHEMA_VERSION).toBe(7);
+    expect(CLOUD_SCHEMA_VERSION).toBe(8);
     expect(CLOUD_SCHEMA_SQL).toContain(`NURLEDGER BYO SCHEMA v${CLOUD_SCHEMA_VERSION}`);
     expect(CLOUD_SCHEMA_SQL).toContain(`INSERT INTO public.cloud_schema_meta (version) VALUES (${CLOUD_SCHEMA_VERSION})`);
   });
@@ -92,5 +92,15 @@ describe('cloud schema bundle (v7 — synced_at cursor + security + provisioning
       if (!/\bWHERE\b/i.test(m[0])) bad.push(m[0].replace(/\s+/g, ' ').slice(0, 80));
     }
     expect(bad).toEqual([]);
+  });
+
+  it('delete_my_account (v8): authenticated-only, owner must confirm, never deletes other users', () => {
+    expect(CLOUD_SCHEMA_SQL).toContain('CREATE OR REPLACE FUNCTION public.delete_my_account(p_delete_store boolean');
+    // client-callable only by signed-in users; anon/PUBLIC revoked like the other v7+ functions
+    expect(CLOUD_SCHEMA_SQL).toMatch(/REVOKE EXECUTE ON FUNCTION[^;]*public\.delete_my_account\(boolean\)[^;]*FROM anon, authenticated, PUBLIC/);
+    expect(CLOUD_SCHEMA_SQL).toMatch(/GRANT EXECUTE ON FUNCTION[^;]*public\.delete_my_account\(boolean\)[^;]*TO authenticated/);
+    // the only auth.users deletion is scoped to the caller
+    const dels = CLOUD_SCHEMA_SQL.match(/DELETE FROM auth\.users[^;]*;/g) ?? [];
+    expect(dels).toEqual(['DELETE FROM auth.users WHERE id = v_uid;']);
   });
 });

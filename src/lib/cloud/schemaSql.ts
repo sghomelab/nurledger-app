@@ -64,7 +64,7 @@
  * time fell behind peers' already-advanced cursors — silent data loss.
  */
 
-export const CLOUD_SCHEMA_VERSION = 7;
+export const CLOUD_SCHEMA_VERSION = 8;
 
 export const CLOUD_SCHEMA_SQL = `
 -- =============================================================
@@ -698,6 +698,50 @@ BEGIN
   RETURN v_code;
 END; $$;
 
+-- v8: in-app account deletion (App Store 5.1.1(v) / Google Play account deletion).
+-- Deletes ONLY the caller's own sign-in (auth.users row -> sessions/refresh
+-- tokens cascade) and membership. The store OWNER must pass p_delete_store = true:
+-- deleting the owner orphans the store, so the store's cloud data (sales, stock,
+-- products, categories, invites, membership of every device) is erased with it.
+-- Other members' auth.users rows are NOT deleted (the Supabase project may host
+-- other apps' users); they simply lose access and can delete their own account.
+-- Returns 'account' or 'store_and_account'.
+CREATE OR REPLACE FUNCTION public.delete_my_account(p_delete_store boolean DEFAULT false) RETURNS text
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
+DECLARE
+  v_uid    uuid := auth.uid();
+  v_outlet text;
+  v_role   text;
+  v_scope  text := 'account';
+BEGIN
+  IF v_uid IS NULL THEN RAISE EXCEPTION 'not authenticated'; END IF;
+  SELECT m.org_id, m.role INTO v_outlet, v_role FROM public.org_member m
+   WHERE m.user_id = v_uid ORDER BY (m.role = 'owner') DESC, m.org_id LIMIT 1;
+
+  IF v_role = 'owner' THEN
+    IF NOT coalesce(p_delete_store, false) THEN
+      RAISE EXCEPTION 'the store owner must confirm deleting the whole store (delete_store = true)';
+    END IF;
+    -- sale cascades to sale_line, payment, refund, refund_line.
+    DELETE FROM public.sale          WHERE outlet_id = v_outlet;
+    DELETE FROM public.stock_ledger  WHERE outlet_id = v_outlet;
+    DELETE FROM public.product_audit WHERE outlet_id = v_outlet;
+    DELETE FROM public.product       WHERE outlet_id = v_outlet;
+    DELETE FROM public.category      WHERE outlet_id = v_outlet;
+    DELETE FROM public.store_invite  WHERE outlet_id = v_outlet;
+    DELETE FROM public.org_member    WHERE org_id = v_outlet;
+    DELETE FROM public.outlet        WHERE id = v_outlet;
+    v_scope := 'store_and_account';
+  ELSIF coalesce(p_delete_store, false) THEN
+    RAISE EXCEPTION 'only the store owner can delete the store';
+  ELSE
+    DELETE FROM public.org_member WHERE user_id = v_uid;
+  END IF;
+
+  DELETE FROM auth.users WHERE id = v_uid;
+  RETURN v_scope;
+END; $$;
+
 -- =============================================================
 -- RLS (FR-506): members see their outlet's rows; writes ONLY via RPCs
 -- =============================================================
@@ -788,10 +832,12 @@ GRANT EXECUTE ON FUNCTION public.is_member(text), public.apply_sale(jsonb), publ
 -- v7 objects: tables hold only code hashes — no client role may read them.
 REVOKE ALL ON public.store_claim, public.store_invite FROM anon, authenticated, PUBLIC;
 REVOKE EXECUTE ON FUNCTION public.nurledger_hash_code(text), public.nurledger_schema_version(),
-  public.nurledger_set_claim(text), public.provision_store(jsonb), public.create_invite(int)
+  public.nurledger_set_claim(text), public.provision_store(jsonb), public.create_invite(int),
+  public.delete_my_account(boolean)
   FROM anon, authenticated, PUBLIC;
 GRANT EXECUTE ON FUNCTION public.nurledger_schema_version() TO anon, authenticated, service_role;
-GRANT EXECUTE ON FUNCTION public.provision_store(jsonb), public.create_invite(int) TO authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.provision_store(jsonb), public.create_invite(int),
+  public.delete_my_account(boolean) TO authenticated, service_role;
 
 -- Mark this bundle applied LAST so a failed run never records the new version.
 INSERT INTO public.cloud_schema_meta (version) VALUES (${CLOUD_SCHEMA_VERSION}) ON CONFLICT DO NOTHING;

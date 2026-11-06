@@ -152,6 +152,8 @@ describe('upgrade paths keep data and end at the current version', () => {
     'v3 -> v4 -> current': [3, 4],
     'v3 -> v4 -> v5 -> current': [3, 4, 5],
     'v3 -> v4 -> v5 -> v6 -> current': [3, 4, 5, 6],
+    'v3 -> ... -> v7 -> current': [3, 4, 5, 6, 7],
+    'fresh v7 -> current': [7],
     'fresh v6 -> current': [6],
     'fresh v5 -> current': [5],
   };
@@ -330,5 +332,94 @@ describe('provisioning without a service key', () => {
     assert.throws(() => schemaSqlWithClaim("x'); DROP TABLE public.outlet; --"));
     assert.throws(() => schemaSqlWithClaim('ABCDEF'));
     assert.doesNotThrow(() => schemaSqlWithClaim('a'.repeat(64)));
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// v8: in-app account deletion (store-policy requirement)
+// ---------------------------------------------------------------------------
+const delAcct = (db, uid, storeFlag) =>
+  as(db, 'authenticated', uid, 'SELECT public.delete_my_account($1::boolean) AS r', [storeFlag]);
+const userExists = async (db, uid) =>
+  (await db.query(`SELECT count(*)::int AS n FROM auth.users WHERE id = '${uid}'`)).rows[0].n === 1;
+
+async function storeWithMembers() {
+  const db = await freshStore();
+  await prov(db, U_OWNER, { outlet: OUTLET(), claim: 'claim-1234-abcd' });
+  const inv = await as(db, 'authenticated', U_OWNER, 'SELECT public.create_invite(24) AS code');
+  await prov(db, U_C, { outlet: OUTLET(), invite: inv.rows[0].code });
+  await as(db, 'authenticated', U_OWNER, 'SELECT apply_product($1::jsonb)', [P('OUT1', 'pp1', 'SKU1', 1000, 'd1')]);
+  await as(db, 'authenticated', U_OWNER, 'SELECT apply_category($1::jsonb)', [JSON.stringify({ outlet_id: 'OUT1', id: 'cc1', name: 'C', created_at: 1000, updated_at: 1000 })]);
+  await as(db, 'authenticated', U_OWNER, 'SELECT apply_sale($1::jsonb)', [JSON.stringify({
+    outlet_id: 'OUT1', uuid: 'sale1', id: 'sale1', created_at: 1000, subtotal_minor: 100, discount_minor: 0, tax_minor: 0, total_minor: 100, cogs_minor: 0,
+    lines: [{ id: 'l1', product_id: 'pp1', qty: 1, qty_g: null, unit_price_minor: 100, discount_minor: 0, tax_minor: 0, line_total_minor: 100, created_at: 1000 }],
+    payments: [{ id: 'pay1', method: 'cash', amount_minor: 100, reference: null, created_at: 1000 }], ledger_rows: [] })]);
+  return db;
+}
+const count = async (db, t) => (await db.query(`SELECT count(*)::int AS n FROM public.${t}`)).rows[0].n;
+
+describe('delete_my_account (v8)', () => {
+  it('a MEMBER deletes only their own sign-in + membership; the store and other users are untouched', async () => {
+    const db = await storeWithMembers();
+    assert.deepEqual(await delAcct(db, U_C, false), { ok: true, rows: [{ r: 'account' }] });
+    assert.equal(await userExists(db, U_C), false);
+    assert.equal((await db.query(`SELECT count(*)::int AS n FROM public.org_member WHERE user_id = '${U_C}'`)).rows[0].n, 0);
+    assert.equal(await userExists(db, U_OWNER), true);
+    assert.equal(await count(db, 'sale'), 1);
+    assert.equal(await count(db, 'product'), 1);
+    assert.equal(await count(db, 'outlet'), 1);
+  });
+
+  it('a member cannot delete the store', async () => {
+    const db = await storeWithMembers();
+    const r = await delAcct(db, U_C, true);
+    assert.equal(r.ok, false);
+    assert.equal(await userExists(db, U_C), true);
+    assert.equal(await count(db, 'sale'), 1);
+  });
+
+  it('the OWNER must confirm: without the flag nothing is deleted', async () => {
+    const db = await storeWithMembers();
+    const r = await delAcct(db, U_OWNER, false);
+    assert.equal(r.ok, false);
+    assert.equal(await userExists(db, U_OWNER), true);
+    assert.equal(await count(db, 'sale'), 1);
+  });
+
+  it('the owner WITH the flag erases the store data + memberships + own sign-in, but NOT other members\' auth users', async () => {
+    const db = await storeWithMembers();
+    assert.deepEqual(await delAcct(db, U_OWNER, true), { ok: true, rows: [{ r: 'store_and_account' }] });
+    assert.equal(await userExists(db, U_OWNER), false);
+    assert.equal(await userExists(db, U_C), true, 'other apps may use this auth user');
+    for (const t of ['sale', 'sale_line', 'payment', 'product', 'category', 'stock_ledger', 'product_audit', 'org_member', 'outlet', 'store_invite']) {
+      assert.equal(await count(db, t), 0, `${t} must be empty`);
+    }
+    // the surviving member is locked out of everything
+    assert.deepEqual(await as(db, 'authenticated', U_C, 'SELECT count(*)::int AS n FROM public.product'), { ok: true, rows: [{ n: 0 }] });
+    // and the (now empty) project can host a new store via a fresh claim
+    await db.exec(schemaSqlWithClaim(hashOf('NEW-CLAIM-0001')));
+    const again = await prov(db, U_STRANGER, { outlet: OUTLET('OUT9'), claim: 'new-claim-0001' });
+    assert.deepEqual(again, { ok: true, rows: [{ r: 'OUT9' }] });
+  });
+
+  it('a user with no membership (e.g. signed up, never joined) can still delete their own account', async () => {
+    const db = await storeWithMembers();
+    assert.deepEqual(await delAcct(db, U_D, false), { ok: true, rows: [{ r: 'account' }] });
+    assert.equal(await userExists(db, U_D), false);
+    assert.equal(await count(db, 'sale'), 1);
+  });
+
+  it('only authenticated users can call it (anon / PUBLIC cannot), and it never touches other tenants', async () => {
+    const db = await storeWithMembers();
+    assert.equal((await as(db, 'anon', null, 'SELECT public.delete_my_account(false)')).ok, false);
+    const priv = await db.query("SELECT has_function_privilege('anon','public.delete_my_account(boolean)','execute') AS a, has_function_privilege('authenticated','public.delete_my_account(boolean)','execute') AS b");
+    assert.deepEqual(priv.rows[0], { a: false, b: true });
+    // second outlet's data survives a first-outlet owner deletion
+    await db.exec(`INSERT INTO public.outlet (id, name, currency, locale, tax_engine) VALUES ('OTHER','O','MYR','en','x');
+      INSERT INTO public.org_member VALUES ('OTHER', '${U_STRANGER}', 'owner');
+      INSERT INTO public.product (id, outlet_id, sku, name, created_at, updated_at) VALUES ('op','OTHER','OSKU','x', now(), now());`);
+    await delAcct(db, U_OWNER, true);
+    assert.equal((await db.query("SELECT count(*)::int AS n FROM public.product WHERE outlet_id = 'OTHER'")).rows[0].n, 1);
   });
 });

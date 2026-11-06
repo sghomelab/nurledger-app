@@ -13,7 +13,7 @@ when Mas gives the GO. (Red line: "ship/prepare" ≠ build GO.)
 | Version (first store release) | 0.1.0 → **bump to 1.0.0 in app.json before the first store build** (one commit for both platforms) |
 | Android versionCode | 1 (EAS `autoIncrement` — will become 2+ on first build) |
 | iOS buildNumber | "1" (EAS builds `max(configured, store-max)+1`; verify actual from the IPA `Info.plist`) |
-| Platform minimums | Android 10+ (spec), iOS 14+ (spec); SDK 57 / RN 0.86 defaults apply |
+| Platform minimums | Android 10+ (spec), iOS 14+ (spec); Expo SDK 58 / React Native 0.88 defaults apply (verify the effective minimums in the generated project) |
 | Deep link scheme | `nurledger://` (dev-client URL) |
 
 ## 2. Build profiles (`eas.json`)
@@ -69,8 +69,24 @@ auto-versioning. All profiles use `credentialsSource: "remote"`.
    creates the app in App Store Connect (UI) and provides the `ascAppId`.
    Verify via ASC API + TestFlight — never trust `finished`.
 7. Store listings: app name "Nurledger", short description, description,
-   keywords, category (Shopping), screenshots (Sell / Inventory / Expiry /
+   keywords, category **Business** (both stores), screenshots (Sell / Inventory / Expiry /
    Insights / Settings, 6.1" portrait).
+
+## 4a. Store-policy items (review 2026-11-06 — see nurledger-store-readiness-review.md)
+
+- **Account deletion:** in-app **Settings → Cloud sync → Delete cloud account…**
+  (schema v8 `delete_my_account`; members delete their own sign-in, the owner also
+  erases the store's cloud data). Mention this path in the Apple review notes and the
+  Play Data-safety "account deletion" answer. Needs cloud schema v8 on the store's
+  project (the wizard's upgrade step re-runs the idempotent script).
+- **Tablets:** `ios.supportsTablet: true` is kept on purpose (dense screens) — this
+  REQUIRES iPad screenshots and an iPad/large-screen layout pass before submission.
+- **Session token** now lives in the platform keystore (`expo-secure-store`,
+  Keychain `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` / Android Keystore); Android backup is
+  disabled (`allowBackup=false`) — local data is NOT restored from a device backup, so
+  tell users to enable cloud sync or export CSV.
+- **Submit config:** `eas.json` has no `submit` block yet — add it (ASC key / Play
+  service account) before step 5/6 of the runbook.
 
 ## 5. Privacy posture (PDPA/GDPR-lite, NFR-9)
 
@@ -82,8 +98,9 @@ auto-versioning. All profiles use `credentialsSource: "remote"`.
 - **No analytics, no crash reporting, no ad SDKs, no PII collected.**
   Cashier names are user-entered labels, not identifiers, and stay local /
   in the store's own project.
-- **Data deletion:** "Disconnect" removes the cloud link from the device;
-  data export (CSV, FR-314) + local DB reset cover deletion requests.
+- **Data deletion:** in-app **Delete cloud account…** erases the caller's cloud
+  sign-in (and, for the owner, the store's cloud data); "Disconnect" removes the cloud
+  link from the device; data export (CSV, FR-314) + local DB reset cover the rest.
 
 ## 6. Deferred by design (no store blockers)
 

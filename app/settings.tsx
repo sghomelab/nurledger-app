@@ -13,6 +13,7 @@ import { resetAllData } from '../src/db/firstRun';
 import { updateOutlet } from '../src/repositories/outletRepository';
 import { quarantinedOps, unsyncedCount, type QuarantinedOp } from '../src/repositories/outboxRepository';
 import {
+  deleteCloudAccount,
   disconnectCloud,
   getCloudConfig,
   setSyncEnabled,
@@ -37,6 +38,7 @@ import type { TaxMode } from '../src/lib/tax';
 import { Card } from '../src/components/Screen';
 import { PickerOverlay } from '../src/components/PickerOverlay';
 import { PinPrompt } from '../src/components/PinPrompt';
+import { DeleteAccountDialog } from '../src/components/DeleteAccountDialog';
 import { roleCanAct } from '../src/lib/roles';
 import { colors, fonts, radius, spacing } from '../src/theme/tokens';
 
@@ -251,6 +253,45 @@ export default function SettingsScreen() {
       if (on) await sync.syncNow(); // turning it on drains the backlog immediately
       await sync.refresh();
     });
+  };
+
+  // In-app cloud account deletion (store-policy requirement): PIN gate → read role
+  // → typed confirmation → server deletion → local disconnect.
+  const [deleteDlg, setDeleteDlg] = useState<{ role: 'owner' | 'member' | null } | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const startDeleteAccount = () =>
+    requireCloudGate(async () => {
+      try {
+        const cfg = await getCloudConfig();
+        if (!cfg) return;
+        const role = await getCloudAdapter().myRole(cfg);
+        setDeleteDlg({ role });
+      } catch (e) {
+        Alert.alert(t('settings.deleteAcctFailed'), e instanceof Error ? e.message : String(e));
+      }
+    });
+
+  const runDeleteAccount = async () => {
+    if (!deleteDlg) return;
+    setDeleting(true);
+    try {
+      const cfg = await getCloudConfig();
+      if (!cfg) return;
+      const scope = await deleteCloudAccount(getCloudAdapter(), cfg, deleteDlg.role === 'owner');
+      setDeleteDlg(null);
+      setCloudCfg(null);
+      await sync.refresh();
+      Alert.alert(
+        t('settings.deleteAcctDone'),
+        scope === 'store_and_account' ? t('settings.deleteAcctDoneStore') : t('settings.deleteAcctDoneMember'),
+      );
+    } catch (e) {
+      // Nothing was changed locally (the server call runs first) — the user can retry.
+      Alert.alert(t('settings.deleteAcctFailed'), e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const confirmDisconnect = () => {
@@ -501,6 +542,9 @@ export default function SettingsScreen() {
                   <Text style={styles.cloudBtnText}>{t('settings.disconnect')}</Text>
                 </Pressable>
               </View>
+              <Pressable style={styles.deleteAcctLink} onPress={startDeleteAccount} accessibilityRole="button">
+                <Text style={styles.deleteAcctText}>{t('settings.deleteAcct')}</Text>
+              </Pressable>
             </>
           )}
         </Card>
@@ -554,6 +598,15 @@ export default function SettingsScreen() {
             void job();
           }}
           onCancel={() => setCloudGate(null)}
+        />
+      )}
+
+      {deleteDlg && (
+        <DeleteAccountDialog
+          role={deleteDlg.role}
+          busy={deleting}
+          onConfirm={() => void runDeleteAccount()}
+          onCancel={() => !deleting && setDeleteDlg(null)}
         />
       )}
 
@@ -658,6 +711,8 @@ const styles = StyleSheet.create({
     gap: 6, marginBottom: spacing.md,
   },
   rejectedTitle: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.danger },
+  deleteAcctLink: { alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.sm },
+  deleteAcctText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.danger, textDecorationLine: 'underline' },
   cloudBtns: { flexDirection: 'row', gap: spacing.sm },
   cloudBtn: {
     backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 12, alignItems: 'center',

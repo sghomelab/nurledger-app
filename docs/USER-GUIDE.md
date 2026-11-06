@@ -407,8 +407,20 @@ lose access immediately, and their past sales stay in your records.
 - **Pause:** flip **Sync** to **Off** — nothing uploads, everything stays on the device.
 - **Disconnect:** **Settings → Cloud sync → Disconnect** removes the connection. Your
   device data is untouched.
-- **Delete your data:** it's in your Supabase project — delete the project from the
-  Supabase dashboard and it's gone. Nurledger (the app) never has a copy of it.
+- **Delete your cloud account (in the app):** **Settings → Cloud sync → Delete cloud account…**
+  (PIN-gated, you type DELETE to confirm).
+  - As a **member** (a phone that joined with an invite code) it deletes only *your own*
+    sign-in; the store's data stays with the owner.
+  - As the **store owner** it permanently erases **all of the store's data in your cloud**
+    (sales, stock, products, categories, invites), removes access for every connected phone,
+    and deletes your sign-in. Other phones' sign-ins are not deleted (they simply lose access
+    and can delete their own account the same way).
+  - The data **on your phone is kept** — this just disconnects it. To wipe the phone too, use
+    **Reset all data** afterwards.
+  - Needs the latest cloud setup script (schema v8): if you see "cloud setup is out of date",
+    Disconnect → Connect, run the updated script in the Supabase SQL Editor, then try again.
+- **Delete everything yourself:** you can also delete the whole Supabase project from the
+  Supabase dashboard. Nurledger (the app) never has a copy of your data.
 
 ## Is my data private?
 Yes. Your data lives in **your own Supabase project**, under **your own account**. The

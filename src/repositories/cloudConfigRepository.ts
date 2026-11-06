@@ -122,6 +122,28 @@ export async function disconnectCloud(): Promise<void> {
   await clearStoredSession();
 }
 
+/**
+ * Delete the signed-in user's CLOUD account (in-app account deletion) and then
+ * disconnect this device. Order matters: the server deletion runs FIRST — if it
+ * fails (offline, schema out of date, rejected) NOTHING is changed locally, so
+ * the user can retry. Local sales/stock/outbox are never touched (same as
+ * Disconnect). The owner must pass `deleteStore = true`.
+ */
+export async function deleteCloudAccount(
+  adapter: Pick<import('../lib/cloud/types').CloudAdapter, 'deleteAccount' | 'signOut'>,
+  cfg: CloudConfig,
+  deleteStore: boolean,
+): Promise<'account' | 'store_and_account'> {
+  const scope = await adapter.deleteAccount(cfg, deleteStore);
+  try {
+    await adapter.signOut(cfg); // best effort — the user no longer exists server-side
+  } catch {
+    /* ignore */
+  }
+  await disconnectCloud();
+  return scope;
+}
+
 /** Sync toggle — OFF by default (key missing = off). */
 export async function isSyncEnabled(): Promise<boolean> {
   const v = await getSetting(K.syncEnabled);

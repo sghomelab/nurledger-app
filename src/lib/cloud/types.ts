@@ -248,6 +248,16 @@ export interface CloudAdapter {
    * device/person. The code is shown once; the server stores only its hash.
    */
   createInvite(cfg: CloudConfig, hours?: number): Promise<string>;
+  /** The signed-in user's role in the store ('owner' | 'member'), or null if not a member. */
+  myRole(cfg: CloudConfig): Promise<'owner' | 'member' | null>;
+  /**
+   * In-app account deletion (store-policy requirement; `delete_my_account`, schema v8).
+   * Deletes the caller's own sign-in + membership. The OWNER must pass
+   * `deleteStore = true`, which also erases the store's cloud data; a member
+   * must pass false. Other members' sign-ins are never deleted. Returns what
+   * was deleted.
+   */
+  deleteAccount(cfg: CloudConfig, deleteStore: boolean): Promise<'account' | 'store_and_account'>;
   /**
    * Idempotently push ops (FIFO order preserved by the caller). Returns one
    * result per op, in order. A thrown error = transport/server failure for the

@@ -289,6 +289,30 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
       return formatInviteCode(String(data));
     },
 
+    async myRole(cfg) {
+      const c = clientFor(cfg, storage);
+      // RLS member_select_self: a user only ever sees their own membership rows.
+      const { data, error } = await c.from('org_member').select('role');
+      if (error) throw new Error(`Could not read your role: ${error.message}`);
+      const roles = (data ?? []).map((r: { role: string }) => r.role);
+      if (roles.includes('owner')) return 'owner';
+      return roles.length > 0 ? 'member' : null;
+    },
+
+    async deleteAccount(cfg, deleteStore) {
+      const c = clientFor(cfg, storage);
+      const { data, error } = await c.rpc('delete_my_account', { p_delete_store: deleteStore });
+      if (error) {
+        if (isFunctionMissingError(error)) {
+          throw new Error(
+            'Your cloud setup is out of date and cannot delete accounts yet — re-run the latest setup SQL (Settings → Cloud sync → Disconnect → Connect), then try again.',
+          );
+        }
+        throw new Error(`delete_my_account: ${error.message}`);
+      }
+      return data === 'store_and_account' ? 'store_and_account' : 'account';
+    },
+
     async pushOps(cfg, ops) {
       const c = clientFor(cfg, storage);
       const results: PushResult[] = [];
