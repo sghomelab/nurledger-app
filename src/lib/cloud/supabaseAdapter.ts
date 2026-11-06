@@ -85,6 +85,20 @@ function withUpgradeHint(where: string, message: string): string {
     : `${where}: ${message}`;
 }
 
+/**
+ * True only when a PostgREST/Postgres error means "the table does not exist":
+ * PGRST205 ("Could not find the table..."), Postgres 42P01 (undefined_table)
+ * or the raw relation message. Everything else (PGRST301 invalid JWT, 403 RLS,
+ * network failures, ...) is a REAL fault and must not be read as "schema not
+ * deployed" by the wizard.
+ */
+export function isTableMissingError(
+  e: { code?: string; message?: string; details?: string; hint?: string | null },
+): boolean {
+  const s = `${e.code ?? ''} ${e.message ?? ''} ${e.details ?? ''} ${e.hint ?? ''}`;
+  return /PGRST205|42P01|could not find the table|relation ["']?\w+["']? does not exist/i.test(s);
+}
+
 function normBool(v: unknown): boolean {
   return v === true || v === 1 || v === 'true' || v === '1';
 }
@@ -211,8 +225,13 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
         .order('version', { ascending: false })
         .limit(1);
       if (error) {
-        // PGRST205 "Could not find the table" → schema not deployed yet.
-        return null;
+        // ONLY "the table does not exist" means a fresh project (schema not
+        // deployed yet) → null, which the wizard renders as "run the SQL step".
+        // Every other error (bad service key, network, RLS, PostgREST misconfig)
+        // must surface with its REAL text — returning null for those made the
+        // wizard say "schema not deployed" on a plain auth failure.
+        if (isTableMissingError(error)) return null;
+        throw new Error(`Schema check failed: ${error.message}`);
       }
       const row = Array.isArray(data) ? data[0] : undefined;
       const v = row ? Number((row as { version: unknown }).version) : NaN;
