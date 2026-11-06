@@ -45,14 +45,18 @@ export async function enqueueOpInTx(db: SQLiteDatabase, entity: SyncEntity, opId
   );
 }
 
-/** Pending ops, strictly FIFO (created_at, then insertion rowid). */
+/**
+ * Pending ops, strictly FIFO by INSERTION order (rowid). Not created_at:
+ * Date.now() stamps can be equal or out of order across the app's clock
+ * drift, and rowid is the ground truth of enqueue order.
+ */
 export async function pendingOps(limit = 20): Promise<PendingOp[]> {
   const db = await getDb();
   return await db.getAllAsync<PendingOp>(
     `SELECT id, op_id AS opId, entity, payload, created_at AS createdAt, rowid AS seq
        FROM outbox
       WHERE uploaded_at IS NULL
-      ORDER BY created_at ASC, rowid ASC
+      ORDER BY rowid ASC
       LIMIT ?`,
     [limit],
   );

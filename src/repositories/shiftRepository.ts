@@ -136,16 +136,19 @@ export async function getDeviceId(): Promise<string | null> {
 /** FR-200: open a shift with a recorded float. Throws if one is already open. */
 export async function openShift(input: OpenShiftInput): Promise<Shift> {
   const db = await getDb();
-  const existing = await getOpenShift();
-  if (existing) throw new Error('A shift is already open on this device');
-
   const id = uuidv4();
+  // ATOMIC: the INSERT is guarded by NOT EXISTS(open shift), so two racing
+  // opens (double-tap, or two processes on one DB) can never both win — the
+  // loser inserts nothing and throws. A check-then-insert would let the
+  // second caller through the gap.
   await db.runAsync(
-    'INSERT INTO shift (id, outlet_id, device_id, cashier_id, opened_at, float_minor) VALUES (?, ?, ?, ?, ?, ?)',
+    `INSERT INTO shift (id, outlet_id, device_id, cashier_id, opened_at, float_minor)
+     SELECT ?, ?, ?, ?, ?, ?
+     WHERE NOT EXISTS (SELECT 1 FROM shift WHERE closed_at IS NULL)`,
     [id, input.outletId, input.deviceId, input.cashierId, Date.now(), Math.max(0, Math.round(input.floatMinor))],
   );
   const shift = await getShift(id);
-  if (!shift) throw new Error('Shift vanished after insert (should be impossible)');
+  if (!shift) throw new Error('A shift is already open on this device');
   return shift;
 }
 
@@ -248,6 +251,12 @@ export async function closeShift(input: CloseShiftInput): Promise<Shift> {
   const shift = await getShift(input.shiftId);
   if (!shift) throw new Error('Shift not found');
   if (shift.closedAt !== null) throw new Error('Shift is already closed');
+  // A drawer count can't be negative or non-finite — reject it before it
+  // poisons the Z-report (Math.round(NaN) would write NULL into counted_minor
+  // and the variance would be meaningless).
+  if (!Number.isFinite(input.countedMinor) || input.countedMinor < 0) {
+    throw new Error('Counted cash must be zero or a positive number');
+  }
 
   const salesByMethod = await getShiftSalesByMethod(shift.id);
   const cashSaleMinor = salesByMethod['cash'] ?? 0;
@@ -275,18 +284,18 @@ export async function closeShift(input: CloseShiftInput): Promise<Shift> {
     refundsMinor,
   });
 
-  // withTransactionAsync is void-returning, so the single write (UPDATE shift)
-  // is the atomic unit; the computed Z-report is already final.
-  await db.withTransactionAsync(async () => {
-    await db.runAsync(
-      `UPDATE shift SET closed_at = ?, counted_minor = ?, expected_minor = ?, variance_minor = ?,
-       notes = ?, z_report_json = ? WHERE id = ?`,
-      [closedAt, report.countedMinor, report.expectedMinor, report.varianceMinor, report.notes, JSON.stringify(report), shift.id],
-    );
-  });
+  // ATOMIC: the UPDATE only hits a shift that is STILL open (closed_at IS
+  // NULL). A racing second close affects 0 rows and throws — the winner's
+  // Z-report is the one stored. (Single statement; no transaction needed.)
+  const res = await db.runAsync(
+    `UPDATE shift SET closed_at = ?, counted_minor = ?, expected_minor = ?, variance_minor = ?,
+     notes = ?, z_report_json = ? WHERE id = ? AND closed_at IS NULL`,
+    [closedAt, report.countedMinor, report.expectedMinor, report.varianceMinor, report.notes, JSON.stringify(report), shift.id],
+  );
+  if (res.changes === 0) throw new Error('Shift is already closed');
 
   const done = await getShift(shift.id);
-  if (!done) throw new Error('Shift vanished after close (should be impossible)');
+  if (!done || done.closedAt === null) throw new Error('Shift is already closed');
   return done;
 }
 

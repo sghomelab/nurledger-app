@@ -137,22 +137,29 @@ export async function createRefund(input: CreateRefundInput): Promise<{ refundId
     const refundUuid = uuidv4();
 
     // CR-08: stamp the refund with the shift being served, so the drawer math
-    // can deduct the cash that leaves THIS drawer. The M6 refund flow is
-    // cash-only (money out of the drawer) — payment_method is therefore
-    // always 'cash'; the Z-report query filters on it so a future non-cash
-    // refund method cannot skew the expected balance. No shift open
+    // can deduct the cash that leaves THIS drawer. payment_method = the tender
+    // the sale was paid in (its LARGEST payment row — mixed tenders refund
+    // against the dominant method; the Z-report query filters on it so the
+    // drawer math only sees refunds that actually moved cash). No payments
+    // recorded (shouldn't happen) → 'cash' fallback. No shift open
     // (register locked) → shift_id stays NULL: the refund affected no drawer.
     // These columns are LOCAL-ONLY — the cloud refund row carries no shift
     // (shifts never sync), and pulled copies insert NULL so another device's
     // refunds can't move this device's drawer.
     const openShift = await getOpenShift();
     const refundShiftId = openShift ? openShift.id : null;
+    const tenderRow = await db.getFirstAsync<{ method: string }>(
+      `SELECT method FROM payment WHERE sale_id = ?
+        ORDER BY amount_minor DESC, rowid ASC LIMIT 1`,
+      [input.saleId],
+    );
+    const refundMethod = tenderRow?.method ?? 'cash';
 
     await db.runAsync(
       `INSERT INTO refund (id, uuid, sale_id, reason_code, restock, amount_minor, pin_verified_by, shift_id, payment_method, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [refundId, refundUuid, input.saleId, input.reasonCode,
-       input.masterRestock ? 1 : 0, plan.totalMinor, input.userId, refundShiftId, 'cash', now],
+       input.masterRestock ? 1 : 0, plan.totalMinor, input.userId, refundShiftId, refundMethod, now],
     );
 
     const lineById = new Map(ctx.lines.map((l) => [l.saleLineId, l]));
