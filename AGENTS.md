@@ -14,7 +14,7 @@ Offline-first POS + inventory for small grocery shops. **Nurlogic.ai.**
 
 ## Stack
 
-Expo SDK 57 / RN 0.86 / expo-router / expo-sqlite (ADR-009 supersedes ADR-001's Flutter+Drift). Metro port **8186**.
+Expo SDK 58 / RN 0.88 / React 19.3 / expo-router / expo-sqlite (ADR-009 supersedes ADR-001's Flutter+Drift; SDK 57→58 upgrade in `afa92bd`). Metro port **8186**.
 
 ## Verification (after every code change)
 
