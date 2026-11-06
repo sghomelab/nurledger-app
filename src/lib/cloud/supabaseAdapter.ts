@@ -110,13 +110,35 @@ function normTs(v: unknown): number {
  * So: every delta query is ordered (synced_at, id) and paged to exhaustion.
  * The page size stays below the server cap; the page count is a runaway guard
  * (50,000 rows is far beyond a shop's backlog — hitting it means retry).
+ *
+ * Two shapes, because the two parent-row classes differ:
+ *
+ * - PARENT tables (category/product/sale/stock_ledger/refund) are paged
+ *   KEYSET on (synced_at, id): each page starts strictly after the last row
+ *   of the previous page — `(synced_at > a) OR (synced_at = a AND id > b)`.
+ *   OFFSET/range paging over a live table shifts the window when a
+ *   concurrent write lands inside the not-yet-fetched region (a backfill, a
+ *   replay, or a clock-step on the server): a PRE-EXISTING row slides past
+ *   the end of the pull while the cursor has already advanced past it —
+ *   silent, permanent loss. Keyset paging is immune: a row already in the
+ *   window can never be skipped by an insert, because the anchor is the row
+ *   itself, not a positional offset. (A write that lands with a synced_at
+ *   EARLIER than the anchor is a write violating the server-stamp invariant
+ *   and is simply not part of this pull's window — same as before.)
+ * - CHILD rows (sale_line/payment/refund_line) page by OFFSET over a FIXED
+ *   id set (`in (sale_uuid)`); the set cannot grow mid-pull, so offset is
+ *   safe there and the queries stay simpler.
  */
 const PULL_PAGE_SIZE = 500;
 const PULL_MAX_PAGES = 100;
 /** Parent ids per child-row query (keeps the `in (...)` URL short; rows are paged anyway). */
 const PULL_CHILD_CHUNK = 50;
 
-type PagedQuery = (from: number, to: number) => Promise<{ data: unknown[] | null; error: { message: string } | null }>;
+type PullResponse = { data: unknown[] | null; error: { message: string } | null };
+type PagedQuery = (from: number, to: number) => Promise<PullResponse>;
+/** Keyset anchor: the last (synced_at, id) of the previous page; null = first page. */
+type KeysetAnchor = { syncedAt: string; id: string } | null;
+type KeysetQuery = (anchor: KeysetAnchor) => Promise<PullResponse>;
 
 async function pullAllPages<T>(
   query: PagedQuery,
@@ -139,8 +161,32 @@ async function pullAllPages<T>(
   throw new Error(`${label}: exceeded ${PULL_MAX_PAGES * PULL_PAGE_SIZE}-row page cap — retry sync`);
 }
 
-/** Test seam: exported so the paging contract can be unit-tested without a network. */
+async function pullAllKeysetPages<T>(
+  query: KeysetQuery,
+  label: string,
+  map: (r: Record<string, unknown>) => T,
+  hintOnUpgrade = false,
+): Promise<T[]> {
+  const out: T[] = [];
+  let anchor: KeysetAnchor = null;
+  for (let page = 0; page < PULL_MAX_PAGES; page++) {
+    const res = await query(anchor);
+    if (res.error) {
+      const msg = res.error.message;
+      throw new Error(hintOnUpgrade ? withUpgradeHint(label, msg) : `${label}: ${msg}`);
+    }
+    const rows = res.data ?? [];
+    for (const r of rows) out.push(map(r as Record<string, unknown>));
+    if (rows.length < PULL_PAGE_SIZE) return out; // final page
+    const last = rows[rows.length - 1] as Record<string, unknown>;
+    anchor = { syncedAt: String(last.synced_at), id: String(last.id) };
+  }
+  throw new Error(`${label}: exceeded ${PULL_MAX_PAGES * PULL_PAGE_SIZE}-row page cap — retry sync`);
+}
+
+/** Test seams: exported so the paging contracts can be unit-tested without a network. */
 export const __pullAllPagesForTest = pullAllPages;
+export const __pullAllKeysetPagesForTest = pullAllKeysetPages;
 
 export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
   return {
@@ -278,23 +324,35 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
       // stamped `updated_at` with the CLIENT's created/edited time, so an
       // offline batch pushed after peers' cursors had passed its creation
       // time was never pulled again (silent peer data loss).
-      const tableQuery = (table: string, cursorMs: number): PagedQuery => (from, to) =>
+      // Keyset on (synced_at, id) — see the paging block at the top of the
+      // file. First page starts at the cursor (gte, ms-precision boundary);
+      // later pages start strictly after the previous page's last row. The
+      // anchor reuses the server-returned synced_at string verbatim, so no
+      // timestamp is ever re-rounded. `.limit` (not `.range`): keyset pages
+      // have no positional offset, and the limit keeps under PostgREST's cap.
+      const tableQuery = (table: string, cursorMs: number): KeysetQuery => (anchor) =>
         Promise.resolve(
-          c.from(table)
-            .select('*')
-            .eq('outlet_id', cfg.outletId)
-            .gte('synced_at', isoSince(cursorMs))
+          (anchor == null
+            ? c.from(table)
+                .select('*')
+                .eq('outlet_id', cfg.outletId)
+                .gte('synced_at', isoSince(cursorMs))
+            : c.from(table)
+                .select('*')
+                .eq('outlet_id', cfg.outletId)
+                .or(`synced_at.gt.${anchor.syncedAt},and(synced_at.eq.${anchor.syncedAt},id.gt.${anchor.id})`)
+          )
             .order('synced_at', { ascending: true })
             .order('id', { ascending: true })
-            .range(from, to),
+            .limit(PULL_PAGE_SIZE),
         );
 
       const [categories, products, sales, ledger, refunds] = await Promise.all([
-        pullAllPages(tableQuery('category', cursors.category), 'pull categories', mapCategory, true),
-        pullAllPages(tableQuery('product', cursors.product), 'pull products', mapProduct),
-        pullAllPages(tableQuery('sale', cursors.sale), 'pull sales', mapSale),
-        pullAllPages(tableQuery('stock_ledger', cursors.ledger), 'pull ledger', mapLedger),
-        pullAllPages(tableQuery('refund', cursors.refund), 'pull refunds', mapRefund, true),
+        pullAllKeysetPages(tableQuery('category', cursors.category), 'pull categories', mapCategory, true),
+        pullAllKeysetPages(tableQuery('product', cursors.product), 'pull products', mapProduct),
+        pullAllKeysetPages(tableQuery('sale', cursors.sale), 'pull sales', mapSale),
+        pullAllKeysetPages(tableQuery('stock_ledger', cursors.ledger), 'pull ledger', mapLedger),
+        pullAllKeysetPages(tableQuery('refund', cursors.refund), 'pull refunds', mapRefund, true),
       ]);
 
       // Lines + payments ride on the pulled sales (they carry no updated_at).
