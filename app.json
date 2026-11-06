@@ -22,6 +22,7 @@
         "monochromeImage": "./assets/adaptive-icon-monochrome.png"
       },
       "package": "com.nurlogic.nurledger",
+      "allowBackup": false,
       "versionCode": 1
     },
     "web": {
