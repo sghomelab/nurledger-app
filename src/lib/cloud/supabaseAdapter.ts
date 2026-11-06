@@ -293,6 +293,10 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
       const c = clientFor(cfg, storage);
       const results: PushResult[] = [];
       // Strictly sequential — preserves FIFO; a failure stops the batch at that op.
+      // The thrown error carries `failedOpId` (which op) and `uploadedOpIds`
+      // (the ops before it that the server CONFIRMED) so the engine can mark
+      // those uploaded and judge the failing op on its own (quarantine).
+      const uploadedOpIds: string[] = [];
       for (const op of ops) {
         const payload = JSON.parse(op.payload) as Record<string, unknown>;
         const fn =
@@ -304,13 +308,19 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
         const { data, error } = await c.rpc(fn, { p: payload });
         if (error) {
           const status = (error as { status?: number }).status ?? undefined;
-          throw Object.assign(new Error(withUpgradeHint(fn, error.message)), { status });
+          const code = (error as { code?: string }).code ?? undefined;
+          throw Object.assign(new Error(withUpgradeHint(fn, error.message)), {
+            status, code, failedOpId: op.opId, uploadedOpIds,
+          });
         }
         const r = String(data) as PushResult;
         if (!['applied', 'duplicate', 'created', 'updated', 'kept'].includes(r)) {
-          throw new Error(`${fn} returned unexpected result: ${r}`);
+          throw Object.assign(new Error(`${fn} returned unexpected result: ${r}`), {
+            failedOpId: op.opId, uploadedOpIds,
+          });
         }
         results.push(r);
+        uploadedOpIds.push(op.opId);
       }
       return results;
     },

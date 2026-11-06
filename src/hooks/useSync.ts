@@ -34,7 +34,8 @@ import type { CloudAdapter, CloudConfig } from '../lib/cloud/types';
 import type { ProductDeltaRow, SyncPullResult, TableCursors } from '../lib/cloud/types';
 import {
   advanceCursor,
-  isRetryableError,
+  classifyPushFailure,
+  MAX_QUARANTINED_OPS,
   planProductPull,
   pruneCategoryRemap,
   resolveCategoryDelta,
@@ -58,10 +59,14 @@ import {
   buildProductPayload,
   buildRefundPayload,
   buildSalePayload,
+  discardQuarantined,
   getCursor,
   markUploaded,
   pendingCount,
   pendingOps,
+  quarantinedCount,
+  recordOpRejection,
+  retryQuarantined,
   setCursor,
 } from '../repositories/outboxRepository';
 import { getDeviceId } from '../repositories/shiftRepository';
@@ -78,8 +83,10 @@ export interface SyncState {
   enabled: boolean;
   /** A sync is running right now. */
   syncing: boolean;
-  /** Ops waiting in the outbox. */
+  /** Ops waiting in the outbox (excludes quarantined). */
   pending: number;
+  /** Ops the server REJECTED and the engine set aside (owner can retry / discard). */
+  quarantined: number;
   lastSyncedAt: number | null;
   lastError: string | null;
 }
@@ -102,7 +109,16 @@ export function getCloudAdapter(): CloudAdapter {
 
 let inFlight: Promise<void> | null = null;
 
-/** Push one FIFO batch; returns how many ops were confirmed uploaded. */
+/**
+ * Push one FIFO batch; returns the progress made (ops confirmed uploaded +
+ * ops set aside), 0 = nothing left to do.
+ *
+ * Quarantine: when the server REJECTS one op's content (see
+ * classifyPushFailure → 'op') the engine counts the rejection and, after
+ * QUARANTINE_AFTER_ATTEMPTS identical rejections (one per tick), sets that op
+ * aside so it no longer blocks the FIFO behind it. Retryable and
+ * whole-connection failures are never pinned on an op.
+ */
 async function drainBatch(cfg: CloudConfig): Promise<number> {
   if (!cfg) return 0;
   const ops = await pendingOps(DRAIN_BATCH);
@@ -132,7 +148,35 @@ async function drainBatch(cfg: CloudConfig): Promise<number> {
   }
   if (prepared.length === 0) return 0;
 
-  await adapter().pushOps(cfg, prepared); // throws on the first failing op (batch stops there)
+  try {
+    await adapter().pushOps(cfg, prepared); // throws on the first failing op (batch stops there)
+  } catch (e) {
+    const err = e as { status?: number; code?: string; message?: string; failedOpId?: string; uploadedOpIds?: string[] };
+    let progress = 0;
+    // Ops the server confirmed BEFORE the failing one are done — record them
+    // so the failing op becomes the head of the queue (and is judged alone).
+    if (err.uploadedOpIds && err.uploadedOpIds.length > 0) {
+      await markUploaded(err.uploadedOpIds);
+      progress += err.uploadedOpIds.length;
+    }
+    const message = err.message ?? String(e);
+    if (err.failedOpId && classifyPushFailure({ status: err.status, code: err.code, message }) === 'op') {
+      if ((await quarantinedCount()) >= MAX_QUARANTINED_OPS) {
+        throw Object.assign(
+          new Error(
+            `The server keeps rejecting uploads (${message}). This usually means the cloud schema is out of date — re-run the latest setup SQL, then sync again.`,
+          ),
+          { status: err.status, code: err.code },
+        );
+      }
+      const r = await recordOpRejection(err.failedOpId, message);
+      if (r?.quarantined) {
+        console.warn(`[sync] quarantined op ${err.failedOpId} after ${r.attempts} rejections: ${message}`);
+        return progress + 1; // the FIFO is unblocked — keep draining
+      }
+    }
+    throw e; // retry next tick (or surface a connection problem)
+  }
   await markUploaded(prepared.map((p) => p.opId));
   return prepared.length;
 }
@@ -492,11 +536,11 @@ function syncTick(): Promise<void> {
       const status = typeof (e as { status?: unknown })?.status === 'number'
         ? ((e as { status?: number }).status as number)
         : undefined;
-      // Retryable (transport/5xx/408/429) or permanent (4xx) — either way this
-      // tick stops at the failing op and surfaces the error; the next tick
-      // retries (a permanent error keeps failing until the user fixes the
-      // connection, e.g. wrong service key).
-      if (isRetryableError(status, status == null)) {
+      const code = typeof (e as { code?: unknown })?.code === 'string' ? (e as { code: string }).code : undefined;
+      // Retryable (transport/5xx/timeouts) or permanent — either way this tick
+      // stops and surfaces the error; the next tick retries. (A record the
+      // server keeps rejecting is set aside after a few tries — see drainBatch.)
+      if (classifyPushFailure({ status, code, message }) === 'retry') {
         await recordSyncError(message);
       } else {
         await recordSyncError(`Permanent error: ${message}`);
@@ -508,6 +552,9 @@ function syncTick(): Promise<void> {
   return inFlight;
 }
 
+/** Test seam: run one engine tick (no React). */
+export const __syncTickForTests = (): Promise<void> => syncTick();
+
 // ---------------------------------------------------------------------------
 // Hook
 // ---------------------------------------------------------------------------
@@ -517,6 +564,7 @@ const initialState: SyncState = {
   enabled: false,
   syncing: false,
   pending: 0,
+  quarantined: 0,
   lastSyncedAt: null,
   lastError: null,
 };
@@ -525,14 +573,15 @@ export function useSync() {
   const [state, setState] = useState<SyncState>(initialState);
 
   const refresh = useCallback(async () => {
-    const [connected, enabled, pending, lastSyncedAt, lastError] = await Promise.all([
+    const [connected, enabled, pending, quarantined, lastSyncedAt, lastError] = await Promise.all([
       getCloudConfig().then((c) => c !== null),
       isSyncEnabled(),
       pendingCount(),
+      quarantinedCount(),
       getLastSyncedAt(),
       getLastSyncError().then((e) => (e ? e.message : null)),
     ]);
-    setState((s) => ({ ...s, connected, enabled, pending, lastSyncedAt, lastError }));
+    setState((s) => ({ ...s, connected, enabled, pending, quarantined, lastSyncedAt, lastError }));
   }, []);
 
   const syncNow = useCallback(async () => {
@@ -557,6 +606,18 @@ export function useSync() {
     }
   }, [refresh]);
 
+  /** Owner action: put the rejected ops back in the queue (original order) and sync. */
+  const retryRejected = useCallback(async () => {
+    await retryQuarantined();
+    await syncNow();
+  }, [syncNow]);
+
+  /** Owner action: stop trying to upload the rejected ops (data stays on this device). */
+  const discardRejected = useCallback(async () => {
+    await discardQuarantined();
+    await refresh();
+  }, [refresh]);
+
   // Auto-sync while mounted: once on mount, then every AUTO_SYNC_MS. The
   // in-flight guard makes overlapping ticks (multiple mounted hooks) a no-op.
   useEffect(() => {
@@ -568,5 +629,5 @@ export function useSync() {
     return () => clearInterval(iv);
   }, [refresh, syncNow]);
 
-  return { ...state, syncNow, refresh };
+  return { ...state, syncNow, refresh, retryRejected, discardRejected };
 }

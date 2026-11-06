@@ -16,7 +16,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 import { getDb } from '../db/database';
 import { uuidv4 } from '../lib/ids';
-import { productResolveRef, saleResolveCandidates, type SyncEntity } from '../lib/sync';
+import { productResolveRef, saleResolveCandidates, QUARANTINE_AFTER_ATTEMPTS, type SyncEntity } from '../lib/sync';
 
 export interface PendingOp {
   id: string;
@@ -55,7 +55,7 @@ export async function pendingOps(limit = 20): Promise<PendingOp[]> {
   return await db.getAllAsync<PendingOp>(
     `SELECT id, op_id AS opId, entity, payload, created_at AS createdAt, rowid AS seq
        FROM outbox
-      WHERE uploaded_at IS NULL
+      WHERE uploaded_at IS NULL AND quarantined_at IS NULL
       ORDER BY rowid ASC
       LIMIT ?`,
     [limit],
@@ -70,17 +70,122 @@ export async function markUploaded(opIds: string[]): Promise<void> {
   await db.runAsync(`UPDATE outbox SET uploaded_at = ? WHERE op_id IN (${ph})`, [Date.now(), ...opIds]);
 }
 
-/** "N ops waiting" (FR-503 banner). */
+/** "N ops waiting" (FR-503 banner) — excludes quarantined ops (shown separately). */
 export async function pendingCount(): Promise<number> {
   const db = await getDb();
-  const row = await db.getFirstAsync<{ n: number }>('SELECT COUNT(*) AS n FROM outbox WHERE uploaded_at IS NULL');
+  const row = await db.getFirstAsync<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM outbox WHERE uploaded_at IS NULL AND quarantined_at IS NULL',
+  );
   return row ? row.n : 0;
+}
+
+/**
+ * Everything not yet on the server and not knowingly abandoned: waiting +
+ * quarantined. This is what a factory reset would LOSE, so the reset warning
+ * must use it (not pendingCount).
+ */
+export async function unsyncedCount(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM outbox WHERE uploaded_at IS NULL AND discarded_at IS NULL',
+  );
+  return row ? row.n : 0;
+}
+
+// ---------------- quarantine (server-rejected ops) ----------------
+
+export interface QuarantinedOp {
+  opId: string;
+  entity: SyncEntity;
+  attempts: number;
+  lastError: string | null;
+  quarantinedAt: number;
+}
+
+/**
+ * Record that the server REJECTED this op's content. Increments `attempts`;
+ * once it reaches QUARANTINE_AFTER_ATTEMPTS the op is set aside so it stops
+ * blocking the FIFO. Returns the new state. No-op (null) for an unknown or
+ * already-uploaded op.
+ */
+export async function recordOpRejection(
+  opId: string,
+  message: string,
+  threshold = QUARANTINE_AFTER_ATTEMPTS,
+): Promise<{ attempts: number; quarantined: boolean } | null> {
+  const db = await getDb();
+  const now = Date.now();
+  await db.runAsync(
+    `UPDATE outbox
+        SET attempts = attempts + 1,
+            last_error = ?,
+            quarantined_at = CASE WHEN attempts + 1 >= ? THEN ? ELSE quarantined_at END
+      WHERE op_id = ? AND uploaded_at IS NULL`,
+    [message.slice(0, 500), threshold, now, opId],
+  );
+  const row = await db.getFirstAsync<{ attempts: number; quarantinedAt: number | null } | null>(
+    'SELECT attempts, quarantined_at AS quarantinedAt FROM outbox WHERE op_id = ? AND uploaded_at IS NULL',
+    [opId],
+  );
+  return row ? { attempts: row.attempts, quarantined: row.quarantinedAt != null } : null;
+}
+
+export async function quarantinedCount(): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM outbox
+      WHERE uploaded_at IS NULL AND quarantined_at IS NOT NULL AND discarded_at IS NULL`,
+  );
+  return row ? row.n : 0;
+}
+
+export async function quarantinedOps(limit = 20): Promise<QuarantinedOp[]> {
+  const db = await getDb();
+  return await db.getAllAsync<QuarantinedOp>(
+    `SELECT op_id AS opId, entity, attempts, last_error AS lastError, quarantined_at AS quarantinedAt
+       FROM outbox
+      WHERE uploaded_at IS NULL AND quarantined_at IS NOT NULL AND discarded_at IS NULL
+      ORDER BY created_at ASC, rowid ASC
+      LIMIT ?`,
+    [limit],
+  );
+}
+
+/**
+ * Put every quarantined op back in the queue. Their created_at/rowid are
+ * unchanged, so they drain in their ORIGINAL order (a refund still follows its
+ * sale). Attempt counters reset so each gets a fresh set of tries.
+ */
+export async function retryQuarantined(): Promise<number> {
+  const db = await getDb();
+  const n = await quarantinedCount();
+  await db.runAsync(
+    `UPDATE outbox SET quarantined_at = NULL, attempts = 0, last_error = NULL
+      WHERE uploaded_at IS NULL AND quarantined_at IS NOT NULL AND discarded_at IS NULL`,
+  );
+  return n;
+}
+
+/**
+ * Owner decision: stop trying to upload the quarantined ops. Nothing is
+ * deleted — the sales/stock rows stay on this device, the outbox rows are kept
+ * (audit) and never drained again.
+ */
+export async function discardQuarantined(): Promise<number> {
+  const db = await getDb();
+  const n = await quarantinedCount();
+  await db.runAsync(
+    `UPDATE outbox SET discarded_at = ?
+      WHERE uploaded_at IS NULL AND quarantined_at IS NOT NULL AND discarded_at IS NULL`,
+    [Date.now()],
+  );
+  return n;
 }
 
 export async function pendingCountByEntity(): Promise<Record<SyncEntity, number>> {
   const db = await getDb();
   const rows = await db.getAllAsync<{ entity: SyncEntity; n: number }>(
-    'SELECT entity, COUNT(*) AS n FROM outbox WHERE uploaded_at IS NULL GROUP BY entity',
+    'SELECT entity, COUNT(*) AS n FROM outbox WHERE uploaded_at IS NULL AND quarantined_at IS NULL GROUP BY entity',
   );
   const out: Record<SyncEntity, number> = { sale: 0, ledger: 0, product: 0, refund: 0, category: 0 };
   for (const r of rows) out[r.entity] = r.n;

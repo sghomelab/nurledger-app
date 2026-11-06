@@ -11,7 +11,7 @@ import { useT } from '../src/hooks/useT';
 import { getDb } from '../src/db/database';
 import { resetAllData } from '../src/db/firstRun';
 import { updateOutlet } from '../src/repositories/outletRepository';
-import { pendingCount } from '../src/repositories/outboxRepository';
+import { quarantinedOps, unsyncedCount, type QuarantinedOp } from '../src/repositories/outboxRepository';
 import {
   disconnectCloud,
   getCloudConfig,
@@ -224,6 +224,27 @@ export default function SettingsScreen() {
       }
     });
 
+  // Server-rejected (quarantined) records: show the first few reasons + retry/discard.
+  const [rejected, setRejected] = useState<QuarantinedOp[]>([]);
+  useEffect(() => {
+    if (sync.quarantined > 0) void quarantinedOps(3).then(setRejected);
+    else setRejected([]);
+  }, [sync.quarantined]);
+
+  const confirmDiscardRejected = () =>
+    Alert.alert(
+      t('settings.rejectedDiscardTitle'),
+      t('settings.rejectedDiscardBody', { n: sync.quarantined }),
+      [
+        { text: t('common.cancel') },
+        {
+          text: t('settings.rejectedDiscardConfirm'),
+          style: 'destructive',
+          onPress: () => requireCloudGate(async () => { await sync.discardRejected(); }),
+        },
+      ],
+    );
+
   const toggleSync = (on: boolean) => {
     requireCloudGate(async () => {
       await setSyncEnabled(on);
@@ -262,7 +283,7 @@ export default function SettingsScreen() {
     // Unsynced outbox ops are deleted by the reset — say so before it happens.
     let pending = 0;
     try {
-      pending = await pendingCount();
+      pending = await unsyncedCount();
     } catch {
       pending = 0;
     }
@@ -436,6 +457,28 @@ export default function SettingsScreen() {
                 </Text>
                 {sync.lastError && <Text style={styles.cloudError}>{sync.lastError}</Text>}
               </View>
+              {sync.quarantined > 0 && (
+                <View style={styles.rejectedBox}>
+                  <Text style={styles.rejectedTitle}>{t('settings.rejectedTitle')}</Text>
+                  <Text style={styles.cloudMetaText}>{t('settings.rejectedNote', { n: sync.quarantined })}</Text>
+                  {rejected.map((r) => (
+                    <Text key={r.opId} style={styles.cloudError} numberOfLines={2}>
+                      {`${r.entity}: ${r.lastError ?? ''}`}
+                    </Text>
+                  ))}
+                  <View style={[styles.cloudBtns, { marginTop: spacing.sm }]}>
+                    <Pressable
+                      style={[styles.cloudBtn, { flex: 1 }]}
+                      onPress={() => requireCloudGate(async () => { await sync.retryRejected(); })}
+                    >
+                      <Text style={styles.cloudBtnText}>{t('settings.rejectedRetry')}</Text>
+                    </Pressable>
+                    <Pressable style={[styles.cloudBtn, { flex: 1, backgroundColor: colors.danger }]} onPress={confirmDiscardRejected}>
+                      <Text style={styles.cloudBtnText}>{t('settings.rejectedDiscard')}</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
               <View style={styles.cloudBtns}>
                 <Pressable style={[styles.cloudBtn, { flex: 1 }]} onPress={inviteDevice}>
                   <Text style={styles.cloudBtnText}>{t('settings.inviteDevice')}</Text>
@@ -610,6 +653,11 @@ const styles = StyleSheet.create({
   cloudMeta: { gap: 4, marginBottom: spacing.md },
   cloudMetaText: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500 },
   cloudError: { fontFamily: fonts.sans, fontSize: 12, color: colors.danger, lineHeight: 16 },
+  rejectedBox: {
+    backgroundColor: colors.dangerSoft, borderRadius: radius.control, padding: spacing.md,
+    gap: 6, marginBottom: spacing.md,
+  },
+  rejectedTitle: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.danger },
   cloudBtns: { flexDirection: 'row', gap: spacing.sm },
   cloudBtn: {
     backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 12, alignItems: 'center',

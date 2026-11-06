@@ -7,7 +7,7 @@
  */
 
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
-import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, MIGRATE_V3_TO_V4_SQL, MIGRATE_V4_TO_V5_SQL, MIGRATE_V5_TO_V6_SQL, MIGRATE_V6_TO_V7_SQL, ENSURE_M4_SQL, ENSURE_M6_SQL, ENSURE_M7_SQL, SCHEMA_SQL, SCHEMA_VERSION, OUTBOX_PENDING_INDEX_SQL, STOCK_VIEW_SQL } from './schema';
+import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, MIGRATE_V3_TO_V4_SQL, MIGRATE_V4_TO_V5_SQL, MIGRATE_V5_TO_V6_SQL, MIGRATE_V6_TO_V7_SQL, ENSURE_M4_SQL, ENSURE_M6_SQL, ENSURE_M7_SQL, SCHEMA_SQL, SCHEMA_VERSION, OUTBOX_QUARANTINE_COLUMNS, OUTBOX_PENDING_INDEX_SQL, STOCK_VIEW_SQL } from './schema';
 import { isSeeded, ensureDefaultUsers, ensureOutlet } from './seed';
 import { uuidv4 } from '../lib/ids';
 
@@ -82,6 +82,7 @@ export async function getDb(): Promise<SQLiteDatabase> {
             // ensureM7() below (every bootstrap).
             await database.execAsync(MIGRATE_V6_TO_V7_SQL);
           }
+          // v8: outbox quarantine columns — guarded ALTERs in ensureM8() below.
           await database.runAsync('INSERT OR REPLACE INTO schema_meta (id, v) VALUES (1, ?)', [
             SCHEMA_VERSION,
           ]);
@@ -113,6 +114,9 @@ export async function getDb(): Promise<SQLiteDatabase> {
       // v7 self-heal: re-assert the category_id_map table and the guarded
       // refund.shift_id / payment_method ALTERs on EVERY bootstrap (idempotent).
       await ensureM7(database);
+
+      // v8 self-heal: the outbox quarantine columns (guarded ALTERs, EVERY bootstrap).
+      await ensureM8(database);
 
       // FR-200: shift = {device, cashier} pair — stable device identity
       // (created once on first run; persists across restarts).
@@ -218,6 +222,14 @@ async function ensureM6(db: SQLiteDatabase): Promise<void> {
  * Pulled refunds (other devices) insert NULL by design — cash left the
  * origin device's drawer, not this one's.
  */
+export async function ensureM8(db: SQLiteDatabase): Promise<void> {
+  for (const [col, ddl] of OUTBOX_QUARANTINE_COLUMNS) {
+    if (!(await hasColumn(db, 'outbox', col))) {
+      await db.execAsync(`ALTER TABLE outbox ADD COLUMN ${col} ${ddl};`);
+    }
+  }
+}
+
 async function ensureM7(db: SQLiteDatabase): Promise<void> {
   await db.execAsync(ENSURE_M7_SQL);
   if (!(await hasColumn(db, 'refund', 'shift_id'))) {

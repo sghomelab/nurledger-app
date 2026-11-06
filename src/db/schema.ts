@@ -3,7 +3,7 @@
  * Bump SCHEMA_VERSION and add a migration step in database.ts when changing existing tables.
  */
 
-export const SCHEMA_VERSION = 7;
+export const SCHEMA_VERSION = 8;
 
 /**
  * M2: active-cart persistence (NFR-3 — every cart mutation is written to SQLite
@@ -360,7 +360,14 @@ CREATE TABLE IF NOT EXISTS outbox (
   entity TEXT NOT NULL,
   payload TEXT NOT NULL,
   created_at INTEGER NOT NULL,
-  uploaded_at INTEGER
+  uploaded_at INTEGER,
+  -- v8 quarantine: an op the server REJECTS (400/409/422) is retried, then set
+  -- aside (quarantined_at) so it cannot block the FIFO behind it. The source
+  -- rows are never touched. discarded_at = the owner chose to stop retrying.
+  attempts INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  quarantined_at INTEGER,
+  discarded_at INTEGER
 );
 -- M5: the drain query (pending ops, FIFO) is the hot path — index it.
 -- (SQLite rejects the rowid pseudo-column in an index column list;
@@ -493,3 +500,11 @@ export const MIGRATE_V6_TO_V7_SQL = CATEGORY_ID_MAP_SQL;
 
 /** v7 self-heal (every bootstrap, see ENSURE_M4_SQL for the pattern). */
 export const ENSURE_M7_SQL = CATEGORY_ID_MAP_SQL;
+
+/** v8 outbox quarantine columns (non-idempotent ALTERs run guarded in ensureM8, database.ts). */
+export const OUTBOX_QUARANTINE_COLUMNS: ReadonlyArray<readonly [string, string]> = [
+  ['attempts', 'INTEGER NOT NULL DEFAULT 0'],
+  ['last_error', 'TEXT'],
+  ['quarantined_at', 'INTEGER'],
+  ['discarded_at', 'INTEGER'],
+];
