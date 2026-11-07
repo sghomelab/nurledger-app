@@ -1,3 +1,4 @@
+import { centeredColumn } from '../../src/lib/layout';
 import { useEffect, useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -144,7 +145,7 @@ export default function ProductFormScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, centeredColumn]} keyboardShouldPersistTaps="handled">
         <Field label="Name *"><TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. Rice 5kg" /></Field>
         <View style={styles.row}>
           <View style={styles.colHalf}><Field label="SKU *"><TextInput style={styles.input} value={sku} onChangeText={setSku} placeholder="RICE-5KG" autoCapitalize="characters" autoCorrect={false} /></Field></View>

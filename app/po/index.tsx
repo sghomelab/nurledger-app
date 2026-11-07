@@ -1,3 +1,5 @@
+import { useLayout } from '../../src/hooks/useLayout';
+import { GridCell } from '../../src/components/GridCell';
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { FlatList, Pressable, Text, StyleSheet, RefreshControl, View } from 'react-native';
@@ -27,6 +29,7 @@ const STATUS_TONE: Record<string, 'neutral' | 'primary' | 'positive' | 'warning'
  * Tapping a row opens the detail + Receive screen.
  */
 export default function POListScreen() {
+  const layout = useLayout();
   const router = useRouter();
   const { outlet } = useOutlet();
   const { orders, reload } = usePurchaseOrders();
@@ -69,9 +72,13 @@ export default function POListScreen() {
   return (
     <View style={styles.wrap}>
       <FlatList
+        key={`cols-${layout.columns}`}
+        numColumns={layout.columns}
         data={orders ?? []}
         keyExtractor={(i) => i.id}
-        renderItem={renderItem}
+        renderItem={({ item }) => (
+          <GridCell columns={layout.columns}>{renderItem({ item })}</GridCell>
+        )}
         contentContainerStyle={
           (orders ?? []).length === 0 ? styles.empty : { padding: spacing.lg, paddingBottom: 120 }
         }

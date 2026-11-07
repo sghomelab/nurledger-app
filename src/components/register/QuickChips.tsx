@@ -8,9 +8,12 @@ import type { ProductWithStock } from '../../types';
 export function QuickChips({
   products,
   onPick,
+  grid = false,
 }: {
   products: ProductWithStock[];
   onPick: (p: ProductWithStock) => void;
+  /** Tablet two-pane: wrap the chips into a scrollable catalogue grid that fills the pane. */
+  grid?: boolean;
 }) {
   const { t } = useT();
   if (products.length === 0) {
@@ -21,7 +24,13 @@ export function QuickChips({
     );
   }
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+    <ScrollView
+      horizontal={!grid}
+      showsHorizontalScrollIndicator={false}
+      style={grid ? styles.gridScroll : undefined}
+      contentContainerStyle={grid ? styles.gridRow : styles.row}
+      keyboardShouldPersistTaps="handled"
+    >
       {products.map((p) => {
         const out = p.stockQty <= 0;
         return (
@@ -43,6 +52,15 @@ export function QuickChips({
 }
 
 const styles = StyleSheet.create({
+  gridScroll: { flex: 1 },
+  gridRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
   row: {
     flexGrow: 1,
     alignItems: 'center',

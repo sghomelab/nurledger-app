@@ -1,3 +1,4 @@
+import { centeredColumn } from '../src/lib/layout';
 import { useState } from 'react';
 import { useRouter, Stack } from 'expo-router';
 import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
@@ -69,7 +70,7 @@ export default function ProductDataScreen() {
   return (
     <View style={styles.wrap}>
       <Stack.Screen options={{ title: 'Product Data (CSV)', headerBackVisible: true }} />
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 48 }}>
+      <ScrollView contentContainerStyle={[{ padding: spacing.lg, paddingBottom: 48 }, centeredColumn]}>
         <Text style={styles.intro}>
           Move the product catalog in and out of the app as a CSV file. Money in the file is in your
           store currency (major units). Import updates products by SKU — new SKUs are added, existing

@@ -1,3 +1,4 @@
+import { wideColumn } from '../../src/lib/layout';
 import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -150,7 +151,7 @@ export default function ShiftTab() {
   }, [newUser, addUser]);
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView contentContainerStyle={[styles.content, wideColumn]}>
       {/* User at the register (FR-500) */}
       <Card style={styles.userCard}>
         <View style={styles.userRow}>
@@ -529,7 +530,7 @@ const styles = StyleSheet.create({
   saveBtn: { flex: 1, height: 48, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   saveText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
-  sheetBody: { backgroundColor: colors.white, borderTopLeftRadius: radius.card + 4, borderTopRightRadius: radius.card + 4, height: '78%' },
+  sheetBody: { width: '100%', maxWidth: 640, alignSelf: 'center', backgroundColor: colors.white, borderTopLeftRadius: radius.card + 4, borderTopRightRadius: radius.card + 4, height: '78%' },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingBottom: spacing.sm },
   sheetTitle: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
 });

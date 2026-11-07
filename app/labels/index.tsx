@@ -1,3 +1,4 @@
+import { centeredColumn } from '../../src/lib/layout';
 import { useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -114,7 +115,7 @@ export default function LabelsScreen() {
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[{ padding: spacing.lg, gap: spacing.lg }, centeredColumn]} keyboardShouldPersistTaps="handled">
         {products === null ? (
           <Text style={styles.muted}>Loading products…</Text>
         ) : (

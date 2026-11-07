@@ -1,3 +1,5 @@
+import { useLayout } from '../../src/hooks/useLayout';
+import { GridCell } from '../../src/components/GridCell';
 import { useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { FlatList, Pressable, Text, StyleSheet, RefreshControl, View } from 'react-native';
@@ -28,6 +30,7 @@ function fmtDays(daysLeft: number): string {
  * opens the product detail.
  */
 export default function ExpiryTab() {
+  const layout = useLayout();
   const router = useRouter();
   const [entries, setEntries] = useState<ExpiryRadarEntry[]>([]);
   const [summary, setSummary] = useState<ExpiryRadarSummary | null>(null);
@@ -86,22 +89,27 @@ export default function ExpiryTab() {
   return (
     <View style={styles.wrap}>
       <FlatList
+        key={`cols-${layout.columns}`}
+        numColumns={layout.columns}
         data={entries}
         keyExtractor={(i) => i.id}
-        renderItem={renderItem}
+        renderItem={({ item }) => (
+          <GridCell columns={layout.columns}>{renderItem({ item })}</GridCell>
+        )}
         contentContainerStyle={entries.length === 0 ? { flexGrow: 1 } : { padding: spacing.lg, paddingBottom: 24 }}
         ListHeaderComponent={
           loaded && summary ? (
             <View style={styles.cards}>
               <SummaryCard
+                wide={layout.isTablet}
                 label="Expired waste"
                 value={String(summary.expiredWasteQty)}
                 color={colors.danger}
                 icon="warning-outline"
               />
-              <SummaryCard label="Expiring" value={String(summary.expiringQty)} color="#B45309" icon="hourglass-outline" />
-              <SummaryCard label="Other" value={String(summary.otherQty)} color={colors.slate500} icon="albums-outline" />
-              <SummaryCard label="Batches" value={String(summary.batchCount)} color={colors.primary} icon="pricetags-outline" />
+              <SummaryCard wide={layout.isTablet} label="Expiring" value={String(summary.expiringQty)} color="#B45309" icon="hourglass-outline" />
+              <SummaryCard wide={layout.isTablet} label="Other" value={String(summary.otherQty)} color={colors.slate500} icon="albums-outline" />
+              <SummaryCard wide={layout.isTablet} label="Batches" value={String(summary.batchCount)} color={colors.primary} icon="pricetags-outline" />
             </View>
           ) : undefined
         }
@@ -120,9 +128,9 @@ export default function ExpiryTab() {
   );
 }
 
-function SummaryCard({ label, value, color, icon }: { label: string; value: string; color: string; icon: keyof typeof Ionicons.glyphMap }) {
+function SummaryCard({ label, value, color, icon, wide }: { label: string; value: string; color: string; icon: keyof typeof Ionicons.glyphMap; wide?: boolean }) {
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, wide && { flexBasis: '22%' }]}>
       <View style={styles.cardHead}>
         <Ionicons name={icon} size={16} color={color} />
         <Text style={styles.cardLabel}>{label}</Text>

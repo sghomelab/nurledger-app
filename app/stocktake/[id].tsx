@@ -1,3 +1,4 @@
+import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -174,7 +175,7 @@ export default function StocktakeDetailScreen() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView contentContainerStyle={[{ paddingBottom: 120 }, centeredColumn]}>
         {/* Variance review */}
         <Text style={styles.sectionTitle}>Variance review</Text>
         <View style={styles.tableHead}>

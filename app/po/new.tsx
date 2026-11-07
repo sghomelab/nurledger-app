@@ -1,3 +1,4 @@
+import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
@@ -156,7 +157,7 @@ export default function NewPOScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, centeredColumn]} keyboardShouldPersistTaps="handled">
         <Field label="Vendor *">
           <TextInput
             style={styles.input}

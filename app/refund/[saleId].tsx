@@ -1,3 +1,4 @@
+import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -219,7 +220,7 @@ export default function RefundScreen() {
   return (
     <View style={styles.wrap}>
       <ScrollView
-        contentContainerStyle={{ padding: spacing.lg, paddingBottom: 140 }}
+        contentContainerStyle={[{ padding: spacing.lg, paddingBottom: 140 }, centeredColumn]}
         refreshControl={<RefreshControl refreshing={false} tintColor={colors.slate300} onRefresh={() => void load()} />}
       >
         <View style={styles.header}>

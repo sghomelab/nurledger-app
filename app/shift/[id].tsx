@@ -1,3 +1,4 @@
+import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useState } from 'react';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -58,7 +59,7 @@ export default function ShiftDetail() {
           <Text style={styles.notFound}>Loading…</Text>
         </View>
       ) : (
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, centeredColumn]}>
           <Card style={styles.metaCard}>
             <View style={styles.metaRow}>
               <Text style={styles.metaTitle}>

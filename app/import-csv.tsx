@@ -1,3 +1,4 @@
+import { centeredColumn } from '../src/lib/layout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
 import { getPickedFile } from '../src/lib/pickedFile';
@@ -134,7 +135,7 @@ export default function ImportCsvScreen() {
       )}
 
       {state.phase === 'parsed' && (
-        <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 120 }}>
+        <ScrollView contentContainerStyle={[{ padding: spacing.lg, paddingBottom: 120 }, centeredColumn]}>
           <Text style={styles.fileName}>{fileName}</Text>
           <View style={styles.summaryRow}>
             <Chip label={`${state.result.okCount} importable`} tone="positive" />

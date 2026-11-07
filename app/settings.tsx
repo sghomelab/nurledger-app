@@ -1,3 +1,4 @@
+import { centeredColumn } from '../src/lib/layout';
 import { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, Pressable, Alert, KeyboardAvoidingView, Platform, Switch,
@@ -370,7 +371,7 @@ export default function SettingsScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={[styles.content, centeredColumn]} keyboardShouldPersistTaps="handled">
         <Card>
           <SectionTitle>{t('settings.store')}</SectionTitle>
           <Field label={t('settings.storeName')}>
