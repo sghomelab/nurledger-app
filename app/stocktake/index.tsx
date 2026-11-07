@@ -120,8 +120,7 @@ export default function StocktakeListScreen() {
                 {item.categoryName ?? t('labels.allProducts')}
               </Text>
               <Text style={styles.rowMeta} numberOfLines={1}>
-                {new Date(item.startedAt).toLocaleString()} · {item.lineCount} products
-                {item.blind ? ' · blind' : ''}
+                {new Date(item.startedAt).toLocaleString()} · {t(item.blind ? 'stList.productsBlind' : 'stList.productsPlain', { n: item.lineCount })}
               </Text>
             </View>
             <StocktakeChip applied={item.appliedAt !== null} />

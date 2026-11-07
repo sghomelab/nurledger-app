@@ -258,7 +258,9 @@ export default function InsightsTab() {
               </Pressable>
             </View>
             <Text style={styles.hint}>
-              Days of stock left at the {periodLabel(period).toLowerCase()} velocity.
+              {t('insights.stockoutHint', {
+                period: t(period === 'today' ? 'insights.periodToday' : period === 'period' ? 'insights.periodCurrent' : 'insights.periodAll').toLowerCase(),
+              })}
             </Text>
             {ins.data!.stockoutRows.length === 0 ? (
               <Text style={styles.empty}>{t('insights.noProductsWithSalesIn')}</Text>

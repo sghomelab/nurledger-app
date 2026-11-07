@@ -116,7 +116,7 @@ export default function StocktakeDetailScreen() {
       await load();
       Alert.alert(
         t('stDetail.stocktakeApplied'),
-        `${r.appliedLines} adjustment${r.appliedLines === 1 ? '' : 's'} written to the stock ledger.`,
+        t(r.appliedLines === 1 ? 'stDetail.adjustmentOne' : 'stDetail.adjustmentMany', { n: r.appliedLines }),
         [{ text: t('common.ok'), onPress: () => router.back() }],
       );
     } catch (e) {

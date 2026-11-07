@@ -294,7 +294,7 @@ export default function NewPOScreen() {
           rows={suppliers.map((s) => ({
             key: s.id,
             label: s.name,
-            sublabel: `${s.leadTimeDays}d lead · ${s.productCount} linked`,
+            sublabel: t('poNew.supplierSublabel', { lead: s.leadTimeDays, n: s.productCount }),
             onPress: () => {
               setSupplier(s.name);
               setSupplierPickOpen(false);

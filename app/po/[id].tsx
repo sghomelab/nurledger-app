@@ -135,8 +135,8 @@ export default function PODetailScreen() {
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
           <Text style={styles.vendor} numberOfLines={1}>{po.supplierName}</Text>
-          <Text style={styles.meta}>{po.terms.toUpperCase()} · created {fmtDate(po.createdAt)}</Text>
-          {po.receivedAt ? <Text style={styles.meta}>received {fmtDate(po.receivedAt)}</Text> : null}
+          <Text style={styles.meta}>{po.terms.toUpperCase()} · {t('poDetail.createdOn', { date: fmtDate(po.createdAt) })}</Text>
+          {po.receivedAt ? <Text style={styles.meta}>{t('poDetail.receivedOn', { date: fmtDate(po.receivedAt) })}</Text> : null}
         </View>
         <Chip label={po.status.toUpperCase()} tone={PO_STATUS_TONE[po.status] ?? 'neutral'} />
       </View>
@@ -144,7 +144,7 @@ export default function PODetailScreen() {
       <View style={styles.totalCard}>
         <Text style={styles.totalLabel}>{t('poDetail.poTotal')}</Text>
         <NumberText style={styles.totalVal}>{formatMoney(po.totalCostMinor, currency)}</NumberText>
-        <Text style={styles.linesCount}>{po.lines.length} line{po.lines.length === 1 ? '' : 's'}</Text>
+        <Text style={styles.linesCount}>{t(po.lines.length === 1 ? 'poDetail.linesOne' : 'poDetail.linesMany', { n: po.lines.length })}</Text>
       </View>
 
       <Text style={styles.sectionTitle}>{t('poDetail.lines')}</Text>
@@ -180,7 +180,7 @@ export default function PODetailScreen() {
         <View style={styles.remainNote}>
           <Ionicons name="information-circle-outline" size={16} color={colors.slate500} />
           <Text style={styles.remainText}>
-            {po.lines.reduce((s, l) => s + remainingToReceive(l), 0)} base units still to receive.
+            {t('poDetail.unitsStillToReceive', { n: po.lines.reduce((s, l) => s + remainingToReceive(l), 0) })}
           </Text>
         </View>
       )}
@@ -193,7 +193,7 @@ export default function PODetailScreen() {
         {receivable ? (
           <Pressable style={[styles.receiveBtn, busy && { opacity: 0.7 }]} onPress={receive} disabled={busy}>
             <Ionicons name="checkbox-outline" size={20} color={colors.white} />
-            <Text style={styles.receiveText}>{busy ? 'Receiving…' : 'Receive PO'}</Text>
+            <Text style={styles.receiveText}>{busy ? t('poDetail.receiving') : t('poDetail.receivePo')}</Text>
           </Pressable>
         ) : (
           <View style={[styles.receiveBtn, { backgroundColor: colors.slate100, opacity: 1 }]}>

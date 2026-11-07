@@ -186,7 +186,7 @@ export default function RefundScreen() {
         masterRestock,
         userId: activeUser?.id ?? null,
       });
-      Alert.alert(t('refund.refundComplete'), `Refunded ${formatMoney(totalMinor, currency)}.`, [
+      Alert.alert(t('refund.refundComplete'), t('refund.refundedAmount', { amount: formatMoney(totalMinor, currency) }), [
         { text: t('common.ok'), onPress: () => router.back() },
       ]);
     } catch (e) {
@@ -283,14 +283,14 @@ export default function RefundScreen() {
                   </View>
                   <Text style={styles.lineMeta} numberOfLines={1}>
                     {l.sku} · {formatMoney(l.unitPriceMinor, currency)}
-                    {l.isWeighed ? '/kg' : ''} · sold {l.isWeighed ? `${l.qtyG} g` : `${l.qty}`}
+                    {l.isWeighed ? '/kg' : ''} · {t('refund.soldQty', { qty: l.isWeighed ? `${l.qtyG} g` : `${l.qty}` })}
                     {(l.refundedQty > 0 || (l.refundedQtyG ?? 0) > 0) &&
-                      ` · refunded ${l.isWeighed ? `${l.refundedQtyG} g` : `${l.refundedQty}`}`}
+                      ` · ${t('refund.refundedQty', { qty: l.isWeighed ? `${l.refundedQtyG} g` : `${l.refundedQty}` })}`}
                   </Text>
                 </View>
                 {requested > 0 && (
                   <NumberText style={[styles.lineAmount, overGrams && { color: colors.danger }]}>
-                    {overGrams ? 'too many' : formatMoney(amount, currency)}
+                    {overGrams ? t('refund.tooMany') : formatMoney(amount, currency)}
                   </NumberText>
                 )}
               </View>
@@ -341,7 +341,7 @@ export default function RefundScreen() {
                     >
                       <Ionicons name="add" size={18} color={st.qty >= remaining ? colors.slate300 : colors.slate700} />
                     </Pressable>
-                    <Text style={styles.remaining}>of {remaining} left</Text>
+                    <Text style={styles.remaining}>{t('refund.ofLeft', { n: remaining })}</Text>
                   </View>
                 )}
                 <Pressable
@@ -374,7 +374,7 @@ export default function RefundScreen() {
           <Text style={styles.totalLabel}>{t('refund.refundTotal')}</Text>
           <NumberText style={styles.totalVal}>{formatMoney(totals.totalMinor, currency)}</NumberText>
           <Text style={styles.linesCount}>
-            {selectedCount} line{selectedCount === 1 ? '' : 's'} selected
+            {t(selectedCount === 1 ? 'refund.linesOne' : 'refund.linesMany', { n: selectedCount })}
           </Text>
         </View>
       </ScrollView>

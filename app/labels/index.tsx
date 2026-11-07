@@ -173,18 +173,16 @@ export default function LabelsScreen() {
                 <LayoutChip label={t('labels.a4Sheet')} selected={layout === 'sheetA4'} onPress={() => setLayout('sheetA4')} />
               </View>
               <Text style={styles.muted}>
-                {layout === 'roll58'
-                  ? 'One 58×40mm label per page — thermal roll printer.'
-                  : '3 columns of 58×40mm labels per A4 page — laser/inkjet.'}
+                {layout === 'roll58' ? t('labels.thermalRollHint') : t('labels.a4Hint')}
               </Text>
             </View>
 
             <View style={styles.summary}>
               <Text style={styles.summaryText}>
-                {printable.length} product{printable.length === 1 ? '' : 's'} × {copies} = {totalLabels} label{totalLabels === 1 ? '' : 's'}
+                {printable.length} {t(printable.length === 1 ? 'labels.productsOne' : 'labels.productsMany')} × {copies} = {totalLabels} {t(totalLabels === 1 ? 'labels.labelOne' : 'labels.labelMany')}
               </Text>
               {skipped > 0 && (
-                <Text style={styles.warning}>{skipped} skipped — no printable barcode/SKU</Text>
+                <Text style={styles.warning}>{t('labels.skippedNoBarcode', { n: skipped })}</Text>
               )}
             </View>
 
@@ -195,7 +193,7 @@ export default function LabelsScreen() {
             >
               <Ionicons name="print-outline" size={18} color={colors.white} />
               <Text style={styles.ctaText}>
-                {state.status === 'busy' ? 'Generating…' : 'Generate & Share'}
+                {state.status === 'busy' ? t('labels.generating') : t('labels.generateShare')}
               </Text>
             </Pressable>
 

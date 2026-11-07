@@ -178,7 +178,7 @@ export default function SuppliersScreen() {
                 onPress={() => void save()}
                 disabled={saving || !name.trim()}
               >
-                <Text style={styles.saveText}>{saving ? 'Saving…' : editing ? 'Save' : 'Create'}</Text>
+                <Text style={styles.saveText}>{saving ? t('suppliers.saving') : editing ? t('common.save') : t('suppliers.create')}</Text>
               </Pressable>
             </View>
           </Pressable>

@@ -53,7 +53,7 @@ export function CashMovePrompt({ visible, type, currency, onSave, onCancel }: Pr
             autoFocus
             style={styles.input}
           />
-          <Text style={styles.hint}>{currency} — major units (e.g. 50.00)</Text>
+          <Text style={styles.hint}>{t('shiftPrompts.amountHint', { currency })}</Text>
           <TextInput
             value={reason}
             onChangeText={setReason}

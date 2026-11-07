@@ -59,13 +59,13 @@ export default function POListScreen() {
           <Chip label={item.status.toUpperCase()} tone={STATUS_TONE[item.status] ?? 'neutral'} />
         </View>
         <Text style={styles.rowMeta}>
-          {fmtDate(item.createdAt)} · {item.lineCount} line{item.lineCount === 1 ? '' : 's'}
-          {item.receivedAt ? ` · rcvd ${fmtDate(item.receivedAt)}` : ''}
+          {fmtDate(item.createdAt)} · {t(item.lineCount === 1 ? 'poList.linesOne' : 'poList.linesMany', { n: item.lineCount })}
+          {item.receivedAt ? ` · ${t('poList.rcvdOn', { date: fmtDate(item.receivedAt) })}` : ''}
         </Text>
       </View>
       <View style={styles.rowRight}>
         <NumberText style={styles.rowTotal}>{formatMoney(item.totalCostMinor, currency)}</NumberText>
-        <Text style={styles.rowQty}>{item.receivedQty}/{item.orderedQty} units</Text>
+        <Text style={styles.rowQty}>{t('poList.unitsOf', { received: item.receivedQty, ordered: item.orderedQty })}</Text>
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.slate300} />
     </Pressable>

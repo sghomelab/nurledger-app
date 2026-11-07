@@ -137,7 +137,7 @@ export default function ProductFormScreen() {
 
   const addCat = async () => {
     const res = await new Promise<string | null>((resolve) => {
-      Alert.prompt('New category name', '', (t) => resolve(t && t.trim() ? t.trim() : null), 'plain-text');
+      Alert.prompt(t('invEdit.newCategoryPrompt'), '', (v) => resolve(v && v.trim() ? v.trim() : null), 'plain-text');
     });
     if (res) {
       const c = await addCategory(res);
@@ -156,7 +156,7 @@ export default function ProductFormScreen() {
 
         <Field label={t('invDetail.category')}>
           <Pressable style={styles.selectBox} onPress={() => setCatPicker(true)}>
-            <Text style={styles.selectText}>{categories?.find((c) => c.id === categoryId)?.name ?? 'None'}</Text>
+            <Text style={styles.selectText}>{categories?.find((c) => c.id === categoryId)?.name ?? t('invDetail.none')}</Text>
             <Ionicons name="chevron-down" size={16} color={colors.slate400} />
           </Pressable>
         </Field>
@@ -164,7 +164,7 @@ export default function ProductFormScreen() {
         {/* FR-313: per-supplier SKU link */}
         <Field label={t('invDetail.supplier')}>
           <Pressable style={styles.selectBox} onPress={() => setSupplierPicker(true)}>
-            <Text style={styles.selectText}>{suppliers.find((s) => s.id === supplierId)?.name ?? 'None'}</Text>
+            <Text style={styles.selectText}>{suppliers.find((s) => s.id === supplierId)?.name ?? t('invDetail.none')}</Text>
             <Ionicons name="chevron-down" size={16} color={colors.slate400} />
           </Pressable>
         </Field>
@@ -206,8 +206,8 @@ export default function ProductFormScreen() {
                 setCatPicker(false);
               },
             })),
-            { key: 'new', label: 'New category…', onPress: () => { setCatPicker(false); void addCat(); } },
-            { key: 'none', label: 'None', onPress: () => { setCategoryId(null); setCatPicker(false); } },
+            { key: 'new', label: t('invEdit.newCategory'), onPress: () => { setCatPicker(false); void addCat(); } },
+            { key: 'none', label: t('invDetail.none'), onPress: () => { setCategoryId(null); setCatPicker(false); } },
           ]}
           onClose={() => setCatPicker(false)}
         />
@@ -220,13 +220,13 @@ export default function ProductFormScreen() {
             ...suppliers.map((s) => ({
               key: s.id,
               label: s.name,
-              sublabel: `${s.leadTimeDays}d lead`,
+              sublabel: t('invDetail.daysLead', { n: s.leadTimeDays }),
               onPress: () => {
                 setSupplierId(s.id);
                 setSupplierPicker(false);
               },
             })),
-            { key: 'none', label: 'None', onPress: () => { setSupplierId(null); setSupplierPicker(false); } },
+            { key: 'none', label: t('invDetail.none'), onPress: () => { setSupplierId(null); setSupplierPicker(false); } },
           ]}
           onClose={() => setSupplierPicker(false)}
         />

@@ -84,7 +84,7 @@ export default function ProductDetailScreen() {
 
   const deactivate = async () => {
     if (!product) return;
-    Alert.alert(t('invDetail.deactivateProduct'), `Hide "${product.name}" from the register? Stock & ledger history are kept.`, [
+    Alert.alert(t('invDetail.deactivateProduct'), t('invDetail.deactivateBody', { name: product.name }), [
       { text: t('common.cancel'), style: 'cancel' },
       {
         text: t('invDetail.deactivate'),
@@ -204,9 +204,9 @@ export default function ProductDetailScreen() {
       <View style={styles.card}>
         <Row label="SKU" value={product.sku} mono />
         <Row label={t('invDetail.barcode')} value={product.barcode ?? '—'} mono />
-        <Row label={t('invDetail.cartonBarcode')} value={product.cartonBarcode ?? '—'} mono sub={`1 carton = ${product.cartonSize} units`} />
+        <Row label={t('invDetail.cartonBarcode')} value={product.cartonBarcode ?? '—'} mono sub={t('invDetail.cartonEqUnits', { n: product.cartonSize })} />
         <Row label={t('invDetail.category')} value={categoryName} />
-        <Row label={t('invDetail.supplier')} value={supplier?.name ?? '—'} sub={supplier ? `${supplier.leadTimeDays}d lead` : undefined} />
+        <Row label={t('invDetail.supplier')} value={supplier?.name ?? '—'} sub={supplier ? t('invDetail.daysLead', { n: supplier.leadTimeDays }) : undefined} />
         <Row label={t('invDetail.unitType')} value={product.unitType} />
         <Row label={t('invDetail.velocityTier')} value={product.velocityClass ?? '—'} />
         <Row label={t('invDetail.minReorder')} value={String(product.minQty)} mono />
