@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { wideColumn } from '../../src/lib/layout';
 import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
@@ -49,6 +50,7 @@ function periodLabel(p: PeriodId): string {
  * (feeds the P&L operating costs), and searchable sales history (FR-401).
  */
 export default function InsightsTab() {
+  const { t } = useT();
   const { outlet } = useOutlet();
   const [period, setPeriodState] = useState<PeriodKey>('today');
   const ins = useInsights(period);
@@ -223,6 +225,7 @@ export default function InsightsTab() {
                 <Text style={styles.exportText}>CSV</Text>
               </Pressable>
             </View>
+            <Text style={styles.abcNote}>{t('insights.abcNote')}</Text>
             {ins.data!.abcRows.length === 0 ? (
               <Text style={styles.empty}>No products yet.</Text>
             ) : (
@@ -525,6 +528,7 @@ const styles = StyleSheet.create({
   pValue: { fontFamily: fonts.mono, fontSize: typography.caption, color: colors.slate700 },
   subSection: { fontFamily: fonts.sansSemiBold, fontSize: typography.micro, color: colors.slate400, marginTop: spacing.sm, textTransform: 'uppercase' },
   divider: { height: 1, backgroundColor: colors.slate200, marginVertical: spacing.xs },
+  abcNote: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginBottom: spacing.xs },
   abcRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.slate100 },
   abcBadges: { flexDirection: 'row', gap: 4 },
   badge: { borderRadius: radius.chip, paddingHorizontal: 6, paddingVertical: 2 },
