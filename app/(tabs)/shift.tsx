@@ -1,4 +1,5 @@
 import { useT } from '../../src/hooks/useT';
+import type { MsgKey } from '../../src/i18n';
 import { wideColumn } from '../../src/lib/layout';
 import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
@@ -29,10 +30,10 @@ function timeStr(ms: number): string {
   return new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-const ROLE_LABEL: Record<UserRole, string> = {
-  owner: 'Owner',
-  manager: 'Manager',
-  cashier: 'Cashier',
+const ROLE_KEY: Record<UserRole, MsgKey> = {
+  owner: 'shift.roleOwner',
+  manager: 'shift.roleManager',
+  cashier: 'shift.roleCashier',
 };
 
 /**
@@ -161,8 +162,8 @@ export default function ShiftTab() {
             <Text style={styles.avatarText}>{(active?.name ?? '?').slice(0, 1).toUpperCase()}</Text>
           </View>
           <View style={styles.userTexts}>
-            <Text style={styles.userName}>{active?.name ?? 'No user'}</Text>
-            <Text style={styles.userRole}>{active ? `${ROLE_LABEL[active.role]} · at register` : '—'}</Text>
+            <Text style={styles.userName}>{active?.name ?? t('shift.noUser')}</Text>
+            <Text style={styles.userRole}>{active ? t('shift.atRegister', { role: t(ROLE_KEY[active.role]) }) : '—'}</Text>
           </View>
           <Pressable style={styles.switchBtn} onPress={() => setUserSheet(true)} hitSlop={8}>
             <Ionicons name="swap-horizontal" size={16} color={colors.primary} />
@@ -234,8 +235,7 @@ export default function ShiftTab() {
           <Ionicons name="lock-closed" size={30} color={colors.warning} />
           <Text style={styles.lockedTitle}>{t('sell.registerLocked')}</Text>
           <Text style={styles.lockedText}>
-            No shift is open. Open a shift with a starting float to unlock selling — every sale records
-            the cashier and shift (FR-200).
+            {t('shift.lockedBody')}
           </Text>
           <Pressable style={styles.openShiftBtn} onPress={() => setOpenFloatVisible(true)}>
             <Text style={styles.openShiftText}>{t('sell.openShift')}</Text>
@@ -279,7 +279,7 @@ export default function ShiftTab() {
             ...(users ?? []).map((u) => ({
               key: u.id,
               label: u.name,
-              sublabel: `${ROLE_LABEL[u.role]}${u.id === active?.id ? ' · active' : ''}`,
+              sublabel: `${t(ROLE_KEY[u.role])}${u.id === active?.id ? t('shift.active') : ''}`,
               onPress: () => void doSwitchUser(u.id),
             })),
             { key: '__add', label: '+ Add user', sublabel: '', onPress: () => { setUserSheet(false); setAddUserVisible(true); } },
@@ -434,7 +434,7 @@ function AddUserSheet({
                   style={[styles.roleChip, state.role === r && styles.roleChipActive]}
                   onPress={() => setState({ ...state, role: r })}
                 >
-                  <Text style={[styles.roleChipText, state.role === r && { color: colors.white }]}>{ROLE_LABEL[r]}</Text>
+                  <Text style={[styles.roleChipText, state.role === r && { color: colors.white }]}>{t(ROLE_KEY[r])}</Text>
                 </Pressable>
               ))}
             </View>
@@ -447,8 +447,7 @@ function AddUserSheet({
               style={styles.inlineInput}
             />
             <Text style={styles.addHint}>
-              Owner/manager PINs unlock gated actions (price override, discounts, close shift, store settings).
-              Cashiers don't need a PIN.
+              {t('shift.pinNote')}
             </Text>
             <View style={styles.buttons}>
               <Pressable style={styles.cancelBtn} onPress={onCancel}>

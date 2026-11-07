@@ -12,7 +12,7 @@
  */
 
 import { getDb } from '../db/database';
-import { resolveLang, type Lang } from '../i18n';
+import { deviceLang, resolveLang, type Lang } from '../i18n';
 
 const UI_LANGUAGE_KEY = 'ui.language';
 
@@ -22,7 +22,8 @@ export async function getUiLanguage(): Promise<Lang> {
   const row = await db.getFirstAsync<{ value: string }>(
     `SELECT value FROM settings WHERE key = '${UI_LANGUAGE_KEY}'`,
   );
-  return resolveLang(row?.value ?? null);
+  // No saved choice yet → follow the device language (ms / fil), else English. An explicit choice always wins.
+  return row?.value ? resolveLang(row.value) : deviceLang();
 }
 
 export async function setUiLanguage(lang: Lang): Promise<void> {

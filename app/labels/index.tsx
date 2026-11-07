@@ -89,7 +89,7 @@ export default function LabelsScreen() {
         throw new Error('Sharing is not available on this device');
       }
       await Sharing.shareAsync(file.uri, {
-        dialogTitle: 'Share label sheet',
+        dialogTitle: t('labels.shareTitle'),
         UTI: 'public.html',
       });
       setState({ status: 'done', path: file.uri, count: totalLabels, skipped });
@@ -100,10 +100,10 @@ export default function LabelsScreen() {
 
   const scopeLabel =
     scope.kind === 'product'
-      ? inScope[0]?.name ?? 'Product not found'
+      ? inScope[0]?.name ?? t('labels.productNotFound')
       : scope.kind === 'category'
-        ? categories?.find((c) => c.id === scope.id)?.name ?? 'Category'
-        : 'All products';
+        ? categories?.find((c) => c.id === scope.id)?.name ?? t('labels.categoryFallback')
+        : t('labels.allProducts');
 
   return (
     <View style={styles.container}>

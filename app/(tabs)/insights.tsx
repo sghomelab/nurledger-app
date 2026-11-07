@@ -344,7 +344,7 @@ export default function InsightsTab() {
               key={s.id}
               style={styles.saleRow}
               onPress={() => router.push(`/refund/${s.id}`)}
-              accessibilityHint="Open refund for this sale"
+              accessibilityHint={t('insights.openRefundHint')}
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.abcName} numberOfLines={1}>

@@ -175,7 +175,7 @@ export default function ProductFormScreen() {
         </View>
 
         <View style={styles.row}>
-          <View style={styles.colHalf}><Field label={`Cost (${outlet?.currency ?? ''})`}><TextInput style={styles.inputMono} value={cost} onChangeText={setCost} placeholder="0.00" keyboardType="decimal-pad" /></Field></View>
+          <View style={styles.colHalf}><Field label={t('invEdit.costLabel', { currency: outlet?.currency ?? '' })}><TextInput style={styles.inputMono} value={cost} onChangeText={setCost} placeholder="0.00" keyboardType="decimal-pad" /></Field></View>
           <View style={styles.colHalf}><Field label={t('invEdit.retailPrice')}><TextInput style={styles.inputMono} value={price} onChangeText={setPrice} placeholder="0.00" keyboardType="decimal-pad" /></Field></View>
         </View>
 
@@ -190,7 +190,7 @@ export default function ProductFormScreen() {
 
       <View style={styles.footer}>
         <Pressable style={[styles.saveBtn, saving && { opacity: 0.7 }]} onPress={() => void save()} disabled={saving}>
-          <Text style={styles.saveText}>{isNew ? 'Add product' : 'Save product'}</Text>
+          <Text style={styles.saveText}>{isNew ? t('invEdit.addProduct') : t('invEdit.saveProduct')}</Text>
         </Pressable>
       </View>
 

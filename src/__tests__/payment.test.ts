@@ -102,7 +102,7 @@ describe('QR acquirer stub (FR-601: show QR + record reference)', () => {
     const prep = a.prepare(1234, 'SGD');
     expect(prep.reference).toMatch(/^QR-[A-Z0-9]{8}$/);
     expect(prep.imageUrl).toBeNull();
-    expect(prep.note).toContain('Stub acquirer');
+    expect(prep.note).toContain('No live acquirer');
     // Two prepares are distinct (unique reference per transaction).
     expect(a.prepare(1234, 'SGD').reference).not.toBe(prep.reference);
   });

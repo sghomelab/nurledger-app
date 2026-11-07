@@ -117,7 +117,7 @@ export default function StocktakeDetailScreen() {
       Alert.alert(
         t('stDetail.stocktakeApplied'),
         `${r.appliedLines} adjustment${r.appliedLines === 1 ? '' : 's'} written to the stock ledger.`,
-        [{ text: 'OK', onPress: () => router.back() }],
+        [{ text: t('common.ok'), onPress: () => router.back() }],
       );
     } catch (e) {
       Alert.alert(t('stDetail.applyFailed'), e instanceof Error ? e.message : String(e));
@@ -162,7 +162,7 @@ export default function StocktakeDetailScreen() {
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={styles.title} numberOfLines={1}>
-            {header.categoryName ?? 'All products'}
+            {header.categoryName ?? t('labels.allProducts')}
           </Text>
           <Text style={styles.meta}>
             {new Date(header.startedAt).toLocaleString()} · {header.lineCount} products

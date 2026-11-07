@@ -101,7 +101,7 @@ export interface QRAcquirer {
 }
 
 const stubNote =
-  'Stub acquirer (ADR-006) — no live acquirer is wired. Show this reference to the customer, collect the payment at the counter, then record it as paid.';
+  'No live acquirer is wired. Show this reference to the customer, collect the payment at the counter, then record it as paid.';
 
 /** The M5 stub: deterministic-shaped reference, no image (real acquirers = v2). */
 export const STUB_QR_ACQUIRER: QRAcquirer = {

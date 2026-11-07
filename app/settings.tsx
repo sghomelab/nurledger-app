@@ -159,7 +159,7 @@ export default function SettingsScreen() {
     }
     if (!isFormattableCurrency(activeCurrency)) {
       Alert.alert(t('settings.unknownCurrency'), t('settings.unknownCurrencyMsg', { code: activeCurrency }), [
-        { text: 'OK' },
+        { text: t('common.ok') },
       ]);
       return;
     }

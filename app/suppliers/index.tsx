@@ -82,7 +82,7 @@ export default function SuppliersScreen() {
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             await deleteSupplier(s.id);
@@ -139,7 +139,7 @@ export default function SuppliersScreen() {
       <Modal transparent visible={formOpen} animationType="fade" onRequestClose={() => setFormOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setFormOpen(false)}>
           <Pressable style={styles.formCard} onPress={() => {}}>
-            <Text style={styles.formTitle}>{editing ? 'Edit supplier' : 'New supplier'}</Text>
+            <Text style={styles.formTitle}>{editing ? t('suppliers.editSupplier') : t('suppliers.newSupplier')}</Text>
             <Field label={t('invEdit.name')}>
               <TextInput
                 style={styles.input}

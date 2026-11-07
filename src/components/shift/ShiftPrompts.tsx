@@ -44,7 +44,7 @@ export function CashMovePrompt({ visible, type, currency, onSave, onCancel }: Pr
     <Modal transparent visible={visible} animationType="fade" onRequestClose={cancel}>
       <Pressable style={styles.backdrop} onPress={cancel}>
         <Pressable style={styles.card} onPress={() => {}}>
-          <Text style={styles.title}>{type === 'in' ? 'Cash in' : 'Cash out'} during shift</Text>
+          <Text style={styles.title}>{type === 'in' ? t('shiftPrompts.cashInTitle') : t('shiftPrompts.cashOutTitle')}</Text>
           <TextInput
             value={text}
             onChangeText={setText}
@@ -57,7 +57,7 @@ export function CashMovePrompt({ visible, type, currency, onSave, onCancel }: Pr
           <TextInput
             value={reason}
             onChangeText={setReason}
-            placeholder={type === 'in' ? 'Reason (e.g. Float top-up, tips)' : 'Reason (e.g. Tips out, personal)'}
+            placeholder={type === 'in' ? t('shiftPrompts.reasonIn') : t('shiftPrompts.reasonOut')}
             style={styles.reason}
           />
           <View style={styles.buttons}>

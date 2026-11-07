@@ -4,7 +4,11 @@
  * value; no orphan keys either way).
  */
 
-import { enDict, msDict, filDict, resolveLang, t, type MsgKey } from '../i18n';
+import { enDict, msDict, filDict, resolveLang, deviceLang, t, type MsgKey } from '../i18n';
+declare const require: (m: string) => any;
+declare const __dirname: string;
+const fs = require('fs');
+const path = require('path');
 
 describe('resolveLang', () => {
   it('maps English values and unknown values to en', () => {
@@ -121,5 +125,64 @@ describe('en ↔ fil parity + placeholders (all languages)', () => {
     const saved = filDict[key];
     delete (filDict as Record<string, string>)[key];
     try { expect(t('fil', key)).toBe('Inventory'); } finally { filDict[key] = saved; }
+  });
+});
+
+describe('deviceLang — default language follows the device until the user chooses', () => {
+  const real = Intl.DateTimeFormat;
+  const withLocale = (loc: string | null) => {
+    (Intl as any).DateTimeFormat = function () {
+      if (loc === null) throw new Error('no Intl');
+      return { resolvedOptions: () => ({ locale: loc }) };
+    };
+  };
+  afterEach(() => {
+    (Intl as any).DateTimeFormat = real;
+  });
+  it('maps ms / fil / tl device locales and falls back to en', () => {
+    withLocale('ms-MY');
+    expect(deviceLang()).toBe('ms');
+    withLocale('fil-PH');
+    expect(deviceLang()).toBe('fil');
+    withLocale('tl-PH');
+    expect(deviceLang()).toBe('fil');
+    withLocale('en-SG');
+    expect(deviceLang()).toBe('en');
+    withLocale('ja-JP');
+    expect(deviceLang()).toBe('en');
+  });
+  it('never throws when Intl is unavailable', () => {
+    withLocale(null);
+    expect(deviceLang()).toBe('en');
+  });
+});
+
+describe('no spec jargon in user-facing text', () => {
+  it('dictionaries contain no FR-/ADR- codes', () => {
+    for (const d of [enDict, msDict, filDict] as Array<Record<string, string>>) {
+      for (const [k, v] of Object.entries(d)) expect([k, /\b(FR|NFR|ADR)-\d+/.test(v)]).toEqual([k, false]);
+    }
+  });
+  it('no screen shows an FR-/ADR- code in rendered text (comments are fine)', () => {
+    const root = path.join(__dirname, '..', '..');
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true }) as Array<{ name: string; isDirectory(): boolean }>) {
+        const p = path.join(dir, e.name);
+        if (e.isDirectory()) walk(p);
+        else if (/\.tsx$/.test(e.name)) files.push(p);
+      }
+    };
+    walk(path.join(root, 'app'));
+    walk(path.join(root, 'src', 'components'));
+    const offenders: string[] = [];
+    for (const f of files) {
+      fs.readFileSync(f, 'utf8').split(/\r?\n/).forEach((line: string, i: number) => {
+        const t = line.trim();
+        if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*') || t.startsWith('{/*')) return;
+        if (/\b(FR|NFR|ADR)-\d+/.test(line)) offenders.push(`${path.relative(root, f)}:${i + 1}`);
+      });
+    }
+    expect(offenders).toEqual([]);
   });
 });

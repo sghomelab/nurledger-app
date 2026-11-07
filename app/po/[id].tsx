@@ -61,7 +61,7 @@ export default function PODetailScreen() {
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Receive',
+          text: t('poDetail.receive'),
           onPress: async () => {
             setBusy(true);
             try {
@@ -103,7 +103,7 @@ export default function PODetailScreen() {
         throw new Error('Sharing is not available on this device');
       }
       await Sharing.shareAsync(file.uri, {
-        dialogTitle: 'Share purchase order',
+        dialogTitle: t('poDetail.shareTitle'),
         mimeType: 'text/plain',
       });
     } catch (e) {
@@ -199,7 +199,7 @@ export default function PODetailScreen() {
           <View style={[styles.receiveBtn, { backgroundColor: colors.slate100, opacity: 1 }]}>
             <Ionicons name="checkmark-circle-outline" size={20} color={colors.positive} />
             <Text style={[styles.receiveText, { color: colors.positive }]}>
-              {po.status === 'received' ? 'Fully received' : 'Closed'}
+              {po.status === 'received' ? t('poDetail.fullyReceived') : t('poDetail.closed')}
             </Text>
           </View>
         )}

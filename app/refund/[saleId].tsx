@@ -1,4 +1,5 @@
 import { useT } from '../../src/hooks/useT';
+import type { MsgKey } from '../../src/i18n';
 import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -33,13 +34,13 @@ import { getActiveUser, listActiveUsers } from '../../src/repositories/userRepos
 import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
 import type { AppUser } from '../../src/types';
 
-const REASON_LABELS: Record<RefundReason, string> = {
-  customer_return: 'Customer return',
-  wrong_item: 'Wrong item',
-  damaged: 'Damaged',
-  pricing_error: 'Pricing error',
-  order_mistake: 'Order mistake',
-  other: 'Other',
+const REASON_KEYS: Record<RefundReason, MsgKey> = {
+  customer_return: 'refund.reasonCustomerReturn',
+  wrong_item: 'refund.reasonWrongItem',
+  damaged: 'refund.reasonDamaged',
+  pricing_error: 'refund.reasonPricingError',
+  order_mistake: 'refund.reasonOrderMistake',
+  other: 'refund.reasonOther',
 };
 
 /** Per-line local edit state. */
@@ -186,7 +187,7 @@ export default function RefundScreen() {
         userId: activeUser?.id ?? null,
       });
       Alert.alert(t('refund.refundComplete'), `Refunded ${formatMoney(totalMinor, currency)}.`, [
-        { text: 'OK', onPress: () => router.back() },
+        { text: t('common.ok'), onPress: () => router.back() },
       ]);
     } catch (e) {
       Alert.alert(t('refund.refundFailed'), e instanceof Error ? e.message : String(e));
@@ -258,7 +259,7 @@ export default function RefundScreen() {
             <View style={{ flex: 1 }}>
               <Text style={styles.reasonLabel}>{t('adjust.reason')}</Text>
               <Text style={reason ? styles.reasonValue : styles.reasonPlaceholder}>
-                {reason ? REASON_LABELS[reason] : 'Select a reason…'}
+                {reason ? t(REASON_KEYS[reason]) : t('refund.selectReason')}
               </Text>
             </View>
             <Ionicons name="chevron-down" size={18} color={colors.slate400} />
@@ -395,7 +396,7 @@ export default function RefundScreen() {
           title={t('refund.refundReason')}
           rows={REFUND_REASONS.map((r) => ({
             key: r,
-            label: REASON_LABELS[r],
+            label: t(REASON_KEYS[r]),
             onPress: () => {
               setReason(r);
               setPickerVisible(false);

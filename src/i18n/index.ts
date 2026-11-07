@@ -28,6 +28,19 @@ export const filDict: Record<MsgKey, string> = fil;
  * 'ms' / 'ms-MY' / 'msa' → Malay; 'fil' / 'fil-PH' / 'tl' / 'tl-PH' → Filipino;
  * anything else (including null/unknown) → English. Lenient on purpose — the setting is a plain TEXT column.
  */
+/**
+ * The device's UI language as one of ours, read from the platform locale (Intl). Used ONLY when the
+ * user has not chosen a language yet; an explicit choice always wins. Anything we do not ship → 'en'.
+ */
+export function deviceLang(): Lang {
+  try {
+    const loc = new Intl.DateTimeFormat().resolvedOptions().locale;
+    return resolveLang(loc);
+  } catch {
+    return 'en';
+  }
+}
+
 export function resolveLang(value: string | null | undefined): Lang {
   if (!value) return 'en';
   const base = value.trim().toLowerCase().split('-')[0] ?? '';

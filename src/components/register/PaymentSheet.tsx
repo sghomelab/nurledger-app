@@ -190,7 +190,7 @@ export function PaymentSheet({ totalMinor, currency, locale, onClose, onComplete
                 <Text style={styles.qrRefLabel}>{t('pay.reference')}</Text>
                 <Text style={styles.qrRef}>{qrPrep.reference}</Text>
                 <Text style={styles.qrAmount}>{t('pay.due', { amount: formatMoney(totalMinor, currency) })}</Text>
-                <Text style={styles.hint}>{qrPrep.note}</Text>
+                <Text style={styles.hint}>{t('pay.qrNote')}</Text>
               </>
             )}
           </View>

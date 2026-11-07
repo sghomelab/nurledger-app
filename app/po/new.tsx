@@ -284,7 +284,7 @@ export default function NewPOScreen() {
 
       <View style={styles.footer}>
         <Pressable style={[styles.saveBtn, !canSave && { opacity: 0.5 }]} onPress={() => void save()} disabled={!canSave || saving}>
-          <Text style={styles.saveText}>{saving ? 'Creating…' : 'Create PO (draft)'}</Text>
+          <Text style={styles.saveText}>{saving ? t('poNew.creating') : t('poNew.createDraft')}</Text>
         </Pressable>
       </View>
 

@@ -42,7 +42,7 @@ export function CsvSheet({ visible, csv, fileName, onClose }: Props) {
         throw new Error('Sharing is not available on this device');
       }
       await Sharing.shareAsync(file.uri, {
-        dialogTitle: 'Share report',
+        dialogTitle: t('reportView.shareTitle'),
         UTI: 'public.comma-separated-values-text',
       });
       setState({ status: 'done' });

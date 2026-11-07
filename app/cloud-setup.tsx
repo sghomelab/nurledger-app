@@ -237,7 +237,7 @@ export default function CloudSetupScreen() {
         joined
           ? t('cloudsetup.connectedJoined')
           : t('cloudsetup.connectedNew'),
-        [{ text: 'OK', onPress: () => router.back() }],
+        [{ text: t('common.ok'), onPress: () => router.back() }],
       );
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

@@ -87,7 +87,7 @@ export default function ProductDetailScreen() {
     Alert.alert(t('invDetail.deactivateProduct'), `Hide "${product.name}" from the register? Stock & ledger history are kept.`, [
       { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Deactivate',
+        text: t('invDetail.deactivate'),
         style: 'destructive',
         onPress: async () => {
           await deactivateProduct(product.id);

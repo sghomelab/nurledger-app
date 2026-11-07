@@ -81,7 +81,7 @@ export default function StocktakeListScreen() {
     }
   };
 
-  const scopeLabel = scope.kind === 'category' ? scope.category.name : 'All products';
+  const scopeLabel = scope.kind === 'category' ? scope.category.name : t('labels.allProducts');
 
   return (
     <View style={styles.wrap}>
@@ -117,7 +117,7 @@ export default function StocktakeListScreen() {
           >
             <View style={styles.rowMain}>
               <Text style={styles.rowName} numberOfLines={1}>
-                {item.categoryName ?? 'All products'}
+                {item.categoryName ?? t('labels.allProducts')}
               </Text>
               <Text style={styles.rowMeta} numberOfLines={1}>
                 {new Date(item.startedAt).toLocaleString()} · {item.lineCount} products
@@ -160,7 +160,7 @@ export default function StocktakeListScreen() {
                 onPress={() => void startStocktake()}
                 disabled={starting || categories === null}
               >
-                <Text style={styles.startText}>{starting ? 'Starting…' : 'Start counting'}</Text>
+                <Text style={styles.startText}>{starting ? t('stList.starting') : t('stList.startCounting')}</Text>
               </Pressable>
             </Pressable>
           </Pressable>
@@ -174,7 +174,7 @@ export default function StocktakeListScreen() {
           rows={[
             {
               key: 'all',
-              label: 'All products',
+              label: t('labels.allProducts'),
               onPress: () => {
                 setScope({ kind: 'all' });
                 setScopePicker(false);

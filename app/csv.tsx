@@ -40,7 +40,7 @@ export default function ProductDataScreen() {
         throw new Error('Sharing is not available on this device');
       }
       await Sharing.shareAsync(file.uri, {
-        dialogTitle: 'Share product list',
+        dialogTitle: t('csv.shareTitle'),
         UTI: 'public.csv',
       });
       setExported(file.uri);
@@ -74,9 +74,7 @@ export default function ProductDataScreen() {
       <Stack.Screen options={{ title: t('nav.productDataCsv'), headerBackVisible: true }} />
       <ScrollView contentContainerStyle={[{ padding: spacing.lg, paddingBottom: 48 }, centeredColumn]}>
         <Text style={styles.intro}>
-          Move the product catalog in and out of the app as a CSV file. Money in the file is in your
-          store currency (major units). Import updates products by SKU — new SKUs are added, existing
-          ones are updated.
+          {t('csv.intro')}
         </Text>
 
         <Pressable

@@ -41,7 +41,7 @@ export default function ImportCsvScreen() {
   // Android versions, so a transient failure shouldn't dead-end the user.
   const readAndParse = useCallback(async () => {
     if (!uri) {
-      setState({ phase: 'error', message: 'No file selected.' });
+      setState({ phase: 'error', message: t('importCsv.noFileSelected') });
       return;
     }
     setState({ phase: 'loading' });
