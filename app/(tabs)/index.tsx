@@ -305,14 +305,10 @@ export default function SellTab() {
     [prompt, cart, doOpenShift],
   );
 
-  const cameraStub = useCallback(() => {
-    Alert.alert(t('sell.cameraScan'), t('sell.cameraScanMsg'));
-  }, [t]);
-
   // Tablet: catalogue (scan, search, product grid) on the left, order on the right.
   const topSection = (
     <>
-      {/* Scan row — prototype "Scan Item" panel; camera stub (FR-100 deferred) */}
+      {/* Scan row — keyboard-wedge / typed barcode (camera scanning is v2) */}
       <View style={styles.scanRow}>
         <View style={styles.scanBox}>
           <Ionicons name="barcode-outline" size={18} color={colors.primary} />
@@ -330,9 +326,6 @@ export default function SellTab() {
             blurOnSubmit={false}
           />
         </View>
-        <Pressable style={styles.camBtn} onPress={cameraStub} hitSlop={4} accessibilityLabel={t('sell.cameraA11y')}>
-          <Ionicons name="camera-outline" size={22} color={colors.slate400} />
-        </Pressable>
       </View>
 
       {/* M5 (FR-503): sync status banner (replaces the old "offline queue" hint) */}
@@ -592,16 +585,6 @@ const styles = StyleSheet.create({
     height: 48,
   },
   scanInput: { flex: 1, fontFamily: fonts.monoMedium, fontSize: typography.body + 1, color: colors.slate900 },
-  camBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.control,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   pendingBanner: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -13,23 +13,27 @@
  */
 import en from './en';
 import ms from './ms';
+import fil from './fil';
 
-export type Lang = 'en' | 'ms';
+export type Lang = 'en' | 'ms' | 'fil';
 export type MsgKey = keyof typeof en;
 export type TFn = (key: MsgKey, vars?: Record<string, string | number>) => string;
 
 export const enDict: Record<MsgKey, string> = en;
 export const msDict: Record<MsgKey, string> = ms;
+export const filDict: Record<MsgKey, string> = fil;
 
 /**
  * Map a stored UI-language value (or any raw tag) to a supported language.
- * 'ms' / 'ms-MY' / 'msa' → Malay; anything else (including null/unknown) →
- * English. Lenient on purpose — the setting is a plain TEXT column.
+ * 'ms' / 'ms-MY' / 'msa' → Malay; 'fil' / 'fil-PH' / 'tl' / 'tl-PH' → Filipino;
+ * anything else (including null/unknown) → English. Lenient on purpose — the setting is a plain TEXT column.
  */
 export function resolveLang(value: string | null | undefined): Lang {
   if (!value) return 'en';
   const base = value.trim().toLowerCase().split('-')[0] ?? '';
-  return base === 'ms' || base === 'msa' ? 'ms' : 'en';
+  if (base === 'ms' || base === 'msa') return 'ms';
+  if (base === 'fil' || base === 'tl' || base === 'tgl') return 'fil';
+  return 'en';
 }
 
 /**
@@ -38,7 +42,7 @@ export function resolveLang(value: string | null | undefined): Lang {
  * a typo'd key is visible rather than blank).
  */
 export function t(lang: Lang, key: MsgKey, vars?: Record<string, string | number>): string {
-  const active = lang === 'ms' ? msDict[key] : enDict[key];
+  const active = lang === 'ms' ? msDict[key] : lang === 'fil' ? filDict[key] : enDict[key];
   const template = active ?? enDict[key] ?? String(key);
   if (!vars) return template;
   let out = template;

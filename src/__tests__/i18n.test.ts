@@ -4,7 +4,7 @@
  * value; no orphan keys either way).
  */
 
-import { enDict, msDict, resolveLang, t, type MsgKey } from '../i18n';
+import { enDict, msDict, filDict, resolveLang, t, type MsgKey } from '../i18n';
 
 describe('resolveLang', () => {
   it('maps English values and unknown values to en', () => {
@@ -25,6 +25,12 @@ describe('resolveLang', () => {
   });
 });
 
+describe('resolveLang — Filipino', () => {
+  it('maps fil / tl variants to fil', () => {
+    for (const v of ['fil', 'fil-PH', 'FIL', 'tl', 'tl-PH', 'tgl', ' fil-PH ']) expect(resolveLang(v)).toBe('fil');
+  });
+});
+
 describe('t() interpolation', () => {
   it('substitutes a single {param}', () => {
     expect(t('en', 'sync.queuedAuto', { n: 3 })).toBe(
@@ -35,7 +41,7 @@ describe('t() interpolation', () => {
   it('substitutes multiple params', () => {
     expect(t('en', 'pin.required', { action: 'Refund' })).toBe('Refund — PIN required');
     expect(t('ms', 'pay.stub', { detail: 'bayar melalui terminal kad luaran' })).toBe(
-      'Stub MVP (ADR-006): bayar melalui terminal kad luaran — tiada pemproses langsung disambungkan.',
+      'bayar melalui terminal kad luaran — Nurledger merekodkan pembayaran tetapi tidak memprosesnya.',
     );
   });
 
@@ -83,5 +89,37 @@ describe('en ↔ ms parity', () => {
   it('Malay has no noun plural (paired item counts translate identically)', () => {
     expect(msDict['sell.itemsOne']).toBe(msDict['sell.itemsMany']);
     expect(msDict['sell.itemsMany']).toBe('{n} item');
+  });
+});
+
+describe('en ↔ fil parity + placeholders (all languages)', () => {
+  const enKeys = Object.keys(enDict) as MsgKey[];
+  const tokens = (s: string) => (s.match(/\{[a-zA-Z]+\}/g) ?? []).sort();
+
+  it('every English key has a non-empty Filipino value and no orphans', () => {
+    expect(enKeys.filter((k) => typeof filDict[k] !== 'string' || filDict[k] === '')).toEqual([]);
+    expect((Object.keys(filDict) as MsgKey[]).sort()).toEqual([...enKeys].sort());
+  });
+
+  it('{placeholders} match English in Malay and Filipino for every key', () => {
+    const bad: string[] = [];
+    for (const k of enKeys) {
+      if (tokens(msDict[k]).join() !== tokens(enDict[k]).join()) bad.push(`ms:${k}`);
+      if (tokens(filDict[k]).join() !== tokens(enDict[k]).join()) bad.push(`fil:${k}`);
+    }
+    expect(bad).toEqual([]);
+  });
+
+  it('Filipino renders and interpolates', () => {
+    expect(t('fil', 'tab.sell')).toBe('Benta');
+    expect(t('fil', 'sell.itemsMany', { n: 4 })).toBe('4 item');
+    expect(t('fil', 'pin.required', { action: 'Refund' })).toBe('Refund — kailangan ang PIN');
+  });
+
+  it('falls back to English for a key missing from Filipino', () => {
+    const key = 'tab.inventory' as MsgKey;
+    const saved = filDict[key];
+    delete (filDict as Record<string, string>)[key];
+    try { expect(t('fil', key)).toBe('Inventory'); } finally { filDict[key] = saved; }
   });
 });
