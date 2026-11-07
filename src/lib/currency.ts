@@ -112,6 +112,16 @@ export const TAX_PRESETS: TaxPreset[] = [
     suggestedLocale: 'en-MY',
   },
   {
+    // Philippines: 12% VAT, prices are normally VAT-inclusive. VAT-exempt /
+    // zero-rated items need the product's tax category — confirm treatment with
+    // the store's accountant. NOT a BIR-registered receipting system.
+    id: 'ph',
+    label: 'Philippines VAT 12% — inclusive',
+    engineId: 'flat:ph-vat-12-inclusive',
+    suggestedCurrency: 'PHP',
+    suggestedLocale: 'en-PH',
+  },
+  {
     id: 'eu',
     label: 'EU VAT 21% — exclusive',
     engineId: 'flat:eu-vat-21-exclusive',

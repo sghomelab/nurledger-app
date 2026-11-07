@@ -82,6 +82,14 @@ describe('non-reference locales (multi-currency/multi-tax support — FR-600/FR-
     expect(r.netMinor).toBe(10_000);
   });
 
+  it('PH VAT 12% inclusive: PHP 1,120.00 → 1,000.00 net + 120.00 VAT (12/112, not 12% of gross)', () => {
+    const ph = taxEngineFor('flat:ph-vat-12-inclusive');
+    expect(ph.ratePct).toBe(12);
+    const r = ph.compute({ categories: [{ category: 'standard', amountMinor: 112_000 }] });
+    expect(r.taxMinor).toBe(12_000);
+    expect(r.netMinor).toBe(100_000);
+  });
+
   it('EU VAT 21% exclusive: €100.00 + €21.00 (switching locale switches the rate)', () => {
     const eu = taxEngineFor('flat:eu-vat-21-exclusive');
     expect(eu.ratePct).toBe(21);

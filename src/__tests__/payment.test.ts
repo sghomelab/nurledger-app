@@ -107,3 +107,15 @@ describe('QR acquirer stub (FR-601: show QR + record reference)', () => {
     expect(a.prepare(1234, 'SGD').reference).not.toBe(prep.reference);
   });
 });
+
+describe('Philippines methods (en-PH / fil-PH)', () => {
+  it('lists Cash, Card, GCash / Maya (mobile) and QR Ph', () => {
+    for (const loc of ['en-PH', 'fil-PH', 'en_ph']) {
+      const m = paymentMethodsFor(loc);
+      expect(m.map((x) => x.id)).toEqual(['cash', 'card', 'mobile', 'qr']);
+      expect(m.find((x) => x.id === 'mobile')?.label).toBe('GCash / Maya');
+      expect(m.find((x) => x.id === 'qr')?.label).toBe('QR Ph');
+      expect(acquirerFor(m.find((x) => x.id === 'qr')?.qrAcquirer)).not.toBeNull();
+    }
+  });
+});

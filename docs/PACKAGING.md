@@ -88,6 +88,18 @@ auto-versioning. All profiles use `credentialsSource: "remote"`.
 - **Submit config:** `eas.json` has no `submit` block yet — add it (ASC key / Play
   service account) before step 5/6 of the runbook.
 
+## 4b. Philippines (first target store, 2026-11-07)
+
+- Tax preset **Philippines VAT 12% — inclusive** (`flat:ph-vat-12-inclusive`, PHP, `en-PH`);
+  payment labels Cash / Card / **GCash / Maya** / **QR Ph** (recorded tenders, not
+  processed). Rate and VAT-exempt/zero-rated treatment: confirm with the store's accountant.
+- **Not a BIR-registered receipting system.** The on-screen receipt is an internal record, not
+  a BIR-registered invoice/official receipt. Whether a POS needs BIR registration/permit and
+  how e-invoicing applies is unresolved (sources conflict) — the store must confirm with its
+  accountant/BIR before relying on the app as its official till. Do not market the app as
+  BIR-compliant.
+- Philippine Data Privacy Act obligations of the store owner: legal owner to advise.
+
 ## 5. Privacy posture (PDPA/GDPR-lite, NFR-9)
 
 - **Offline-first:** all sales/stock live in local SQLite. The network is

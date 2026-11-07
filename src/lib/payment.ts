@@ -51,6 +51,15 @@ const MY_METHODS: LocaleMethod[] = [
   { id: 'qr', label: 'Touch \'n Go QR', icon: 'qr-code-outline', kind: 'qr', qrAcquirer: 'tng' },
 ];
 
+// Philippines: e-wallets (GCash / Maya) are 'mobile' tenders; QR Ph is the national QR standard.
+// Like every method here these are RECORDED tenders — no live payment API.
+const PH_METHODS: LocaleMethod[] = [
+  { id: 'cash', label: 'Cash', icon: 'cash-outline', kind: 'cash' },
+  { id: 'card', label: 'Card', icon: 'card-outline', kind: 'card' },
+  { id: 'mobile', label: 'GCash / Maya', icon: 'phone-portrait-outline', kind: 'other' },
+  { id: 'qr', label: 'QR Ph', icon: 'qr-code-outline', kind: 'qr', qrAcquirer: 'qrph' },
+];
+
 const DEFAULT_METHODS: LocaleMethod[] = [
   { id: 'cash', label: 'Cash', icon: 'cash-outline', kind: 'cash' },
   { id: 'card', label: 'Card', icon: 'card-outline', kind: 'card' },
@@ -63,6 +72,7 @@ export function paymentMethodsFor(locale: string | null | undefined): LocaleMeth
   const key = (locale ?? '').toLowerCase().replace('-', '_');
   if (key === 'en_sg') return SG_METHODS;
   if (key === 'en_my') return MY_METHODS;
+  if (key === 'en_ph' || key === 'fil_ph') return PH_METHODS;
   return DEFAULT_METHODS;
 }
 
@@ -109,6 +119,7 @@ export const STUB_QR_ACQUIRER: QRAcquirer = {
 const QR_ACQUIRERS: Record<string, QRAcquirer> = {
   paynow: STUB_QR_ACQUIRER,
   tng: STUB_QR_ACQUIRER,
+  qrph: STUB_QR_ACQUIRER,
   generic: STUB_QR_ACQUIRER,
 };
 

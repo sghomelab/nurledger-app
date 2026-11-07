@@ -78,6 +78,9 @@ export const SG_BARCODE_PARSER: BarcodeParser = {
 const PARSER_BY_LOCALE: Record<string, BarcodeParser> = {
   'en_sg': SG_BARCODE_PARSER,
   'en_my': SG_BARCODE_PARSER,
+  // Philippines: no verified scale-barcode format yet — GS1 in-store-range convention (same as SG) applies.
+  'en_ph': SG_BARCODE_PARSER,
+  'fil_ph': SG_BARCODE_PARSER,
 };
 
 export function parserForLocale(locale: string | null | undefined): BarcodeParser {
