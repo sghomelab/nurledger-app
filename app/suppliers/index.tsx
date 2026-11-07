@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -17,6 +18,7 @@ import type { Supplier } from '../../src/types';
  * the vendor name, so historical documents survive renames/deletes.
  */
 export default function SuppliersScreen() {
+  const { t } = useT();
   const router = useRouter();
   const [suppliers, setSuppliers] = useState<ReturnType<typeof listSuppliers> extends Promise<infer T> ? T : never>([]);
   const [loaded, setLoaded] = useState(false);
@@ -65,7 +67,7 @@ export default function SuppliersScreen() {
       setFormOpen(false);
       await reload();
     } catch (e) {
-      Alert.alert('Save failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('settings.saveFailed'), e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -73,12 +75,12 @@ export default function SuppliersScreen() {
 
   const confirmDelete = (s: (typeof suppliers)[number]) => {
     Alert.alert(
-      'Delete supplier',
+      t('suppliers.deleteSupplier'),
       s.productCount > 0
-        ? `"${s.name}" is linked to ${s.productCount} product${s.productCount === 1 ? '' : 's'}. Deleting unlinks them (products keep their data). Continue?`
-        : `Delete "${s.name}"?`,
+        ? t('suppliers.confirmLinked', { name: s.name, n: s.productCount })
+        : t('suppliers.confirmDelete', { name: s.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
@@ -98,12 +100,12 @@ export default function SuppliersScreen() {
           <Ionicons name="chevron-back" size={24} color={colors.slate700} />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Suppliers</Text>
-          <Text style={styles.subtitle}>Vendor master · lead times · SKU links</Text>
+          <Text style={styles.title}>{t('inv.suppliers')}</Text>
+          <Text style={styles.subtitle}>{t('suppliers.vendorMasterLeadTimesSku')}</Text>
         </View>
         <Pressable style={styles.newBtn} onPress={openNew} hitSlop={8}>
           <Ionicons name="add" size={18} color={colors.white} />
-          <Text style={styles.newText}>New</Text>
+          <Text style={styles.newText}>{t('stList.new')}</Text>
         </Pressable>
       </View>
 
@@ -111,7 +113,7 @@ export default function SuppliersScreen() {
         {loaded && suppliers.length === 0 && (
           <View style={styles.empty}>
             <Ionicons name="business-outline" size={32} color={colors.slate300} />
-            <Text style={styles.emptyText}>No suppliers yet. Add one to pick it on purchase orders and link products to it.</Text>
+            <Text style={styles.emptyText}>{t('suppliers.noSuppliersYetAddOne')}</Text>
           </View>
         )}
         {suppliers.map((s) => (
@@ -138,17 +140,17 @@ export default function SuppliersScreen() {
         <Pressable style={styles.backdrop} onPress={() => setFormOpen(false)}>
           <Pressable style={styles.formCard} onPress={() => {}}>
             <Text style={styles.formTitle}>{editing ? 'Edit supplier' : 'New supplier'}</Text>
-            <Field label="Name *">
+            <Field label={t('invEdit.name')}>
               <TextInput
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
-                placeholder="e.g. Sheng Siong Wholesale"
+                placeholder={t('poNew.eGShengSiongWholesale')}
                 placeholderTextColor={colors.slate400}
                 autoCapitalize="words"
               />
             </Field>
-            <Field label="Lead time (days)">
+            <Field label={t('suppliers.leadTimeDays')}>
               <TextInput
                 style={styles.inputMono}
                 value={lead}
@@ -157,19 +159,19 @@ export default function SuppliersScreen() {
                 keyboardType="number-pad"
               />
             </Field>
-            <Field label="Notes">
+            <Field label={t('suppliers.notes')}>
               <TextInput
                 style={[styles.input, styles.multiline]}
                 value={notes}
                 onChangeText={setNotes}
-                placeholder="Optional — delivery days, min order, contacts"
+                placeholder={t('suppliers.optionalDeliveryDaysMinOrder')}
                 multiline
                 numberOfLines={3}
               />
             </Field>
             <View style={styles.formButtons}>
               <Pressable style={styles.cancelBtn} onPress={() => setFormOpen(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={styles.cancelText}>{t('common.cancel')}</Text>
               </Pressable>
               <Pressable
                 style={[styles.saveBtn, (saving || !name.trim()) && { opacity: 0.5 }]}

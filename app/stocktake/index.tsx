@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import {
@@ -23,10 +24,11 @@ import { Chip } from '../../src/components/Chip';
 
 /** Applied stocktakes are done; in-progress ones show as counting. */
 function StocktakeChip({ applied }: { applied: boolean }) {
+  const { t } = useT();
   return applied ? (
-    <Chip label="Applied" tone="positive" />
+    <Chip label={t('stDetail.applied')} tone="positive" />
   ) : (
-    <Chip label="Counting" tone="primary" />
+    <Chip label={t('stDetail.counting')} tone="primary" />
   );
 }
 import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
@@ -41,6 +43,7 @@ import type { Category } from '../../src/types';
  * `stocktake_apply` gate (owner/manager PIN for cashiers).
  */
 export default function StocktakeListScreen() {
+  const { t } = useT();
   const router = useRouter();
   const { categories } = useCategories();
 
@@ -72,7 +75,7 @@ export default function StocktakeListScreen() {
       setCreateVisible(false);
       router.push({ pathname: '/stocktake/[id]', params: { id } });
     } catch (e) {
-      Alert.alert('Stocktake failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('stList.stocktakeFailed'), e instanceof Error ? e.message : String(e));
     } finally {
       setStarting(false);
     }
@@ -84,15 +87,15 @@ export default function StocktakeListScreen() {
     <View style={styles.wrap}>
       <View style={styles.header}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Stocktakes</Text>
-          <Text style={styles.meta}>Count stock · blind count · apply variances</Text>
+          <Text style={styles.title}>{t('stList.stocktakes')}</Text>
+          <Text style={styles.meta}>{t('stList.countStockBlindCountApply')}</Text>
         </View>
         <Pressable
           style={({ pressed }) => [styles.newBtn, pressed && { opacity: 0.9 }]}
           onPress={() => setCreateVisible(true)}
         >
           <Ionicons name="add" size={18} color={colors.white} />
-          <Text style={styles.newText}>New</Text>
+          <Text style={styles.newText}>{t('stList.new')}</Text>
         </Pressable>
       </View>
 
@@ -104,7 +107,7 @@ export default function StocktakeListScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Ionicons name="clipboard-outline" size={40} color={colors.slate300} />
-            <Text style={styles.emptyText}>No stocktakes yet</Text>
+            <Text style={styles.emptyText}>{t('stList.noStocktakesYet')}</Text>
           </View>
         }
         renderItem={({ item }) => (
@@ -131,9 +134,9 @@ export default function StocktakeListScreen() {
         <Modal transparent animationType="fade" onRequestClose={() => setCreateVisible(false)}>
           <Pressable style={styles.backdrop} onPress={() => setCreateVisible(false)}>
             <Pressable style={styles.sheet} onPress={() => {}}>
-              <Text style={styles.sheetTitle}>New stocktake</Text>
+              <Text style={styles.sheetTitle}>{t('stList.newStocktake')}</Text>
 
-              <Text style={styles.fieldLabel}>Scope</Text>
+              <Text style={styles.fieldLabel}>{t('labels.scope')}</Text>
               <Pressable style={styles.scopeBtn} onPress={() => setScopePicker(true)}>
                 <Text style={styles.scopeText} numberOfLines={1}>{scopeLabel}</Text>
                 <Ionicons name="chevron-down" size={16} color={colors.slate400} />
@@ -141,8 +144,8 @@ export default function StocktakeListScreen() {
 
               <View style={styles.blindRow}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.fieldLabel}>Blind count</Text>
-                  <Text style={styles.hint}>Hide book stock while counting (recommended)</Text>
+                  <Text style={styles.fieldLabel}>{t('stDetail.blindCount')}</Text>
+                  <Text style={styles.hint}>{t('stList.hideBookStockWhileCounting')}</Text>
                 </View>
                 <Switch
                   value={blind}
@@ -166,7 +169,7 @@ export default function StocktakeListScreen() {
 
       {scopePicker && (
         <PickerOverlay
-          title="Stocktake scope"
+          title={t('stList.stocktakeScope')}
           onClose={() => setScopePicker(false)}
           rows={[
             {

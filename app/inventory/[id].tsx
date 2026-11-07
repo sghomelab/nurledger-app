@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useState } from 'react';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -37,6 +38,7 @@ const URGENCY_COLOR: Record<ExpiryUrgency, string> = {
  * desktop 17-column table; no new top-level nav is invented.)
  */
 export default function ProductDetailScreen() {
+  const { t } = useT();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
   const { outlet } = useOutlet();
@@ -82,8 +84,8 @@ export default function ProductDetailScreen() {
 
   const deactivate = async () => {
     if (!product) return;
-    Alert.alert('Deactivate product', `Hide "${product.name}" from the register? Stock & ledger history are kept.`, [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('invDetail.deactivateProduct'), `Hide "${product.name}" from the register? Stock & ledger history are kept.`, [
+      { text: t('common.cancel'), style: 'cancel' },
       {
         text: 'Deactivate',
         style: 'destructive',
@@ -105,7 +107,7 @@ export default function ProductDetailScreen() {
       await reload();
       await load();
     } catch (e) {
-      Alert.alert('Price update failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('invDetail.priceUpdateFailed'), e instanceof Error ? e.message : String(e));
     }
   };
 
@@ -122,12 +124,12 @@ export default function ProductDetailScreen() {
   if (loaded && !product) {
     return (
       <View style={styles.center}>
-        <Text style={styles.missing}>This product no longer exists.</Text>
+        <Text style={styles.missing}>{t('invDetail.thisProductNoLongerExists')}</Text>
       </View>
     );
   }
   if (!product) {
-    return <View style={styles.center}><Text style={styles.missing}>Loading…</Text></View>;
+    return <View style={styles.center}><Text style={styles.missing}>{t('common.loading')}</Text></View>;
   }
 
   const currency = outlet?.currency ?? 'SGD';
@@ -150,10 +152,10 @@ export default function ProductDetailScreen() {
 
       {/* Key metrics */}
       <View style={styles.metrics}>
-        <Metric label="On hand" value={String(product.stockQty)} />
-        <Metric label="Price" value={formatMoney(product.priceMinor, currency)} />
-        <Metric label="Cost" value={formatMoney(product.costMinor, currency)} />
-        <Metric label="Margin" value={`${marginChip}%`} accent={colors.positive} />
+        <Metric label={t('adjust.onHand')} value={String(product.stockQty)} />
+        <Metric label={t('sell.promptPrice')} value={formatMoney(product.priceMinor, currency)} />
+        <Metric label={t('invDetail.cost')} value={formatMoney(product.costMinor, currency)} />
+        <Metric label={t('invDetail.margin')} value={`${marginChip}%`} accent={colors.positive} />
       </View>
 
       {/* Reorder suggestion (FR-308) */}
@@ -163,7 +165,7 @@ export default function ProductDetailScreen() {
         }>
           <Ionicons name="refresh-circle" size={20} color={colors.warning} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.reorderTitle}>Reorder suggested</Text>
+            <Text style={styles.reorderTitle}>{t('invDetail.reorderSuggested')}</Text>
             <Text style={styles.reorderSub}>
               Stock {product.stockQty} below min {product.minQty} — order {Math.max(suggested, 1)} (max {product.maxQty})
             </Text>
@@ -191,32 +193,32 @@ export default function ProductDetailScreen() {
           </View>
           {margin.suggestedPriceMinor != null && (
             <Pressable style={styles.marginBtn} onPress={requestSuggestedPrice}>
-              <Text style={styles.marginBtnText}>Use</Text>
+              <Text style={styles.marginBtnText}>{t('invDetail.use')}</Text>
             </Pressable>
           )}
         </View>
       )}
 
       {/* Details (the prototype columns) */}
-      <SectionTitle>Details</SectionTitle>
+      <SectionTitle>{t('invDetail.details')}</SectionTitle>
       <View style={styles.card}>
         <Row label="SKU" value={product.sku} mono />
-        <Row label="Barcode" value={product.barcode ?? '—'} mono />
-        <Row label="Carton barcode" value={product.cartonBarcode ?? '—'} mono sub={`1 carton = ${product.cartonSize} units`} />
-        <Row label="Category" value={categoryName} />
-        <Row label="Supplier" value={supplier?.name ?? '—'} sub={supplier ? `${supplier.leadTimeDays}d lead` : undefined} />
-        <Row label="Unit type" value={product.unitType} />
-        <Row label="Velocity tier" value={product.velocityClass ?? '—'} />
-        <Row label="Min (reorder)" value={String(product.minQty)} mono />
-        <Row label="Max" value={String(product.maxQty)} mono />
-        <Row label="Last updated" value={fmtDate(product.updatedAt)} />
+        <Row label={t('invDetail.barcode')} value={product.barcode ?? '—'} mono />
+        <Row label={t('invDetail.cartonBarcode')} value={product.cartonBarcode ?? '—'} mono sub={`1 carton = ${product.cartonSize} units`} />
+        <Row label={t('invDetail.category')} value={categoryName} />
+        <Row label={t('invDetail.supplier')} value={supplier?.name ?? '—'} sub={supplier ? `${supplier.leadTimeDays}d lead` : undefined} />
+        <Row label={t('invDetail.unitType')} value={product.unitType} />
+        <Row label={t('invDetail.velocityTier')} value={product.velocityClass ?? '—'} />
+        <Row label={t('invDetail.minReorder')} value={String(product.minQty)} mono />
+        <Row label={t('invDetail.max')} value={String(product.maxQty)} mono />
+        <Row label={t('invDetail.lastUpdated')} value={fmtDate(product.updatedAt)} />
       </View>
 
       {/* FEFO batches (FR-307) */}
-      <SectionTitle>Batches (FEFO)</SectionTitle>
+      <SectionTitle>{t('invDetail.batchesFefo')}</SectionTitle>
       <View style={styles.card}>
         {batches.length === 0 ? (
-          <Text style={styles.emptyText}>No batches on record.</Text>
+          <Text style={styles.emptyText}>{t('invDetail.noBatchesOnRecord')}</Text>
         ) : (
           batches.map((b, i) => {
             const daysLeft = b.expiryDate ? daysUntil(b.expiryDate) : Number.POSITIVE_INFINITY;
@@ -226,7 +228,7 @@ export default function ProductDetailScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={styles.batchCode} numberOfLines={1}>{b.lotCode || '—'}</Text>
                   <Text style={styles.batchMeta}>
-                    {b.expiryDate ? `Exp ${b.expiryDate}` : 'No expiry'}
+                    {b.expiryDate ? t('invDetail.expOn', { date: b.expiryDate }) : t('invDetail.noExpiry')}
                   </Text>
                 </View>
                 <Text style={[styles.batchDays, { color: URGENCY_COLOR[urgency] }]}>
@@ -240,10 +242,10 @@ export default function ProductDetailScreen() {
       </View>
 
       {/* Ledger (last movements, FR-316) */}
-      <SectionTitle>Recent movements</SectionTitle>
+      <SectionTitle>{t('invDetail.recentMovements')}</SectionTitle>
       <View style={styles.card}>
         {ledger.length === 0 ? (
-          <Text style={styles.emptyText}>No stock movements yet.</Text>
+          <Text style={styles.emptyText}>{t('invDetail.noStockMovementsYet')}</Text>
         ) : (
           ledger.map((l, i) => (
             <View key={l.id} style={[styles.ledgerRow, i > 0 && styles.batchDivider]}>
@@ -261,19 +263,19 @@ export default function ProductDetailScreen() {
 
       {/* Actions */}
       <View style={styles.actions}>
-        <ActionButton icon="scale-outline" label="Adjust" tone="warning" onPress={() => setAdjusting(true)} />
-        <ActionButton icon="add-circle-outline" label="Restock" tone="primary" onPress={() =>
+        <ActionButton icon="scale-outline" label={t('invDetail.adjust')} tone="warning" onPress={() => setAdjusting(true)} />
+        <ActionButton icon="add-circle-outline" label={t('invDetail.restock')} tone="primary" onPress={() =>
           router.push({ pathname: '/po/new', params: { product: product.id, qty: String(Math.max(suggested, product.maxQty || 1)) } })
         } />
       </View>
       <View style={styles.actions}>
-        <ActionButton icon="create-outline" label="Edit" tone="neutral" onPress={() =>
+        <ActionButton icon="create-outline" label={t('invDetail.edit')} tone="neutral" onPress={() =>
           router.push({ pathname: '/inventory/edit', params: { id: product.id } })
         } />
-        <ActionButton icon="print-outline" label="Label" tone="neutral" onPress={() =>
+        <ActionButton icon="print-outline" label={t('invDetail.label')} tone="neutral" onPress={() =>
           router.push({ pathname: '/labels', params: { product: product.id } })
         } />
-        <ActionButton icon="eye-off-outline" label="Deactivate" tone="danger" onPress={() => void deactivate()} />
+        <ActionButton icon="eye-off-outline" label={t('invDetail.deactivate')} tone="danger" onPress={() => void deactivate()} />
       </View>
 
       {adjusting && (

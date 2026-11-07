@@ -1,4 +1,5 @@
 import { useT } from '../../src/hooks/useT';
+import type { MsgKey } from '../../src/i18n';
 import { wideColumn } from '../../src/lib/layout';
 import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
@@ -24,10 +25,10 @@ import { colors, fonts, radius, spacing, typography } from '../../src/theme/toke
 
 type PeriodKey = PeriodId;
 
-const PERIODS: Array<{ key: PeriodKey; label: string }> = [
-  { key: 'today', label: 'Today' },
-  { key: 'period', label: 'Current Period' },
-  { key: 'all', label: 'All Time' },
+const PERIODS: Array<{ key: PeriodKey; labelKey: MsgKey }> = [
+  { key: 'today', labelKey: 'insights.periodToday' },
+  { key: 'period', labelKey: 'insights.periodCurrent' },
+  { key: 'all', labelKey: 'insights.periodAll' },
 ];
 
 function errMsg(e: unknown): string {
@@ -120,7 +121,7 @@ export default function InsightsTab() {
       <View style={styles.segment}>
         {PERIODS.map((p) => (
           <Pressable key={p.key} style={[styles.segmentBtn, period === p.key && styles.segmentBtnActive]} onPress={() => setPeriod(p.key)}>
-            <Text style={[styles.segmentText, period === p.key && styles.segmentTextActive]}>{p.label}</Text>
+            <Text style={[styles.segmentText, period === p.key && styles.segmentTextActive]}>{t(p.labelKey)}</Text>
           </Pressable>
         ))}
       </View>
@@ -129,26 +130,26 @@ export default function InsightsTab() {
       {k ? (
         <>
           <View style={styles.kpiGrid}>
-            <KpiCard label="Revenue (net)" value={formatMoney(k.netSalesMinor, currency)} />
+            <KpiCard label={t('insights.revenueNet')} value={formatMoney(k.netSalesMinor, currency)} />
             <KpiCard label="COGS" value={formatMoney(k.cogsMinor, currency)} />
-            <KpiCard label="Gross profit" value={formatMoney(k.grossProfitMinor, currency)} tone={k.grossProfitMinor >= 0 ? 'pos' : 'neg'} />
-            <KpiCard label="Operating net margin" value={`${k.opNetMarginPct.toFixed(2)}%`} tone={k.opNetMarginPct >= 0 ? 'pos' : 'neg'} />
-            <KpiCard label="Discounted items" value={String(k.discountedItems)} />
-            <KpiCard label="Total units" value={String(k.unitsSold)} />
+            <KpiCard label={t('insights.grossProfit')} value={formatMoney(k.grossProfitMinor, currency)} tone={k.grossProfitMinor >= 0 ? 'pos' : 'neg'} />
+            <KpiCard label={t('insights.operatingNetMargin')} value={`${k.opNetMarginPct.toFixed(2)}%`} tone={k.opNetMarginPct >= 0 ? 'pos' : 'neg'} />
+            <KpiCard label={t('insights.discountedItems')} value={String(k.discountedItems)} />
+            <KpiCard label={t('insights.totalUnits')} value={String(k.unitsSold)} />
           </View>
           <View style={styles.subGrid}>
-            <SubStat label="Transactions" value={String(k.transactions)} />
-            <SubStat label="Avg basket" value={formatMoney(k.avgBasketMinor, currency)} />
-            <SubStat label="Units / txn" value={k.upt.toFixed(2)} />
+            <SubStat label={t('insights.transactions')} value={String(k.transactions)} />
+            <SubStat label={t('insights.avgBasket')} value={formatMoney(k.avgBasketMinor, currency)} />
+            <SubStat label={t('insights.unitsTxn')} value={k.upt.toFixed(2)} />
           </View>
 
           {/* Payment Mix (FR-400 — period-scoped sales by payment method) */}
           <Card style={styles.card}>
             <View style={styles.cardHead}>
-              <Text style={styles.cardTitle}>Payment Mix</Text>
+              <Text style={styles.cardTitle}>{t('insights.paymentMix')}</Text>
             </View>
             {mix.length === 0 ? (
-              <Text style={styles.empty}>No sales in this period.</Text>
+              <Text style={styles.empty}>{t('insights.noSalesInThisPeriod')}</Text>
             ) : (
               <>
                 {mix.map((m) => (
@@ -166,25 +167,25 @@ export default function InsightsTab() {
                   </View>
                 ))}
                 <View style={styles.divider} />
-                <PRow label="Total" value={formatMoney(mixTotalMinor, currency)} strong />
+                <PRow label={t('insights.total')} value={formatMoney(mixTotalMinor, currency)} strong />
               </>
             )}
           </Card>
 
           {/* Extended KPIs (research doc §4 full list — FR-403) */}
           <Card style={styles.card}>
-            <Text style={styles.cardTitle}>Extended KPIs</Text>
+            <Text style={styles.cardTitle}>{t('insights.extendedKpis')}</Text>
             <View style={styles.kpiMiniGrid}>
-              <KpiMini label="Gross margin %" value={`${k.grossMarginPct.toFixed(2)}%`} />
-              <KpiMini label="Mark-up %" value={`${k.markupPct.toFixed(2)}%`} />
-              <KpiMini label="Inv. turnover" value={`${k.inventoryTurnover.toFixed(2)}×`} />
-              <KpiMini label="Days on hand" value={`${k.daysOnHand.toFixed(0)}d`} />
-              <KpiMini label="Sell-through" value={`${k.sellThroughPct.toFixed(1)}%`} />
+              <KpiMini label={t('insights.grossMargin')} value={`${k.grossMarginPct.toFixed(2)}%`} />
+              <KpiMini label={t('insights.markUp')} value={`${k.markupPct.toFixed(2)}%`} />
+              <KpiMini label={t('insights.invTurnover')} value={`${k.inventoryTurnover.toFixed(2)}×`} />
+              <KpiMini label={t('insights.daysOnHand')} value={`${k.daysOnHand.toFixed(0)}d`} />
+              <KpiMini label={t('insights.sellThrough')} value={`${k.sellThroughPct.toFixed(1)}%`} />
               <KpiMini label="GMROI" value={`${k.gmroi.toFixed(2)}×`} />
-              <KpiMini label="Shrinkage" value={`${k.shrinkagePct.toFixed(2)}%`} />
-              <KpiMini label="Stockout rate" value={`${k.stockoutRatePct.toFixed(1)}%`} />
-              <KpiMini label="Expiry waste" value={`${k.expiryWastePct.toFixed(2)}%`} />
-              <KpiMini label="Fill rate" value={`${k.fillRatePct.toFixed(1)}%`} />
+              <KpiMini label={t('insights.shrinkage')} value={`${k.shrinkagePct.toFixed(2)}%`} />
+              <KpiMini label={t('insights.stockoutRate')} value={`${k.stockoutRatePct.toFixed(1)}%`} />
+              <KpiMini label={t('insights.expiryWaste')} value={`${k.expiryWastePct.toFixed(2)}%`} />
+              <KpiMini label={t('insights.fillRate')} value={`${k.fillRatePct.toFixed(1)}%`} />
             </View>
             <Text style={styles.hint}>
               Turnover/GMROI use period-end inventory (at cost) as the average; stockout rate and
@@ -195,31 +196,31 @@ export default function InsightsTab() {
           {/* P&L (prototype structure) */}
           <Card style={styles.card}>
             <View style={styles.cardHead}>
-              <Text style={styles.cardTitle}>Profit & Loss</Text>
+              <Text style={styles.cardTitle}>{t('insights.profitLoss')}</Text>
               <Pressable style={styles.exportBtn} onPress={exportPl} hitSlop={8}>
                 <Ionicons name="download-outline" size={14} color={colors.primary} />
                 <Text style={styles.exportText}>CSV</Text>
               </Pressable>
             </View>
-            <PRow label="Total Gross Sales" value={formatMoney(k.grossSalesMinor, currency)} />
-            <PRow label="Cost of Goods Sold" value={formatMoney(k.cogsMinor, currency)} />
-            <PRow label="Gross Margin" value={formatMoney(k.plGrossMarginMinor, currency)} strong />
-            <Text style={styles.subSection}>Operating Costs</Text>
-            <PRow label="Staff Payroll" value={formatMoney(k.plOpex.payrollMinor, currency)} indent />
-            <PRow label="Maintenance" value={formatMoney(k.plOpex.maintenanceMinor, currency)} indent />
-            <PRow label="Other Operational" value={formatMoney(k.plOpex.otherMinor, currency)} indent />
+            <PRow label={t('insights.totalGrossSales')} value={formatMoney(k.grossSalesMinor, currency)} />
+            <PRow label={t('insights.costOfGoodsSold')} value={formatMoney(k.cogsMinor, currency)} />
+            <PRow label={t('insights.grossMargin2')} value={formatMoney(k.plGrossMarginMinor, currency)} strong />
+            <Text style={styles.subSection}>{t('insights.operatingCosts')}</Text>
+            <PRow label={t('insights.staffPayroll')} value={formatMoney(k.plOpex.payrollMinor, currency)} indent />
+            <PRow label={t('insights.maintenance')} value={formatMoney(k.plOpex.maintenanceMinor, currency)} indent />
+            <PRow label={t('insights.otherOperational')} value={formatMoney(k.plOpex.otherMinor, currency)} indent />
             <View style={styles.divider} />
-            <PRow label="Operating Net Margin %" value={`${k.opNetMarginPct.toFixed(2)}%`} strong />
-            <Text style={styles.subSection}>Inventory Asset Position</Text>
-            <PRow label="At Wholesale Cost" value={formatMoney(k.inventory.atCostMinor, currency)} indent />
-            <PRow label="At Retail Value" value={formatMoney(k.inventory.atRetailMinor, currency)} indent />
-            <PRow label="Unrealized Potential Margin" value={formatMoney(k.inventory.atRetailMinor - k.inventory.atCostMinor, currency)} indent />
+            <PRow label={t('insights.operatingNetMargin2')} value={`${k.opNetMarginPct.toFixed(2)}%`} strong />
+            <Text style={styles.subSection}>{t('insights.inventoryAssetPosition')}</Text>
+            <PRow label={t('insights.atWholesaleCost')} value={formatMoney(k.inventory.atCostMinor, currency)} indent />
+            <PRow label={t('insights.atRetailValue')} value={formatMoney(k.inventory.atRetailMinor, currency)} indent />
+            <PRow label={t('insights.unrealizedPotentialMargin')} value={formatMoney(k.inventory.atRetailMinor - k.inventory.atCostMinor, currency)} indent />
           </Card>
 
           {/* Velocity / ABC */}
           <Card style={styles.card}>
             <View style={styles.cardHead}>
-              <Text style={styles.cardTitle}>Velocity / ABC</Text>
+              <Text style={styles.cardTitle}>{t('insights.velocityAbc')}</Text>
               <Pressable style={styles.exportBtn} onPress={exportAbc} hitSlop={8}>
                 <Ionicons name="download-outline" size={14} color={colors.primary} />
                 <Text style={styles.exportText}>CSV</Text>
@@ -227,7 +228,7 @@ export default function InsightsTab() {
             </View>
             <Text style={styles.abcNote}>{t('insights.abcNote')}</Text>
             {ins.data!.abcRows.length === 0 ? (
-              <Text style={styles.empty}>No products yet.</Text>
+              <Text style={styles.empty}>{t('insights.noProductsYet')}</Text>
             ) : (
               ins.data!.abcRows.slice(0, 15).map((r) => (
                 <View key={r.sku} style={styles.abcRow}>
@@ -250,7 +251,7 @@ export default function InsightsTab() {
           {/* Stockout forecast */}
           <Card style={styles.card}>
             <View style={styles.cardHead}>
-              <Text style={styles.cardTitle}>Stockout Forecast</Text>
+              <Text style={styles.cardTitle}>{t('insights.stockoutForecast')}</Text>
               <Pressable style={styles.exportBtn} onPress={exportStockout} hitSlop={8}>
                 <Ionicons name="download-outline" size={14} color={colors.primary} />
                 <Text style={styles.exportText}>CSV</Text>
@@ -260,7 +261,7 @@ export default function InsightsTab() {
               Days of stock left at the {periodLabel(period).toLowerCase()} velocity.
             </Text>
             {ins.data!.stockoutRows.length === 0 ? (
-              <Text style={styles.empty}>No products with sales in this period.</Text>
+              <Text style={styles.empty}>{t('insights.noProductsWithSalesIn')}</Text>
             ) : (
               ins.data!.stockoutRows.map((r) => (
                 <View key={r.sku} style={styles.stockRow}>
@@ -284,20 +285,20 @@ export default function InsightsTab() {
           </Card>
         </>
       ) : (
-        <Text style={styles.loading}>Loading…</Text>
+        <Text style={styles.loading}>{t('common.loading')}</Text>
       )}
 
       {/* Expenses (feed the P&L operating costs) */}
       <Card style={styles.card}>
         <View style={styles.cardHead}>
-          <Text style={styles.cardTitle}>Operating Expenses</Text>
+          <Text style={styles.cardTitle}>{t('insights.operatingExpenses')}</Text>
           <Pressable style={styles.exportBtn} onPress={() => setExpenseVisible(true)} hitSlop={8}>
             <Ionicons name="add" size={16} color={colors.primary} />
-            <Text style={styles.exportText}>Add</Text>
+            <Text style={styles.exportText}>{t('common.add')}</Text>
           </Pressable>
         </View>
         {ins.expenses.length === 0 ? (
-          <Text style={styles.empty}>No expenses in this period.</Text>
+          <Text style={styles.empty}>{t('insights.noExpensesInThisPeriod')}</Text>
         ) : (
           ins.expenses.map((e) => (
             <View key={e.id} style={styles.expenseRow}>
@@ -317,7 +318,7 @@ export default function InsightsTab() {
       {/* Sales history (FR-401: searchable by date[period]/product/cashier) */}
       <Card style={styles.card}>
         <View style={styles.cardHead}>
-          <Text style={styles.cardTitle}>Sales History</Text>
+          <Text style={styles.cardTitle}>{t('insights.salesHistory')}</Text>
           <Pressable style={styles.exportBtn} onPress={exportHistory} hitSlop={8}>
             <Ionicons name="download-outline" size={14} color={colors.primary} />
             <Text style={styles.exportText}>CSV</Text>
@@ -329,14 +330,14 @@ export default function InsightsTab() {
             style={styles.searchInput}
             value={ins.search}
             onChangeText={(v) => ins.setSearch(v)}
-            placeholder="Search product, cashier or sale ID"
+            placeholder={t('insights.searchProductCashierOrSale')}
             placeholderTextColor={colors.slate400}
             autoCorrect={false}
             autoCapitalize="none"
           />
         </View>
         {ins.salesHistory.length === 0 ? (
-          <Text style={styles.empty}>No sales in this period.</Text>
+          <Text style={styles.empty}>{t('insights.noSalesInThisPeriod')}</Text>
         ) : (
           ins.salesHistory.map((s) => (
             <Pressable
@@ -373,7 +374,7 @@ export default function InsightsTab() {
             try {
               await ins.addExpense(type, amountMinor, description);
             } catch (e) {
-              Alert.alert('Expense failed', errMsg(e));
+              Alert.alert(t('insights.expenseFailed'), errMsg(e));
             }
           }}
           onCancel={() => setExpenseVisible(false)}
@@ -439,6 +440,7 @@ function ExpenseSheet({
   onSave: (type: ExpenseType, amountMinor: number, description: string | null) => void;
   onCancel: () => void;
 }) {
+  const { t } = useT();
   const [type, setType] = useState<ExpenseType>('payroll');
   const [text, setText] = useState('');
   const [desc, setDesc] = useState('');
@@ -450,7 +452,7 @@ function ExpenseSheet({
       <Pressable style={styles.sheetBackdrop} onPress={onCancel}>
         <Pressable style={styles.sheetBody} onPress={() => {}}>
           <View style={styles.expenseForm}>
-            <Text style={styles.cardTitle}>Operating Expense</Text>
+            <Text style={styles.cardTitle}>{t('insights.operatingExpense')}</Text>
             <View style={styles.roleRow}>
               {(Object.keys(EXPENSE_TYPE_LABELS) as ExpenseType[]).map((t) => (
                 <Pressable key={t} style={[styles.roleChip, type === t && styles.roleChipActive]} onPress={() => setType(t)}>
@@ -472,16 +474,16 @@ function ExpenseSheet({
             <TextInput
               value={desc}
               onChangeText={setDesc}
-              placeholder="Description (optional)"
+              placeholder={t('insights.descriptionOptional')}
               placeholderTextColor={colors.slate400}
               style={styles.inlineInput}
             />
             <View style={styles.buttons}>
               <Pressable style={styles.cancelBtn} onPress={onCancel}>
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={styles.cancelText}>{t('common.cancel')}</Text>
               </Pressable>
               <Pressable style={[styles.saveBtn, !valid && { opacity: 0.45 }]} disabled={!valid} onPress={() => onSave(type, value, desc.trim() || null)}>
-                <Text style={styles.saveText}>Save Expense</Text>
+                <Text style={styles.saveText}>{t('insights.saveExpense')}</Text>
               </Pressable>
             </View>
           </View>

@@ -40,7 +40,7 @@ export function PickerOverlay({
       <View style={styles.sheet}>
         <View style={styles.header}>
           <Text style={styles.title} numberOfLines={1}>{title}</Text>
-          <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={12} accessibilityLabel="Close">
+          <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={12} accessibilityLabel={t('pickerOverlay.close')}>
             <Ionicons name="close" size={24} color={colors.slate500} />
           </Pressable>
         </View>

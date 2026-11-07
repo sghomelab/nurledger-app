@@ -4,7 +4,7 @@
  * The `settings` key-value table (schema v6) is the home of per-device
  * choices that must NOT sync to the cloud (same table/pattern as
  * `receipt.width` in saleRepository). Currently holds:
- *   - `ui.language` — interface language, 'en' | 'ms' (FR-115).
+ *   - `ui.language` — interface language, 'en' | 'ms' | 'fil' (FR-115).
  *
  * This is deliberately NOT the outlet's BUSINESS locale (`outlet.locale`):
  * that one drives the barcode parser, payment methods and tax engine and

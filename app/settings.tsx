@@ -383,9 +383,9 @@ export default function SettingsScreen() {
           <SectionTitle>{t('settings.language')}</SectionTitle>
           <Field label={t('settings.appLanguage')}>
             <Segmented
-              options={[t('settings.langEn'), t('settings.langMs')]}
-              value={lang === 'en' ? t('settings.langEn') : t('settings.langMs')}
-              onChange={(v) => void setLanguage(v === t('settings.langMs') ? 'ms' : 'en')}
+              options={[t('settings.langEn'), t('settings.langMs'), t('settings.langFil')]}
+              value={lang === 'en' ? t('settings.langEn') : lang === 'ms' ? t('settings.langMs') : t('settings.langFil')}
+              onChange={(v) => void setLanguage(v === t('settings.langMs') ? 'ms' : v === t('settings.langFil') ? 'fil' : 'en')}
             />
           </Field>
           <Text style={styles.note}>{t('settings.languageNote')}</Text>

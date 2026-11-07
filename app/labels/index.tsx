@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
 import { useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -33,6 +34,7 @@ const DEFAULT_COPIES = 5;
  * the offline kiosk print path (open in any browser → print, or email).
  */
 export default function LabelsScreen() {
+  const { t } = useT();
   const router = useRouter();
   const params = useLocalSearchParams<{ product?: string }>();
   const { outlet } = useOutlet();
@@ -110,7 +112,7 @@ export default function LabelsScreen() {
           <Ionicons name="chevron-back" size={24} color={colors.slate700} />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={styles.title}>Label printing</Text>
+          <Text style={styles.title}>{t('inv.labels')}</Text>
           <Text style={styles.subtitle} numberOfLines={1}>{scopeLabel}</Text>
         </View>
       </View>
@@ -122,9 +124,9 @@ export default function LabelsScreen() {
           <>
             {scope.kind !== 'product' && (
               <View style={{ gap: spacing.xs }}>
-                <Text style={styles.sectionTitle}>Scope</Text>
+                <Text style={styles.sectionTitle}>{t('labels.scope')}</Text>
                 <ScopeChip
-                  label="All products"
+                  label={t('labels.allProducts')}
                   count={products.length}
                   selected={scope.kind === 'all'}
                   onPress={() => setScope({ kind: 'all' })}
@@ -144,7 +146,7 @@ export default function LabelsScreen() {
             )}
 
             <View style={{ gap: spacing.xs }}>
-              <Text style={styles.sectionTitle}>Copies per product</Text>
+              <Text style={styles.sectionTitle}>{t('labels.copiesPerProduct')}</Text>
               <View style={styles.stepper}>
                 <Pressable
                   style={[styles.stepBtn, copies <= MIN_COPIES && { opacity: 0.4 }]}
@@ -165,10 +167,10 @@ export default function LabelsScreen() {
             </View>
 
             <View style={{ gap: spacing.xs }}>
-              <Text style={styles.sectionTitle}>Paper</Text>
+              <Text style={styles.sectionTitle}>{t('labels.paper')}</Text>
               <View style={styles.toggleRow}>
-                <LayoutChip label="58mm roll" selected={layout === 'roll58'} onPress={() => setLayout('roll58')} />
-                <LayoutChip label="A4 sheet" selected={layout === 'sheetA4'} onPress={() => setLayout('sheetA4')} />
+                <LayoutChip label={t('labels.58mmRoll')} selected={layout === 'roll58'} onPress={() => setLayout('roll58')} />
+                <LayoutChip label={t('labels.a4Sheet')} selected={layout === 'sheetA4'} onPress={() => setLayout('sheetA4')} />
               </View>
               <Text style={styles.muted}>
                 {layout === 'roll58'

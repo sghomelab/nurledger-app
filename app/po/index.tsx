@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { useLayout } from '../../src/hooks/useLayout';
 import { GridCell } from '../../src/components/GridCell';
 import { useState } from 'react';
@@ -29,6 +30,7 @@ const STATUS_TONE: Record<string, 'neutral' | 'primary' | 'positive' | 'warning'
  * Tapping a row opens the detail + Receive screen.
  */
 export default function POListScreen() {
+  const { t } = useT();
   const layout = useLayout();
   const router = useRouter();
   const { outlet } = useOutlet();
@@ -85,8 +87,8 @@ export default function POListScreen() {
         ListEmptyComponent={
           <View style={styles.emptyBox}>
             <Ionicons name="business-outline" size={36} color={colors.slate300} />
-            <Text style={styles.emptyTitle}>No purchase orders yet</Text>
-            <Text style={styles.emptySub}>Create a PO to receive stock in batches.</Text>
+            <Text style={styles.emptyTitle}>{t('poList.noPurchaseOrdersYet')}</Text>
+            <Text style={styles.emptySub}>{t('poList.createAPoToReceive')}</Text>
           </View>
         }
         refreshControl={<RefreshControl refreshing={refreshing} tintColor={colors.slate300} onRefresh={() => void onRefresh()} />}

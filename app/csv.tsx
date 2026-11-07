@@ -1,3 +1,4 @@
+import { useT } from '../src/hooks/useT';
 import { centeredColumn } from '../src/lib/layout';
 import { useState } from 'react';
 import { useRouter, Stack } from 'expo-router';
@@ -17,6 +18,7 @@ import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens'
  * Import: pick a .csv → /import-csv preview + report screen.
  */
 export default function ProductDataScreen() {
+  const { t } = useT();
   const router = useRouter();
   const { outlet } = useOutlet();
   const [exporting, setExporting] = useState(false);
@@ -43,7 +45,7 @@ export default function ProductDataScreen() {
       });
       setExported(file.uri);
     } catch (e) {
-      Alert.alert('Export failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('csv.exportFailed'), e instanceof Error ? e.message : String(e));
     } finally {
       setExporting(false);
     }
@@ -63,13 +65,13 @@ export default function ProductDataScreen() {
       setPickedFile({ uri: res.result.uri, name: res.result.name ?? null });
       router.push('/import-csv');
     } catch (e) {
-      Alert.alert('Import failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('csv.importFailed'), e instanceof Error ? e.message : String(e));
     }
   };
 
   return (
     <View style={styles.wrap}>
-      <Stack.Screen options={{ title: 'Product Data (CSV)', headerBackVisible: true }} />
+      <Stack.Screen options={{ title: t('nav.productDataCsv'), headerBackVisible: true }} />
       <ScrollView contentContainerStyle={[{ padding: spacing.lg, paddingBottom: 48 }, centeredColumn]}>
         <Text style={styles.intro}>
           Move the product catalog in and out of the app as a CSV file. Money in the file is in your
@@ -86,8 +88,8 @@ export default function ProductDataScreen() {
             <Ionicons name="download-outline" size={20} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.actionTitle}>Export products to CSV</Text>
-            <Text style={styles.actionSub}>All products, current prices & thresholds</Text>
+            <Text style={styles.actionTitle}>{t('csv.exportProductsToCsv')}</Text>
+            <Text style={styles.actionSub}>{t('csv.allProductsCurrentPricesThresholds')}</Text>
           </View>
           {exporting && <ActivityIndicator color={colors.primary} />}
         </Pressable>
@@ -100,8 +102,8 @@ export default function ProductDataScreen() {
             <Ionicons name="cloud-upload-outline" size={20} color={colors.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.actionTitle}>Import products from CSV</Text>
-            <Text style={styles.actionSub}>Upsert by SKU · preview & report before applying</Text>
+            <Text style={styles.actionTitle}>{t('csv.importProductsFromCsv')}</Text>
+            <Text style={styles.actionSub}>{t('csv.upsertBySkuPreviewReport')}</Text>
           </View>
           <Ionicons name="chevron-forward" size={18} color={colors.slate400} />
         </Pressable>
