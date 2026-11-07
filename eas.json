@@ -20,5 +20,17 @@
       "channel": "production",
       "credentialsSource": "remote"
     }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "channel": "internal"
+      },
+      "ios": {
+        "ascApiKeyPath": "/home/mars/keys/AuthKey_94Y9L28A97.p8",
+        "ascApiKeyId": "94Y9L28A97",
+        "ascApiKeyIssuerId": "fd19ba70-8a95-4070-852d-3799948e29e7"
+      }
+    }
   }
 }
