@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -59,6 +60,7 @@ interface LineState {
  * Gated: cashiers need the owner/manager PIN (FR-501, `refund` gate).
  */
 export default function RefundScreen() {
+  const { t } = useT();
   const router = useRouter();
   const { saleId } = useLocalSearchParams<{ saleId: string }>();
   const { outlet } = useOutlet();
@@ -183,11 +185,11 @@ export default function RefundScreen() {
         masterRestock,
         userId: activeUser?.id ?? null,
       });
-      Alert.alert('Refund complete', `Refunded ${formatMoney(totalMinor, currency)}.`, [
+      Alert.alert(t('refund.refundComplete'), `Refunded ${formatMoney(totalMinor, currency)}.`, [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (e) {
-      Alert.alert('Refund failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('refund.refundFailed'), e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -206,15 +208,15 @@ export default function RefundScreen() {
     return (
       <View style={styles.center}>
         <Ionicons name="checkmark-circle" size={40} color={colors.positive} />
-        <Text style={styles.missing}>This sale has no refundable lines left.</Text>
+        <Text style={styles.missing}>{t('refund.thisSaleHasNoRefundable')}</Text>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>Back</Text>
+          <Text style={styles.backText}>{t('importCsv.back')}</Text>
         </Pressable>
       </View>
     );
   }
   if (!ctx) {
-    return <View style={styles.center}><Text style={styles.missing}>Loading…</Text></View>;
+    return <View style={styles.center}><Text style={styles.missing}>{t('common.loading')}</Text></View>;
   }
 
   return (
@@ -224,11 +226,11 @@ export default function RefundScreen() {
         refreshControl={<RefreshControl refreshing={false} tintColor={colors.slate300} onRefresh={() => void load()} />}
       >
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel="Back">
+          <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel={t('importCsv.back')}>
             <Ionicons name="chevron-back" size={24} color={colors.slate700} />
           </Pressable>
           <View style={{ flex: 1 }}>
-            <Text style={styles.title}>Refund sale</Text>
+            <Text style={styles.title}>{t('refund.refundSale')}</Text>
             <Text style={styles.meta}>
               {new Date(ctx.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
             </Text>
@@ -240,21 +242,21 @@ export default function RefundScreen() {
         <View style={styles.card}>
           <View style={styles.rowBetween}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.cardTitle}>Restock returned goods</Text>
-              <Text style={styles.hint}>Refunded items go back to stock (FIFO, at sale-time cost).</Text>
+              <Text style={styles.cardTitle}>{t('refund.restockReturnedGoods')}</Text>
+              <Text style={styles.hint}>{t('refund.refundedItemsGoBackTo')}</Text>
             </View>
             <Switch
               value={masterRestock}
               onValueChange={applyMasterRestock}
               trackColor={{ true: colors.positive, false: colors.slate300 }}
-              accessibilityLabel="Restock returned goods"
+              accessibilityLabel={t('refund.restockReturnedGoods')}
             />
           </View>
 
           {/* Reason (required, FR-110) */}
           <Pressable style={styles.reasonBtn} onPress={() => setPickerVisible(true)}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.reasonLabel}>Reason * (required)</Text>
+              <Text style={styles.reasonLabel}>{t('adjust.reason')}</Text>
               <Text style={reason ? styles.reasonValue : styles.reasonPlaceholder}>
                 {reason ? REASON_LABELS[reason] : 'Select a reason…'}
               </Text>
@@ -263,7 +265,7 @@ export default function RefundScreen() {
           </Pressable>
         </View>
 
-        <Text style={styles.sectionTitle}>Lines</Text>
+        <Text style={styles.sectionTitle}>{t('poDetail.lines')}</Text>
         <View style={styles.card}>
           {ctx.lines.map((l, i) => {
             const st = lines[l.saleLineId];
@@ -276,7 +278,7 @@ export default function RefundScreen() {
                 <View style={{ flex: 1 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
                     <Text style={styles.lineName} numberOfLines={1}>{l.name}</Text>
-                    {l.isWeighed && <Chip label="WEIGHED" tone="warning" />}
+                    {l.isWeighed && <Chip label={t('refund.weighed')} tone="warning" />}
                   </View>
                   <Text style={styles.lineMeta} numberOfLines={1}>
                     {l.sku} · {formatMoney(l.unitPriceMinor, currency)}
@@ -316,7 +318,7 @@ export default function RefundScreen() {
                       keyboardType="number-pad"
                     />
                     <Pressable style={styles.maxBtn} onPress={() => setLineGrams(l, String(remaining))}>
-                      <Text style={styles.maxText}>Max</Text>
+                      <Text style={styles.maxText}>{t('invDetail.max')}</Text>
                     </Pressable>
                   </View>
                 ) : (
@@ -325,7 +327,7 @@ export default function RefundScreen() {
                       style={[styles.stepBtn, st.qty === 0 && styles.stepBtnDisabled]}
                       onPress={() => setLineQty(l, st.qty - 1)}
                       disabled={st.qty === 0}
-                      accessibilityLabel={`Decrease ${l.name}`}
+                      accessibilityLabel={t('refund.decrease', { name: l.name })}
                     >
                       <Ionicons name="remove" size={18} color={st.qty === 0 ? colors.slate300 : colors.slate700} />
                     </Pressable>
@@ -334,7 +336,7 @@ export default function RefundScreen() {
                       style={[styles.stepBtn, st.qty >= remaining && styles.stepBtnDisabled]}
                       onPress={() => setLineQty(l, st.qty + 1)}
                       disabled={st.qty >= remaining}
-                      accessibilityLabel={`Increase ${l.name}`}
+                      accessibilityLabel={t('refund.increase', { name: l.name })}
                     >
                       <Ionicons name="add" size={18} color={st.qty >= remaining ? colors.slate300 : colors.slate700} />
                     </Pressable>
@@ -358,7 +360,7 @@ export default function RefundScreen() {
                     color={st.restock ? colors.positive : colors.slate400}
                   />
                   <Text style={[styles.lineRestockText, !st.restock && { color: colors.slate400 }]}>
-                    Restock this line
+                    {t('refund.restockThisLine')}
                   </Text>
                 </Pressable>
               </View>
@@ -368,7 +370,7 @@ export default function RefundScreen() {
 
         {/* Total + CTA */}
         <View style={[styles.totalCard, { marginTop: spacing.lg }]}>
-          <Text style={styles.totalLabel}>Refund total</Text>
+          <Text style={styles.totalLabel}>{t('refund.refundTotal')}</Text>
           <NumberText style={styles.totalVal}>{formatMoney(totals.totalMinor, currency)}</NumberText>
           <Text style={styles.linesCount}>
             {selectedCount} line{selectedCount === 1 ? '' : 's'} selected
@@ -383,14 +385,14 @@ export default function RefundScreen() {
           disabled={!canSubmit}
         >
           <Text style={styles.ctaText}>
-            {busy ? 'Refunding…' : `Refund ${formatMoney(totals.totalMinor, currency)}`}
+            {busy ? t('refund.refunding') : t('refund.refundAmount', { amount: formatMoney(totals.totalMinor, currency) })}
           </Text>
         </Pressable>
       </View>
 
       {pickerVisible && (
         <PickerOverlay
-          title="Refund reason"
+          title={t('refund.refundReason')}
           rows={REFUND_REASONS.map((r) => ({
             key: r,
             label: REASON_LABELS[r],

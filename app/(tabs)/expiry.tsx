@@ -1,3 +1,5 @@
+import { useT } from '../../src/hooks/useT';
+import type { TFn } from '../../src/i18n';
 import { useLayout } from '../../src/hooks/useLayout';
 import { GridCell } from '../../src/components/GridCell';
 import { useCallback, useState } from 'react';
@@ -9,18 +11,18 @@ import { type ExpiryRadarEntry, type ExpiryRadarSummary, type ExpiryUrgency } fr
 import { NumberText } from '../../src/components/NumberText';
 import { colors, fonts, radius, spacing } from '../../src/theme/tokens';
 
-const URGENCY_META: Record<ExpiryUrgency, { label: string; color: string; bg: string }> = {
-  expired: { label: 'Expired', color: colors.danger, bg: colors.dangerSoft },
-  critical: { label: 'Critical', color: colors.danger, bg: colors.dangerSoft },
-  soon: { label: 'Soon', color: '#B45309', bg: colors.warningSoft },
-  ok: { label: 'OK', color: colors.positive, bg: colors.positiveSoft },
+const URGENCY_META: Record<ExpiryUrgency, { color: string; bg: string }> = {
+  expired: { color: colors.danger, bg: colors.dangerSoft },
+  critical: { color: colors.danger, bg: colors.dangerSoft },
+  soon: { color: '#B45309', bg: colors.warningSoft },
+  ok: { color: colors.positive, bg: colors.positiveSoft },
 };
 
-function fmtDays(daysLeft: number): string {
+function fmtDays(daysLeft: number, t: TFn): string {
   if (!Number.isFinite(daysLeft)) return '—';
-  if (daysLeft < 0) return `${-daysLeft}d ago`;
-  if (daysLeft === 0) return 'today';
-  return `${daysLeft}d`;
+  if (daysLeft < 0) return t('expiry.daysAgo', { n: -daysLeft });
+  if (daysLeft === 0) return t('expiry.today');
+  return t('expiry.daysLeft', { n: daysLeft });
 }
 
 /**
@@ -30,6 +32,7 @@ function fmtDays(daysLeft: number): string {
  * opens the product detail.
  */
 export default function ExpiryTab() {
+  const { t } = useT();
   const layout = useLayout();
   const router = useRouter();
   const [entries, setEntries] = useState<ExpiryRadarEntry[]>([]);
@@ -78,7 +81,7 @@ export default function ExpiryTab() {
         </View>
         <View style={styles.rowRight}>
           <View style={[styles.urgencyChip, { backgroundColor: meta.bg }]}>
-            <Text style={[styles.urgencyText, { color: meta.color }]}>{fmtDays(item.daysLeft)}</Text>
+            <Text style={[styles.urgencyText, { color: meta.color }]}>{fmtDays(item.daysLeft, t)}</Text>
           </View>
           <NumberText style={styles.qty}>{item.qtyRemaining}</NumberText>
         </View>
@@ -102,14 +105,14 @@ export default function ExpiryTab() {
             <View style={styles.cards}>
               <SummaryCard
                 wide={layout.isTablet}
-                label="Expired waste"
+                label={t('expiry.expiredWaste')}
                 value={String(summary.expiredWasteQty)}
                 color={colors.danger}
                 icon="warning-outline"
               />
-              <SummaryCard wide={layout.isTablet} label="Expiring" value={String(summary.expiringQty)} color="#B45309" icon="hourglass-outline" />
-              <SummaryCard wide={layout.isTablet} label="Other" value={String(summary.otherQty)} color={colors.slate500} icon="albums-outline" />
-              <SummaryCard wide={layout.isTablet} label="Batches" value={String(summary.batchCount)} color={colors.primary} icon="pricetags-outline" />
+              <SummaryCard wide={layout.isTablet} label={t('expiry.expiring')} value={String(summary.expiringQty)} color="#B45309" icon="hourglass-outline" />
+              <SummaryCard wide={layout.isTablet} label={t('expiry.other')} value={String(summary.otherQty)} color={colors.slate500} icon="albums-outline" />
+              <SummaryCard wide={layout.isTablet} label={t('expiry.batches')} value={String(summary.batchCount)} color={colors.primary} icon="pricetags-outline" />
             </View>
           ) : undefined
         }
@@ -117,8 +120,8 @@ export default function ExpiryTab() {
           loaded ? (
             <View style={styles.empty}>
               <Ionicons name="checkmark-done-circle-outline" size={40} color={colors.positive} />
-              <Text style={styles.emptyTitle}>No expiry risk</Text>
-              <Text style={styles.emptySub}>No batches with remaining stock to track.</Text>
+              <Text style={styles.emptyTitle}>{t('expiry.noExpiryRisk')}</Text>
+              <Text style={styles.emptySub}>{t('expiry.noBatchesWithRemainingStock')}</Text>
             </View>
           ) : undefined
         }

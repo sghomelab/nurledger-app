@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { wideColumn } from '../../src/lib/layout';
 import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
@@ -48,6 +49,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
  * "owner's PIN protects the rest" rule (FR-500 / DEV-003).
  */
 export default function ShiftTab() {
+  const { t } = useT();
   const router = useRouter();
   const { outlet } = useOutlet();
   const { users, active, switchUser, addUser } = useUsers();
@@ -76,7 +78,7 @@ export default function ShiftTab() {
         });
         setOpenFloatVisible(false);
       } catch (e) {
-        Alert.alert('Could not open shift', errMsg(e));
+        Alert.alert(t('sell.couldNotOpenShift'), errMsg(e));
       }
     },
     [openShift, outlet, active],
@@ -89,7 +91,7 @@ export default function ShiftTab() {
         await addCashMove(open.id, cashMove.type, amountMinor, reason);
         setCashMove(null);
       } catch (e) {
-        Alert.alert('Cash movement failed', errMsg(e));
+        Alert.alert(t('shift.cashMovementFailed'), errMsg(e));
       }
     },
     [open, cashMove, addCashMove],
@@ -117,7 +119,7 @@ export default function ShiftTab() {
         setCloseVisible(false);
         if (closed.zReport) setReport(closed.zReport);
       } catch (e) {
-        Alert.alert('Close failed', errMsg(e));
+        Alert.alert(t('shift.closeFailed'), errMsg(e));
       }
     },
     [open, closeShift],
@@ -134,7 +136,7 @@ export default function ShiftTab() {
         await switchUser(id);
         setUserSheet(false);
       } catch (e) {
-        Alert.alert('Switch failed', errMsg(e));
+        Alert.alert(t('shift.switchFailed'), errMsg(e));
       }
     },
     [switchUser],
@@ -146,7 +148,7 @@ export default function ShiftTab() {
       setNewUser({ name: '', role: 'cashier', pin: '' });
       setAddUserVisible(false);
     } catch (e) {
-      Alert.alert('Add user failed', errMsg(e));
+      Alert.alert(t('shift.addUserFailed'), errMsg(e));
     }
   }, [newUser, addUser]);
 
@@ -164,12 +166,12 @@ export default function ShiftTab() {
           </View>
           <Pressable style={styles.switchBtn} onPress={() => setUserSheet(true)} hitSlop={8}>
             <Ionicons name="swap-horizontal" size={16} color={colors.primary} />
-            <Text style={styles.switchBtnText}>Switch</Text>
+            <Text style={styles.switchBtnText}>{t('shift.switch')}</Text>
           </Pressable>
         </View>
         <Pressable style={styles.addUserBtn} onPress={() => setAddUserVisible(true)}>
           <Ionicons name="person-add-outline" size={14} color={colors.slate500} />
-          <Text style={styles.addUserText}>Add user</Text>
+          <Text style={styles.addUserText}>{t('shift.addUser')}</Text>
         </Pressable>
       </Card>
 
@@ -180,7 +182,7 @@ export default function ShiftTab() {
             <View style={styles.shiftHead}>
               <View style={styles.openBadge}>
                 <View style={styles.openDot} />
-                <Text style={styles.openBadgeText}>Shift open</Text>
+                <Text style={styles.openBadgeText}>{t('shift.shiftOpen')}</Text>
               </View>
               <Text style={styles.shiftMeta}>
                 {open.cashierName ?? '—'} · {timeStr(open.openedAt)}
@@ -189,27 +191,27 @@ export default function ShiftTab() {
 
             {snapshot && (
               <View style={styles.drawerRows}>
-                <DrawerRow label="Opening float" value={formatMoney(snapshot.totals.floatMinor, currency)} />
-                <DrawerRow label="Cash sales (this shift)" value={formatMoney(snapshot.totals.cashSaleMinor, currency)} />
-                <DrawerRow label="Cash in" value={formatMoney(snapshot.totals.cashInMinor, currency)} />
-                <DrawerRow label="Cash out" value={formatMoney(snapshot.totals.cashOutMinor, currency)} />
+                <DrawerRow label={t('shift.openingFloat')} value={formatMoney(snapshot.totals.floatMinor, currency)} />
+                <DrawerRow label={t('shift.cashSalesThisShift')} value={formatMoney(snapshot.totals.cashSaleMinor, currency)} />
+                <DrawerRow label={t('shift.cashIn')} value={formatMoney(snapshot.totals.cashInMinor, currency)} />
+                <DrawerRow label={t('shift.cashOut')} value={formatMoney(snapshot.totals.cashOutMinor, currency)} />
                 <View style={styles.drawerDivider} />
-                <DrawerRow label="Expected in drawer" value={formatMoney(snapshot.expectedCashMinor, currency)} strong />
+                <DrawerRow label={t('shift.expectedInDrawer')} value={formatMoney(snapshot.expectedCashMinor, currency)} strong />
               </View>
             )}
 
             <View style={styles.actionGrid}>
-              <ActionTile icon="arrow-down-circle" label="Cash in" onPress={() => setCashMove({ type: 'in' })} tone="pos" />
-              <ActionTile icon="arrow-up-circle" label="Cash out" onPress={() => setCashMove({ type: 'out' })} tone="warn" />
-              <ActionTile icon="pulse" label="X-report" onPress={() => void doXReport()} tone="neutral" />
-              <ActionTile icon="lock-closed" label="Close shift" onPress={requestClose} tone="danger" />
+              <ActionTile icon="arrow-down-circle" label={t('shift.cashIn')} onPress={() => setCashMove({ type: 'in' })} tone="pos" />
+              <ActionTile icon="arrow-up-circle" label={t('shift.cashOut')} onPress={() => setCashMove({ type: 'out' })} tone="warn" />
+              <ActionTile icon="pulse" label={t('shift.xReport')} onPress={() => void doXReport()} tone="neutral" />
+              <ActionTile icon="lock-closed" label={t('gate.close_shift')} onPress={requestClose} tone="danger" />
             </View>
           </Card>
 
           {/* Cash movements (FR-201) */}
           {snapshot && snapshot.moves.length > 0 && (
             <Card style={styles.movesCard}>
-              <Text style={styles.sectionTitle}>Cash movements</Text>
+              <Text style={styles.sectionTitle}>{t('shift.cashMovements')}</Text>
               {snapshot.moves.map((m) => (
                 <View key={m.id} style={styles.moveRow}>
                   <Ionicons
@@ -230,22 +232,22 @@ export default function ShiftTab() {
       ) : (
         <Card style={styles.lockedCard}>
           <Ionicons name="lock-closed" size={30} color={colors.warning} />
-          <Text style={styles.lockedTitle}>Register locked</Text>
+          <Text style={styles.lockedTitle}>{t('sell.registerLocked')}</Text>
           <Text style={styles.lockedText}>
             No shift is open. Open a shift with a starting float to unlock selling — every sale records
             the cashier and shift (FR-200).
           </Text>
           <Pressable style={styles.openShiftBtn} onPress={() => setOpenFloatVisible(true)}>
-            <Text style={styles.openShiftText}>Open shift</Text>
+            <Text style={styles.openShiftText}>{t('sell.openShift')}</Text>
           </Pressable>
         </Card>
       )}
 
       {/* Closed shift history */}
       <Card style={styles.historyCard}>
-        <Text style={styles.sectionTitle}>Closed shifts</Text>
+        <Text style={styles.sectionTitle}>{t('shift.closedShifts')}</Text>
         {!history || history.length === 0 ? (
-          <Text style={styles.empty}>No closed shifts yet.</Text>
+          <Text style={styles.empty}>{t('shift.noClosedShiftsYet')}</Text>
         ) : (
           history.map((s) => <HistoryRow key={s.id} shift={s} currency={currency} onOpen={() => router.push(`/shift/${s.id}`)} />)
         )}
@@ -264,7 +266,7 @@ export default function ShiftTab() {
             </Text>
           </View>
           <Pressable style={styles.changeBtn} onPress={() => router.push('/settings')} hitSlop={8}>
-            <Text style={styles.changeBtnText}>Change</Text>
+            <Text style={styles.changeBtnText}>{t('shift.change')}</Text>
           </Pressable>
         </View>
       </Card>
@@ -272,7 +274,7 @@ export default function ShiftTab() {
       {/* Overlays */}
       {userSheet && (
         <PickerOverlay
-          title="Who is at the register?"
+          title={t('shift.whoIsAtTheRegister')}
           rows={[
             ...(users ?? []).map((u) => ({
               key: u.id,
@@ -297,7 +299,7 @@ export default function ShiftTab() {
 
       {openFloatVisible && outlet && (
         <MoneyPrompt
-          title="Open shift — starting float"
+          title={t('sell.openShiftFloat')}
           currency={currency}
           initialMinor={0}
           onSave={(m) => void doOpenShift(m)}
@@ -409,16 +411,17 @@ function AddUserSheet({
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useT();
   return (
     <Modal visible animationType="slide" onRequestClose={onCancel}>
       <Pressable style={styles.sheetBackdrop} onPress={onCancel}>
         <Pressable style={styles.sheetBody} onPress={() => {}}>
           <View style={styles.addForm}>
-            <Text style={styles.addTitle}>New user</Text>
+            <Text style={styles.addTitle}>{t('shift.newUser')}</Text>
             <TextInput
               value={state.name}
               onChangeText={(v) => setState({ ...state, name: v })}
-              placeholder="Name"
+              placeholder={t('shift.name')}
               placeholderTextColor={colors.slate400}
               autoCapitalize="none"
               autoCorrect={false}
@@ -438,7 +441,7 @@ function AddUserSheet({
             <TextInput
               value={state.pin}
               onChangeText={(v) => setState({ ...state, pin: v.replace(/\D/g, '').slice(0, 8) })}
-              placeholder="PIN (4–8 digits, optional)"
+              placeholder={t('shift.pin48DigitsOptional')}
               placeholderTextColor={colors.slate400}
               keyboardType="number-pad"
               style={styles.inlineInput}
@@ -449,14 +452,14 @@ function AddUserSheet({
             </Text>
             <View style={styles.buttons}>
               <Pressable style={styles.cancelBtn} onPress={onCancel}>
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={styles.cancelText}>{t('common.cancel')}</Text>
               </Pressable>
               <Pressable
                 style={[styles.saveBtn, state.name.trim().length === 0 && { opacity: 0.45 }]}
                 onPress={onSave}
                 disabled={state.name.trim().length === 0}
               >
-                <Text style={styles.saveText}>Add</Text>
+                <Text style={styles.saveText}>{t('common.add')}</Text>
               </Pressable>
             </View>
           </View>

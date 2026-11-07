@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useState } from 'react';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
@@ -20,6 +21,7 @@ function timeStr(ms: number): string {
  * The Z-report is the stored z_report_json — the source of truth (FR-202).
  */
 export default function ShiftDetail() {
+  const { t } = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { outlet } = useOutlet();
@@ -46,17 +48,17 @@ export default function ShiftDetail() {
 
   return (
     <View style={styles.wrap}>
-      <Stack.Screen options={{ title: 'Shift', headerBackTitle: 'Shifts' }} />
+      <Stack.Screen options={{ title: t('nav.shift'), headerBackTitle: t('nav.shifts') }} />
       {notFound ? (
         <View style={styles.center}>
-          <Text style={styles.notFound}>Shift not found.</Text>
+          <Text style={styles.notFound}>{t('shiftDetail.shiftNotFound')}</Text>
           <Pressable style={styles.backBtn} onPress={() => router.back()}>
-            <Text style={styles.backText}>Go back</Text>
+            <Text style={styles.backText}>{t('shiftDetail.goBack')}</Text>
           </Pressable>
         </View>
       ) : !shift ? (
         <View style={styles.center}>
-          <Text style={styles.notFound}>Loading…</Text>
+          <Text style={styles.notFound}>{t('common.loading')}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={[styles.content, centeredColumn]}>
@@ -77,15 +79,15 @@ export default function ShiftDetail() {
             <ReportView report={shift.zReport} currency={currency} />
           ) : snapshot ? (
             <>
-              <Text style={styles.section}>Live drawer</Text>
+              <Text style={styles.section}>{t('shiftDetail.liveDrawer')}</Text>
               <Card style={styles.drawerCard}>
-                <Row label="Cash sales" value={formatMoney(snapshot.totals.cashSaleMinor, currency)} />
-                <Row label="Cash in" value={formatMoney(snapshot.totals.cashInMinor, currency)} />
-                <Row label="Cash out" value={formatMoney(snapshot.totals.cashOutMinor, currency)} />
+                <Row label={t('shiftDetail.cashSales')} value={formatMoney(snapshot.totals.cashSaleMinor, currency)} />
+                <Row label={t('shift.cashIn')} value={formatMoney(snapshot.totals.cashInMinor, currency)} />
+                <Row label={t('shift.cashOut')} value={formatMoney(snapshot.totals.cashOutMinor, currency)} />
                 <View style={styles.divider} />
-                <Row label="Expected in drawer" value={formatMoney(snapshot.expectedCashMinor, currency)} strong />
+                <Row label={t('shift.expectedInDrawer')} value={formatMoney(snapshot.expectedCashMinor, currency)} strong />
               </Card>
-              <Text style={styles.hint}>Close the shift from the Shift tab to generate the Z-report.</Text>
+              <Text style={styles.hint}>{t('shiftDetail.closeTheShiftFromThe')}</Text>
             </>
           ) : null}
         </ScrollView>

@@ -1,3 +1,4 @@
+import { useT } from '../../hooks/useT';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatMoney } from '../../lib/money';
@@ -16,6 +17,7 @@ interface Props {
  * source of truth; this view is one faithful rendering of it).
  */
 export function ReportView({ report, currency }: Props) {
+  const { t } = useT();
   const isZ = report.kind === 'Z';
 
   return (
@@ -29,55 +31,55 @@ export function ReportView({ report, currency }: Props) {
       </Text>
 
       {/* Sales by method */}
-      <Text style={styles.section}>Sales by payment method</Text>
+      <Text style={styles.section}>{t('reportView.salesByPaymentMethod')}</Text>
       <View style={styles.card}>
         {Object.keys(report.salesByMethod).length === 0 ? (
-          <Text style={styles.empty}>No sales this shift</Text>
+          <Text style={styles.empty}>{t('reportView.noSalesThisShift')}</Text>
         ) : (
           Object.entries(report.salesByMethod).map(([method, minor]) => (
             <Row key={method} label={methodLabel(method)} value={formatMoney(minor, currency)} />
           ))
         )}
         <Divider />
-        <Row label="Total sales" value={formatMoney(totalByMethod(report.salesByMethod), currency)} strong />
+        <Row label={t('reportView.totalSales')} value={formatMoney(totalByMethod(report.salesByMethod), currency)} strong />
         {isZ && (
           <>
             <Divider />
-            <Row label="Refunds" value={`−${formatMoney(report.refundsMinor, currency)}`} />
+            <Row label={t('reportView.refunds')} value={`−${formatMoney(report.refundsMinor, currency)}`} />
           </>
         )}
       </View>
 
       {/* Cash movements */}
-      <Text style={styles.section}>Cash drawer</Text>
+      <Text style={styles.section}>{t('reportView.cashDrawer')}</Text>
       <View style={styles.card}>
-        <Row label="Opening float" value={formatMoney(report.floatMinor, currency)} />
-        <Row label="Cash sales" value={formatMoney(report.cashSaleMinor, currency)} />
+        <Row label={t('shift.openingFloat')} value={formatMoney(report.floatMinor, currency)} />
+        <Row label={t('shiftDetail.cashSales')} value={formatMoney(report.cashSaleMinor, currency)} />
         {isZ ? (
           <>
             {report.cashMoves.map((m) => (
               <Row key={m.id} label={`${m.type === 'in' ? '+' : '−'} ${m.reason}`} value={formatMoney(m.amountMinor, currency)} indent />
             ))}
-            {report.cashMoves.length === 0 && <Text style={styles.empty}>No cash movements</Text>}
+            {report.cashMoves.length === 0 && <Text style={styles.empty}>{t('reportView.noCashMovements')}</Text>}
             <Divider />
-            <Row label="Expected cash" value={formatMoney(report.expectedMinor, currency)} strong />
-            <Row label="Counted cash" value={formatMoney(report.countedMinor, currency)} strong />
+            <Row label={t('reportView.expectedCash')} value={formatMoney(report.expectedMinor, currency)} strong />
+            <Row label={t('reportView.countedCash')} value={formatMoney(report.countedMinor, currency)} strong />
             <Divider />
             <VarianceRow varianceMinor={report.varianceMinor} varianceClass={report.varianceClass} currency={currency} />
           </>
         ) : (
           <>
-            {(report as XReport).cashInMinor > 0 && <Row label="Cash in" value={formatMoney((report as XReport).cashInMinor, currency)} />}
-            {(report as XReport).cashOutMinor > 0 && <Row label="Cash out" value={formatMoney((report as XReport).cashOutMinor, currency)} />}
+            {(report as XReport).cashInMinor > 0 && <Row label={t('shift.cashIn')} value={formatMoney((report as XReport).cashInMinor, currency)} />}
+            {(report as XReport).cashOutMinor > 0 && <Row label={t('shift.cashOut')} value={formatMoney((report as XReport).cashOutMinor, currency)} />}
             <Divider />
-            <Row label="Expected cash now" value={formatMoney((report as XReport).expectedCashMinor, currency)} strong />
+            <Row label={t('reportView.expectedCashNow')} value={formatMoney((report as XReport).expectedCashMinor, currency)} strong />
           </>
         )}
       </View>
 
       {isZ && report.notes ? (
         <>
-          <Text style={styles.section}>Shift notes</Text>
+          <Text style={styles.section}>{t('reportView.shiftNotes')}</Text>
           <View style={styles.card}>
             <Text style={styles.note}>{report.notes}</Text>
           </View>

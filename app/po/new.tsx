@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -22,6 +23,7 @@ import type { POLineInput, ProductWithStock } from '../../src/types';
  * cartons for carton products and are stored as base units (FR-318).
  */
 export default function NewPOScreen() {
+  const { t } = useT();
   const router = useRouter();
   const { product: prefilledId, qty: prefilledQty } = useLocalSearchParams<{
     product?: string;
@@ -107,7 +109,7 @@ export default function NewPOScreen() {
   /** Open the product picker (default cost = product's cost, qty 1). */
   const addLine = () => {
     if ((products ?? []).filter((p) => p.active).length === 0) {
-      Alert.alert('No products', 'Add products to the catalog first.');
+      Alert.alert(t('poNew.noProducts'), t('poNew.addProductsToTheCatalog'));
       return;
     }
     setPickOpen(true);
@@ -115,7 +117,7 @@ export default function NewPOScreen() {
 
   const addToPO = (p: ProductWithStock) => {
     if (lines.some((l) => l.productId === p.id)) {
-      Alert.alert('Already on this PO', `"${p.name}" is already a line.`);
+      Alert.alert(t('poNew.alreadyOnThisPo'), `"${p.name}" is already a line.`);
       return;
     }
     setLines((cur) => [
@@ -149,7 +151,7 @@ export default function NewPOScreen() {
       const po = await createPO(supplier.trim(), lines, 'net30');
       router.replace({ pathname: '/po/[id]', params: { id: po.id } });
     } catch (e) {
-      Alert.alert('Save failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('settings.saveFailed'), e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -158,29 +160,29 @@ export default function NewPOScreen() {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={[styles.content, centeredColumn]} keyboardShouldPersistTaps="handled">
-        <Field label="Vendor *">
+        <Field label={t('poNew.vendor')}>
           <TextInput
             style={styles.input}
             value={supplier}
             onChangeText={setSupplier}
-            placeholder="e.g. Sheng Siong Wholesale"
+            placeholder={t('poNew.eGShengSiongWholesale')}
             placeholderTextColor={colors.slate400}
           />
           {suppliers.length > 0 && (
             <Pressable style={styles.pickSupplierBtn} onPress={() => setSupplierPickOpen(true)}>
               <Ionicons name="business-outline" size={14} color={colors.primary} />
-              <Text style={styles.pickSupplierText}>Pick from supplier master</Text>
+              <Text style={styles.pickSupplierText}>{t('poNew.pickFromSupplierMaster')}</Text>
             </Pressable>
           )}
         </Field>
-        <Text style={styles.termsNote}>Terms: Net 30 (default) · one lot per received line (FEFO batches)</Text>
+        <Text style={styles.termsNote}>{t('poNew.termsNet30DefaultOne')}</Text>
 
         <Text style={styles.linesTitle}>Lines ({lines.length})</Text>
 
         {lines.length === 0 && (
           <Pressable style={styles.addLineBtn} onPress={addLine}>
             <Ionicons name="add" size={18} color={colors.primary} />
-            <Text style={styles.addLineText}>Add a product line</Text>
+            <Text style={styles.addLineText}>{t('poNew.addAProductLine')}</Text>
           </Pressable>
         )}
 
@@ -197,7 +199,7 @@ export default function NewPOScreen() {
               <View style={styles.lineGrid}>
                 <View style={styles.lineCol}>
                   <Text style={styles.lineLabel}>
-                    {carton ? `Cartons (×${cartonSizeOf(l)} = ${l.qtyOrdered} u)` : 'Quantity (base units)'}
+                    {carton ? t('poNew.qtyCartons', { size: cartonSizeOf(l), units: l.qtyOrdered }) : t('poNew.qtyBase')}
                   </Text>
                   <TextInput
                     style={styles.inputMono}
@@ -212,7 +214,7 @@ export default function NewPOScreen() {
                   />
                 </View>
                 <View style={styles.lineCol}>
-                  <Text style={styles.lineLabel}>Unit cost</Text>
+                  <Text style={styles.lineLabel}>{t('poNew.unitCost')}</Text>
                   <TextInput
                     style={styles.inputMono}
                     value={draftFor(l.productId).cost ?? (l.unitCostMinor / 100).toFixed(2)}
@@ -230,18 +232,18 @@ export default function NewPOScreen() {
               </View>
               <View style={styles.lineGrid}>
                 <View style={styles.lineCol}>
-                  <Text style={styles.lineLabel}>Lot / batch code</Text>
+                  <Text style={styles.lineLabel}>{t('poNew.lotBatchCode')}</Text>
                   <TextInput
                     style={styles.input}
                     value={l.lotCode ?? ''}
                     onChangeText={(t) => patchLine(i, { lotCode: t.trim() || null })}
-                    placeholder="Optional"
+                    placeholder={t('poNew.optional')}
                     autoCapitalize="characters"
                     autoCorrect={false}
                   />
                 </View>
                 <View style={styles.lineCol}>
-                  <Text style={styles.lineLabel}>Expiry (YYYY-MM-DD)</Text>
+                  <Text style={styles.lineLabel}>{t('poNew.expiryYyyyMmDd')}</Text>
                   <TextInput
                     style={styles.inputMono}
                     value={draftFor(l.productId).expiry ?? (l.expiryDate ?? '')}
@@ -250,7 +252,7 @@ export default function NewPOScreen() {
                       patchLine(i, { expiryDate: /^\d{4}-\d{2}-\d{2}$/.test(t) ? t : null });
                     }}
                     onEndEditing={() => setDraft(l.productId, 'expiry', l.expiryDate ?? '')}
-                    placeholder="Optional"
+                    placeholder={t('poNew.optional')}
                     keyboardType="numbers-and-punctuation"
                     autoCapitalize="characters"
                     autoCorrect={false}
@@ -258,7 +260,7 @@ export default function NewPOScreen() {
                 </View>
               </View>
               <View style={styles.lineTotalRow}>
-                <Text style={styles.lineTotalLabel}>Line total</Text>
+                <Text style={styles.lineTotalLabel}>{t('poNew.lineTotal')}</Text>
                 <NumberText style={styles.lineTotalVal}>
                   {formatMoney(l.qtyOrdered * l.unitCostMinor, outlet?.currency ?? 'SGD')}
                 </NumberText>
@@ -270,12 +272,12 @@ export default function NewPOScreen() {
         {lines.length > 0 && (
           <Pressable style={styles.addLineBtn} onPress={addLine}>
             <Ionicons name="add" size={18} color={colors.primary} />
-            <Text style={styles.addLineText}>Add another line</Text>
+            <Text style={styles.addLineText}>{t('poNew.addAnotherLine')}</Text>
           </Pressable>
         )}
 
         <View style={styles.totalRow}>
-          <Text style={styles.totalLabel}>PO total</Text>
+          <Text style={styles.totalLabel}>{t('poDetail.poTotal')}</Text>
           <NumberText style={styles.totalVal}>{formatMoney(totalMinor, outlet?.currency ?? 'SGD')}</NumberText>
         </View>
       </ScrollView>
@@ -288,7 +290,7 @@ export default function NewPOScreen() {
 
       {supplierPickOpen && (
         <PickerOverlay
-          title="Pick vendor"
+          title={t('poNew.pickVendor')}
           rows={suppliers.map((s) => ({
             key: s.id,
             label: s.name,
@@ -304,7 +306,7 @@ export default function NewPOScreen() {
 
       {pickOpen && (
         <PickerOverlay
-          title="Add line — pick product"
+          title={t('poNew.addLinePickProduct')}
           rows={(products ?? [])
             .filter((p) => p.active)
             .map((p) => ({

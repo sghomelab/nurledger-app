@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
@@ -33,6 +34,7 @@ const PO_STATUS_TONE: Record<string, 'neutral' | 'primary' | 'positive' | 'warni
  * cost layer per line, cost layer linked to the lot for the FEFO radar).
  */
 export default function PODetailScreen() {
+  const { t } = useT();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { outlet } = useOutlet();
   const { products } = useProducts();
@@ -54,10 +56,10 @@ export default function PODetailScreen() {
   const receive = () => {
     if (!po) return;
     Alert.alert(
-      'Receive this PO?',
-      'Adds stock for every not-fully-received line (one lot per line, at the line cost). Stock-in is recorded on the immutable ledger.',
+      t('poDetail.receiveThisPo'),
+      t('poDetail.addsStockForEveryNot'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
           text: 'Receive',
           onPress: async () => {
@@ -66,7 +68,7 @@ export default function PODetailScreen() {
               await receivePO(po.id);
               await load();
             } catch (e) {
-              Alert.alert('Receive failed', e instanceof Error ? e.message : String(e));
+              Alert.alert(t('poDetail.receiveFailed'), e instanceof Error ? e.message : String(e));
             } finally {
               setBusy(false);
             }
@@ -105,7 +107,7 @@ export default function PODetailScreen() {
         mimeType: 'text/plain',
       });
     } catch (e) {
-      Alert.alert('Share failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('poDetail.shareFailed'), e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -114,11 +116,11 @@ export default function PODetailScreen() {
   if (loaded && !po) {
     return (
       <View style={styles.center}>
-        <Text style={styles.missing}>This purchase order no longer exists.</Text>
+        <Text style={styles.missing}>{t('poDetail.thisPurchaseOrderNoLonger')}</Text>
       </View>
     );
   }
-  if (!po) return <View style={styles.center}><Text style={styles.missing}>Loading…</Text></View>;
+  if (!po) return <View style={styles.center}><Text style={styles.missing}>{t('common.loading')}</Text></View>;
 
   const currency = outlet?.currency ?? 'SGD';
   const fullyReceived = isFullyReceived(po.lines);
@@ -140,12 +142,12 @@ export default function PODetailScreen() {
       </View>
 
       <View style={styles.totalCard}>
-        <Text style={styles.totalLabel}>PO total</Text>
+        <Text style={styles.totalLabel}>{t('poDetail.poTotal')}</Text>
         <NumberText style={styles.totalVal}>{formatMoney(po.totalCostMinor, currency)}</NumberText>
         <Text style={styles.linesCount}>{po.lines.length} line{po.lines.length === 1 ? '' : 's'}</Text>
       </View>
 
-      <Text style={styles.sectionTitle}>Lines</Text>
+      <Text style={styles.sectionTitle}>{t('poDetail.lines')}</Text>
       <View style={styles.card}>
         {po.lines.map((l, i) => (
           <View key={l.id} style={[styles.lineRow, i > 0 && styles.divider]}>
@@ -159,15 +161,15 @@ export default function PODetailScreen() {
               </Text>
             </View>
             <View style={styles.qtyCol}>
-              <Text style={styles.qtyLabel}>ord</Text>
+              <Text style={styles.qtyLabel}>{t('poDetail.ord')}</Text>
               <NumberText style={styles.qtyVal}>{l.qtyOrdered}</NumberText>
             </View>
             <View style={styles.qtyCol}>
-              <Text style={styles.qtyLabel}>rcvd</Text>
+              <Text style={styles.qtyLabel}>{t('poDetail.rcvd')}</Text>
               <NumberText style={styles.qtyVal}>{l.qtyReceived}</NumberText>
             </View>
             <View style={styles.qtyCol}>
-              <Text style={styles.qtyLabel}>cost</Text>
+              <Text style={styles.qtyLabel}>{t('poDetail.cost')}</Text>
               <NumberText style={styles.qtyVal}>{formatMoney(l.unitCostMinor, currency)}</NumberText>
             </View>
           </View>
@@ -186,7 +188,7 @@ export default function PODetailScreen() {
       <View style={styles.footer}>
         <Pressable style={[styles.shareBtn, busy && { opacity: 0.7 }]} onPress={() => void share()} disabled={busy}>
           <Ionicons name="share-social-outline" size={20} color={colors.primary} />
-          <Text style={styles.shareText}>Share</Text>
+          <Text style={styles.shareText}>{t('poDetail.share')}</Text>
         </Pressable>
         {receivable ? (
           <Pressable style={[styles.receiveBtn, busy && { opacity: 0.7 }]} onPress={receive} disabled={busy}>

@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -41,6 +42,7 @@ import type { AppUser } from '../../src/types';
  * marked applied and the screen becomes read-only.
  */
 export default function StocktakeDetailScreen() {
+  const { t } = useT();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
@@ -113,12 +115,12 @@ export default function StocktakeDetailScreen() {
       const r = await applyStocktake(id);
       await load();
       Alert.alert(
-        'Stocktake applied',
+        t('stDetail.stocktakeApplied'),
         `${r.appliedLines} adjustment${r.appliedLines === 1 ? '' : 's'} written to the stock ledger.`,
         [{ text: 'OK', onPress: () => router.back() }],
       );
     } catch (e) {
-      Alert.alert('Apply failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('stDetail.applyFailed'), e instanceof Error ? e.message : String(e));
     } finally {
       setBusy(false);
     }
@@ -140,9 +142,9 @@ export default function StocktakeDetailScreen() {
     return (
       <View style={styles.center}>
         <Ionicons name="clipboard-outline" size={40} color={colors.slate300} />
-        <Text style={styles.missing}>Stocktake not found.</Text>
+        <Text style={styles.missing}>{t('stDetail.stocktakeNotFound')}</Text>
         <Pressable style={styles.backBtn} onPress={() => router.back()}>
-          <Text style={styles.backText}>Back</Text>
+          <Text style={styles.backText}>{t('importCsv.back')}</Text>
         </Pressable>
       </View>
     );
@@ -167,22 +169,22 @@ export default function StocktakeDetailScreen() {
           </Text>
         </View>
         {applied ? (
-          <Chip label="Applied" tone="positive" />
+          <Chip label={t('stDetail.applied')} tone="positive" />
         ) : blind ? (
-          <Chip label="Blind count" tone="primary" />
+          <Chip label={t('stDetail.blindCount')} tone="primary" />
         ) : (
-          <Chip label="Counting" tone="primary" />
+          <Chip label={t('stDetail.counting')} tone="primary" />
         )}
       </View>
 
       <ScrollView contentContainerStyle={[{ paddingBottom: 120 }, centeredColumn]}>
         {/* Variance review */}
-        <Text style={styles.sectionTitle}>Variance review</Text>
+        <Text style={styles.sectionTitle}>{t('stDetail.varianceReview')}</Text>
         <View style={styles.tableHead}>
-          <Text style={[styles.tableCol, { flex: 1 }]}>Product</Text>
-          <Text style={[styles.tableCol, styles.tableNum]}>Book</Text>
-          <Text style={[styles.tableCol, styles.tableNum]}>Counted</Text>
-          <Text style={[styles.tableCol, styles.tableNum]}>Variance</Text>
+          <Text style={[styles.tableCol, { flex: 1 }]}>{t('stDetail.product')}</Text>
+          <Text style={[styles.tableCol, styles.tableNum]}>{t('stDetail.book')}</Text>
+          <Text style={[styles.tableCol, styles.tableNum]}>{t('stDetail.counted')}</Text>
+          <Text style={[styles.tableCol, styles.tableNum]}>{t('stDetail.variance')}</Text>
         </View>
         {review.lines.map((l) => {
           const v = l.variance;
@@ -213,19 +215,19 @@ export default function StocktakeDetailScreen() {
         {/* Summary */}
         <View style={styles.summaryRow}>
           <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>Counted</Text>
+            <Text style={styles.summaryLabel}>{t('stDetail.counted')}</Text>
             <NumberText style={styles.summaryValue}>{review.summary.counted}/{review.summary.total}</NumberText>
           </View>
           <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>Gains</Text>
+            <Text style={styles.summaryLabel}>{t('stDetail.gains')}</Text>
             <NumberText style={[styles.summaryValue, { color: colors.positive }]}>{review.summary.gains}</NumberText>
           </View>
           <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>Shrinkage</Text>
+            <Text style={styles.summaryLabel}>{t('insights.shrinkage')}</Text>
             <NumberText style={[styles.summaryValue, { color: colors.danger }]}>{review.summary.losses}</NumberText>
           </View>
           <View style={styles.summaryCell}>
-            <Text style={styles.summaryLabel}>Net</Text>
+            <Text style={styles.summaryLabel}>{t('stDetail.net')}</Text>
             <NumberText
               style={[
                 styles.summaryValue,
@@ -238,7 +240,7 @@ export default function StocktakeDetailScreen() {
           </View>
         </View>
         <Text style={styles.hint}>
-          Variance = counted − current book stock (live). Weighed products count in grams.
+          {t('stDetail.varianceCountedCurrentBookStock')}
         </Text>
 
         {/* Count input */}
@@ -296,7 +298,7 @@ export default function StocktakeDetailScreen() {
             disabled={busy || net === 0}
           >
             <Text style={styles.applyText}>
-              {busy ? 'Applying…' : net === 0 ? 'No variance to apply' : `Apply variance (${net > 0 ? `+${net}` : net})`}
+              {busy ? t('stDetail.applying') : net === 0 ? t('stDetail.noVarianceToApply') : t('stDetail.applyVariance', { net: net > 0 ? `+${net}` : net })}
             </Text>
           </Pressable>
         </View>

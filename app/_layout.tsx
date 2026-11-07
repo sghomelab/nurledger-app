@@ -88,12 +88,12 @@ export default function RootLayout() {
       <AppFrame>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.slate50 } }}>
         {/* Non-tab screens live outside the (tabs) group — header + back button. */}
-        <Stack.Screen name="inventory/new" options={{ ...headerOptions, title: 'New product' }} />
-        <Stack.Screen name="inventory/[id]" options={{ ...headerOptions, title: 'Product' }} />
-        <Stack.Screen name="inventory/edit" options={{ ...headerOptions, title: 'Edit product' }} />
-        <Stack.Screen name="po" options={{ ...headerOptions, title: 'Purchase Orders' }} />
-        <Stack.Screen name="po/new" options={{ ...headerOptions, title: 'New PO' }} />
-        <Stack.Screen name="po/[id]" options={{ ...headerOptions, title: 'PO' }} />
+        <Stack.Screen name="inventory/new" options={{ ...headerOptions, title: t('nav.newProduct') }} />
+        <Stack.Screen name="inventory/[id]" options={{ ...headerOptions, title: t('nav.product') }} />
+        <Stack.Screen name="inventory/edit" options={{ ...headerOptions, title: t('nav.editProduct') }} />
+        <Stack.Screen name="po" options={{ ...headerOptions, title: t('nav.purchaseOrders') }} />
+        <Stack.Screen name="po/new" options={{ ...headerOptions, title: t('nav.newPo') }} />
+        <Stack.Screen name="po/[id]" options={{ ...headerOptions, title: t('nav.po') }} />
         <Stack.Screen name="settings" options={{ ...headerOptions, title: t('settings.title') }} />
         <Stack.Screen name="cloud-setup" options={{ ...headerOptions, title: t('cloudsetup.title') }} />
       </Stack>

@@ -1,3 +1,4 @@
+import { useT } from '../src/hooks/useT';
 import { centeredColumn } from '../src/lib/layout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
@@ -26,6 +27,7 @@ type State =
   | { phase: 'error'; message: string };
 
 export default function ImportCsvScreen() {
+  const { t } = useT();
   const router = useRouter();
   const { outlet } = useOutlet();
   // The picked URI arrives via module-state handoff (see pickedFile.ts) — it
@@ -82,7 +84,7 @@ export default function ImportCsvScreen() {
 
   return (
     <View style={styles.wrap}>
-      <Stack.Screen options={{ title: 'Import Products', headerBackVisible: true }} />
+      <Stack.Screen options={{ title: t('nav.importProducts'), headerBackVisible: true }} />
 
       {state.phase === 'loading' && (
         <View style={styles.center}>
@@ -96,10 +98,10 @@ export default function ImportCsvScreen() {
           <Ionicons name="alert-circle-outline" size={40} color={colors.danger} />
           <Text style={styles.errorText}>{state.message}</Text>
           <Pressable style={[styles.primaryBtn, { marginTop: spacing.xl }]} onPress={() => void readAndParse()}>
-            <Text style={styles.primaryBtnText}>Retry</Text>
+            <Text style={styles.primaryBtnText}>{t('importCsv.retry')}</Text>
           </Pressable>
           <Pressable style={[styles.ghostBtn, { marginTop: spacing.sm }]} onPress={() => router.back()}>
-            <Text style={styles.ghostBtnText}>Back</Text>
+            <Text style={styles.ghostBtnText}>{t('importCsv.back')}</Text>
           </Pressable>
         </View>
       )}
@@ -114,7 +116,7 @@ export default function ImportCsvScreen() {
       {state.phase === 'done' && (
         <View style={styles.center}>
           <Ionicons name="checkmark-circle" size={48} color={colors.positive} />
-          <Text style={styles.doneTitle}>Import complete</Text>
+          <Text style={styles.doneTitle}>{t('importCsv.importComplete')}</Text>
           <Text style={styles.centerText}>
             {state.report.created} created · {state.report.updated} updated
           </Text>
@@ -129,7 +131,7 @@ export default function ImportCsvScreen() {
             </Text>
           ) : null}
           <Pressable style={[styles.primaryBtn, { marginTop: spacing.xl }]} onPress={() => router.back()}>
-            <Text style={styles.primaryBtnText}>Done</Text>
+            <Text style={styles.primaryBtnText}>{t('common.done')}</Text>
           </Pressable>
         </View>
       )}
@@ -176,7 +178,7 @@ export default function ImportCsvScreen() {
           ))}
 
           {state.result.rows.length === 0 && !state.result.fatal && (
-            <Text style={styles.centerText}>No data rows in the file.</Text>
+            <Text style={styles.centerText}>{t('importCsv.noDataRowsInThe')}</Text>
           )}
         </ScrollView>
       )}

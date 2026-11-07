@@ -1,3 +1,4 @@
+import { useT } from '../../hooks/useT';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { formatMoney, parseMoneyToMinor } from '../../lib/money';
@@ -17,6 +18,7 @@ interface Props {
  * Amount + free-text reason in one modal (kiosk pattern — one tap, one confirm).
  */
 export function CashMovePrompt({ visible, type, currency, onSave, onCancel }: Props) {
+  const { t } = useT();
   const [text, setText] = useState('');
   const [reason, setReason] = useState('');
   const value = parseMoneyToMinor(text);
@@ -60,10 +62,10 @@ export function CashMovePrompt({ visible, type, currency, onSave, onCancel }: Pr
           />
           <View style={styles.buttons}>
             <Pressable style={styles.cancelBtn} onPress={cancel}>
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
             <Pressable style={[styles.saveBtn, !valid && { opacity: 0.45 }]} onPress={save} disabled={!valid}>
-              <Text style={styles.saveText}>Save</Text>
+              <Text style={styles.saveText}>{t('common.save')}</Text>
             </Pressable>
           </View>
         </Pressable>
@@ -83,6 +85,7 @@ interface CloseProps {
 
 /** FR-202: close-shift counted cash + notes. Expected is shown read-only. */
 export function CountedCashPrompt({ visible, currency, expectedMinor, onSave, onCancel }: CloseProps) {
+  const { t } = useT();
   const [text, setText] = useState('');
   const [notes, setNotes] = useState('');
   const value = parseMoneyToMinor(text);
@@ -105,16 +108,16 @@ export function CountedCashPrompt({ visible, currency, expectedMinor, onSave, on
     <Modal transparent visible={visible} animationType="fade" onRequestClose={cancel}>
       <Pressable style={styles.backdrop} onPress={cancel}>
         <Pressable style={styles.card} onPress={() => {}}>
-          <Text style={styles.title}>Close shift — count the drawer</Text>
+          <Text style={styles.title}>{t('shiftPrompts.closeShiftCountTheDrawer')}</Text>
           <View style={styles.expectedRow}>
-            <Text style={styles.expectedLabel}>Expected in drawer</Text>
+            <Text style={styles.expectedLabel}>{t('shift.expectedInDrawer')}</Text>
             <Text style={styles.expectedValue}>{formatMoney(expectedMinor, currency)}</Text>
           </View>
           <TextInput
             value={text}
             onChangeText={setText}
             keyboardType="decimal-pad"
-            placeholder="Counted cash"
+            placeholder={t('reportView.countedCash')}
             autoFocus
             style={styles.input}
           />
@@ -122,15 +125,15 @@ export function CountedCashPrompt({ visible, currency, expectedMinor, onSave, on
           <TextInput
             value={notes}
             onChangeText={setNotes}
-            placeholder="Shift notes (optional)"
+            placeholder={t('shiftPrompts.shiftNotesOptional')}
             style={styles.reason}
           />
           <View style={styles.buttons}>
             <Pressable style={styles.cancelBtn} onPress={cancel}>
-              <Text style={styles.cancelText}>Cancel</Text>
+              <Text style={styles.cancelText}>{t('common.cancel')}</Text>
             </Pressable>
             <Pressable style={[styles.saveBtn, !valid && { opacity: 0.45 }]} onPress={save} disabled={!valid}>
-              <Text style={styles.saveText}>Close shift</Text>
+              <Text style={styles.saveText}>{t('gate.close_shift')}</Text>
             </Pressable>
           </View>
         </Pressable>

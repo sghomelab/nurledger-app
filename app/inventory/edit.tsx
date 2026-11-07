@@ -1,3 +1,4 @@
+import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
 import { useEffect, useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -18,6 +19,7 @@ import type { SupplierWithCounts, UnitType, VelocityClass } from '../../src/type
  * `/inventory/new` (no id) or `/inventory/edit?id=<id>` (edit).
  */
 export default function ProductFormScreen() {
+  const { t } = useT();
   // Route params arrive via useLocalSearchParams (routes are untyped — no prop injection).
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
@@ -58,7 +60,7 @@ export default function ProductFormScreen() {
     void (async () => {
       const p = await getProduct(id!);
       if (!p) {
-        Alert.alert('Not found', 'This product no longer exists.');
+        Alert.alert(t('invEdit.notFound'), t('invDetail.thisProductNoLongerExists'));
         router.back();
         return;
       }
@@ -91,11 +93,11 @@ export default function ProductFormScreen() {
 
   const save = async () => {
     if (!name.trim() || !sku.trim()) {
-      Alert.alert('Missing fields', 'Name and SKU are required.');
+      Alert.alert(t('settings.missingFields'), t('invEdit.nameAndSkuAreRequired'));
       return;
     }
     if (toMinor(price) <= 0) {
-      Alert.alert('Missing fields', 'Retail price must be greater than zero.');
+      Alert.alert(t('settings.missingFields'), t('invEdit.retailPriceMustBeGreater'));
       return;
     }
     setSaving(true);
@@ -127,7 +129,7 @@ export default function ProductFormScreen() {
       await reload();
       router.back();
     } catch (e) {
-      Alert.alert('Save failed', e instanceof Error ? e.message : String(e));
+      Alert.alert(t('settings.saveFailed'), e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
     }
@@ -146,13 +148,13 @@ export default function ProductFormScreen() {
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={[styles.content, centeredColumn]} keyboardShouldPersistTaps="handled">
-        <Field label="Name *"><TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. Rice 5kg" /></Field>
+        <Field label={t('invEdit.name')}><TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('invEdit.eGRice5kg')} /></Field>
         <View style={styles.row}>
-          <View style={styles.colHalf}><Field label="SKU *"><TextInput style={styles.input} value={sku} onChangeText={setSku} placeholder="RICE-5KG" autoCapitalize="characters" autoCorrect={false} /></Field></View>
-          <View style={styles.colHalf}><Field label="Barcode"><TextInput style={styles.input} value={barcode} onChangeText={setBarcode} placeholder="Scan or type" keyboardType="number-pad" autoCapitalize="characters" autoCorrect={false} /></Field></View>
+          <View style={styles.colHalf}><Field label={t('invEdit.sku')}><TextInput style={styles.input} value={sku} onChangeText={setSku} placeholder="RICE-5KG" autoCapitalize="characters" autoCorrect={false} /></Field></View>
+          <View style={styles.colHalf}><Field label={t('invDetail.barcode')}><TextInput style={styles.input} value={barcode} onChangeText={setBarcode} placeholder={t('invEdit.scanOrType')} keyboardType="number-pad" autoCapitalize="characters" autoCorrect={false} /></Field></View>
         </View>
 
-        <Field label="Category">
+        <Field label={t('invDetail.category')}>
           <Pressable style={styles.selectBox} onPress={() => setCatPicker(true)}>
             <Text style={styles.selectText}>{categories?.find((c) => c.id === categoryId)?.name ?? 'None'}</Text>
             <Ionicons name="chevron-down" size={16} color={colors.slate400} />
@@ -160,7 +162,7 @@ export default function ProductFormScreen() {
         </Field>
 
         {/* FR-313: per-supplier SKU link */}
-        <Field label="Supplier">
+        <Field label={t('invDetail.supplier')}>
           <Pressable style={styles.selectBox} onPress={() => setSupplierPicker(true)}>
             <Text style={styles.selectText}>{suppliers.find((s) => s.id === supplierId)?.name ?? 'None'}</Text>
             <Ionicons name="chevron-down" size={16} color={colors.slate400} />
@@ -168,22 +170,22 @@ export default function ProductFormScreen() {
         </Field>
 
         <View style={styles.row}>
-          <View style={styles.colHalf}><Field label="Unit type"><Segmented options={['each', 'kg', 'carton']} value={unitType} onChange={(v) => setUnitType(v as UnitType)} /></Field></View>
-          <View style={styles.colHalf}><Field label="Velocity tier"><Segmented options={['A', 'B', 'C']} value={velocityClass ?? ''} onChange={(v) => setVelocityClass((v as VelocityClass) || null)} /></Field></View>
+          <View style={styles.colHalf}><Field label={t('invDetail.unitType')}><Segmented options={['each', 'kg', 'carton']} value={unitType} onChange={(v) => setUnitType(v as UnitType)} /></Field></View>
+          <View style={styles.colHalf}><Field label={t('invDetail.velocityTier')}><Segmented options={['A', 'B', 'C']} value={velocityClass ?? ''} onChange={(v) => setVelocityClass((v as VelocityClass) || null)} /></Field></View>
         </View>
 
         <View style={styles.row}>
           <View style={styles.colHalf}><Field label={`Cost (${outlet?.currency ?? ''})`}><TextInput style={styles.inputMono} value={cost} onChangeText={setCost} placeholder="0.00" keyboardType="decimal-pad" /></Field></View>
-          <View style={styles.colHalf}><Field label="Retail price *"><TextInput style={styles.inputMono} value={price} onChangeText={setPrice} placeholder="0.00" keyboardType="decimal-pad" /></Field></View>
+          <View style={styles.colHalf}><Field label={t('invEdit.retailPrice')}><TextInput style={styles.inputMono} value={price} onChangeText={setPrice} placeholder="0.00" keyboardType="decimal-pad" /></Field></View>
         </View>
 
         <View style={styles.row}>
-          <View style={styles.colThird}><Field label="Min (reorder)"><TextInput style={styles.inputMono} value={minQty} onChangeText={setMinQty} placeholder="0" keyboardType="number-pad" /></Field></View>
-          <View style={styles.colThird}><Field label="Max"><TextInput style={styles.inputMono} value={maxQty} onChangeText={setMaxQty} placeholder="0" keyboardType="number-pad" /></Field></View>
-          <View style={styles.colThird}><Field label="Carton = N units"><TextInput style={styles.inputMono} value={cartonSize} onChangeText={setCartonSize} placeholder="1" keyboardType="number-pad" /></Field></View>
+          <View style={styles.colThird}><Field label={t('invDetail.minReorder')}><TextInput style={styles.inputMono} value={minQty} onChangeText={setMinQty} placeholder="0" keyboardType="number-pad" /></Field></View>
+          <View style={styles.colThird}><Field label={t('invDetail.max')}><TextInput style={styles.inputMono} value={maxQty} onChangeText={setMaxQty} placeholder="0" keyboardType="number-pad" /></Field></View>
+          <View style={styles.colThird}><Field label={t('invEdit.cartonNUnits')}><TextInput style={styles.inputMono} value={cartonSize} onChangeText={setCartonSize} placeholder="1" keyboardType="number-pad" /></Field></View>
         </View>
-        <Field label="Carton barcode (FR-322)"><TextInput style={styles.input} value={cartonBarcode} onChangeText={setCartonBarcode} placeholder="Optional — scans sell N units" autoCapitalize="characters" autoCorrect={false} /></Field>
-        <Field label="Description"><TextInput style={[styles.input, styles.multiline]} value={description} onChangeText={setDescription} placeholder="Optional notes" multiline numberOfLines={3} /></Field>
+        <Field label={t('invEdit.cartonBarcodeFr322')}><TextInput style={styles.input} value={cartonBarcode} onChangeText={setCartonBarcode} placeholder={t('invEdit.optionalScansSellNUnits')} autoCapitalize="characters" autoCorrect={false} /></Field>
+        <Field label={t('invEdit.description')}><TextInput style={[styles.input, styles.multiline]} value={description} onChangeText={setDescription} placeholder={t('invEdit.optionalNotes')} multiline numberOfLines={3} /></Field>
       </ScrollView>
 
       <View style={styles.footer}>
@@ -194,7 +196,7 @@ export default function ProductFormScreen() {
 
       {catPicker && (
         <PickerOverlay
-          title="Category"
+          title={t('invDetail.category')}
           rows={[
             ...(categories ?? []).map((c) => ({
               key: c.id,
@@ -213,7 +215,7 @@ export default function ProductFormScreen() {
 
       {supplierPicker && (
         <PickerOverlay
-          title="Supplier (FR-313)"
+          title={t('invEdit.supplierFr313')}
           rows={[
             ...suppliers.map((s) => ({
               key: s.id,

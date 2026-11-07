@@ -1,3 +1,4 @@
+import { useT } from '../../hooks/useT';
 import { useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,6 +27,7 @@ type ShareState =
  * standard offline path for "email this report" on a shop kiosk.
  */
 export function CsvSheet({ visible, csv, fileName, onClose }: Props) {
+  const { t } = useT();
   const [state, setState] = useState<ShareState>({ status: 'idle' });
 
   const share = async () => {
@@ -74,7 +76,7 @@ export function CsvSheet({ visible, csv, fileName, onClose }: Props) {
             {state.status === 'error' && <Text style={styles.error}>{state.message}</Text>}
             <View style={styles.buttons}>
               <Pressable style={styles.cancelBtn} onPress={onClose}>
-                <Text style={styles.cancelText}>Close</Text>
+                <Text style={styles.cancelText}>{t('pickerOverlay.close')}</Text>
               </Pressable>
               <Pressable
                 style={[styles.shareBtn, state.status === 'busy' && { opacity: 0.6 }]}
