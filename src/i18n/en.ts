@@ -33,6 +33,7 @@ const en = {
   'sync.connected': 'Connected',
   'sync.queuedOff': '{n} ops queued · Sync off',
   'sync.queuedOffShort': '{n} ops queued · sync off',
+  'insights.abcNote': 'Revenue here = item sales after line discounts, before any order-level discount and tax, so it will not add up to Net Sales.',
   'sync.off': 'Sync off — sales queue locally',
   'sync.rejected': '{n} record(s) rejected by your server — tap to review',
   'settings.rejectedTitle': 'Rejected uploads',

@@ -32,6 +32,7 @@ const ms: Record<keyof EnDict, string> = {
   'sync.connected': 'Disambung',
   'sync.queuedOff': '{n} operasi menunggu · Segerak ditutup',
   'sync.queuedOffShort': '{n} operasi menunggu · segerak tutup',
+  'insights.abcNote': 'Hasil di sini = jualan item selepas diskaun baris, sebelum sebarang diskaun peringkat pesanan dan cukai, jadi jumlahnya tidak sama dengan Jualan Bersih.',
   'sync.off': 'Segerak ditutup — jualan bergilir di tempat',
   'sync.rejected': '{n} rekod ditolak oleh pelayan anda — ketik untuk semak',
   'settings.rejectedTitle': 'Muat naik ditolak',

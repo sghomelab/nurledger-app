@@ -65,7 +65,7 @@ export function buildPlCsv(k: Kpis, currency: string, periodLabel: string): stri
  */
 export function buildVelocityAbcCsv(rows: VelocityAbcRow[], currency: string, periodLabel: string): string {
   const rowsOut: (string | number)[][] = [
-    ['Velocity/ABC Analysis — ' + periodLabel],
+    ['Velocity/ABC Analysis — ' + periodLabel + ' (revenue = item sales after line discounts, before order-level discount and tax)'],
     ['Velocity Tier', 'Classification', 'Product Name', 'SKU', 'Category', 'Units Sold', 'Total Revenue', 'Total Profit', 'Gross Margin %', 'Revenue Share %', 'Current Stock'],
   ];
   for (const r of rows) {
