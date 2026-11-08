@@ -4,7 +4,7 @@ Goal: get 1.0.0 to **internal testers only** (Google Play internal testing + Tes
 
 Who does what: **[Mas]** needs a person with console/legal access, **[OpenCode]** is repo/build/device work, **[Both]** is shared. Do not start EAS builds or store actions without Mas's GO (see `docs/PACKAGING.md` §4). Items marked **(verify)** are store-console rules that change over time: check the console's own wording before relying on them.
 
-Status line to keep updated: `Last updated: 2026-11-08 · main @ 02287b6 (code state audited; commits after it are docs-only) · state: audited`
+Status line to keep updated: `Last updated: 2026-11-09 · main @ 0957853 (app.json synced to build 3/3) · builds 1.0.0/3 finished from f40d0ce; Android BLOCKED at Play first-upload (app not in Play Console yet); iOS build 3 VALID + attached to version 1.0.0 (internal TF group = Mas in console; App Store review submission blocked by missing listing §4/§8) — see docs/handoff/reports/0003-report.md`
 
 ## 0. Decisions already made
 
@@ -23,7 +23,7 @@ Status line to keep updated: `Last updated: 2026-11-08 · main @ 02287b6 (code s
 - [x] Gates on that exact commit: `npx tsc --noEmit` = 0, `npx jest` passes in two timezones (default and `TZ=America/Los_Angeles`, 544/544), `npm run test:strict` = 0 skipped — verified on `02287b6`.
 - [x] `app.json`: `version` 1.0.0, Android `versionCode` 2, iOS `buildNumber` "2"; one commit for both platforms (`b201059`).
 - [x] Working tree clean: no stray files, no tracked `node_modules`, no secrets (scan returns nothing; `secrets/` gitignored).
-- [ ] `ios.supportsTablet` set per the decision in section 0.
+- [x] `ios.supportsTablet` set per the decision in section 0. (`"supportsTablet": true` in `app.json`; unchanged by the 1.0.0 builds.)
 
 ## 2. Security hygiene  [Mas]
 
@@ -61,19 +61,17 @@ Both
 
 ## 5. Build  [OpenCode, on Mas's GO]
 
-1. [ ] Mas confirms the Expo build credit balance on expo.dev (visible only on the dashboard). Stop if unknown.
-2. [ ] Both platforms build from the SAME commit:
-   - `eas build --platform android --profile production --non-interactive`
-   - `eas build --platform ios --profile production --non-interactive`
-3. [ ] Verify the real numbers from the artifacts (AAB manifest / IPA Info.plist): version 1.0.0, versionCode / buildNumber as expected. If they differ, sync `app.json` in a follow-up commit.
-4. [ ] Smoke-test the production Android build on a real phone: first run, load sample data, sell, refund, close shift, Settings > Language (3 options), cloud setup wizard against a throwaway HTTPS Supabase project.
-5. [ ] Release-build checks already passed on a clean 1.0.0 APK: no dev menu, no logs with record contents, `allowBackup=false`, manifest permissions minimal. Re-run only if the build config changed.
+1. [x] Mas confirms the Expo build credit balance on expo.dev (visible only on the dashboard). Stop if unknown. — **$19** supplied in the 2026-11-08 GO.
+2. [x] Both platforms build from the SAME commit — **`f40d0ce`**: Android build `5d5508e7-e84d-4577-83f8-2f586987ad85`, iOS build `0c0adea6-b985-4bfc-9608-e9275d96c845`, both FINISHED.
+3. [x] Verify the real numbers from the artifacts (AAB manifest / IPA Info.plist): **1.0.0 / versionCode 3 / buildNumber 3** (configured 2 → EAS autoIncrement → 3). `app.json` synced to the actuals in commit `0957853`.
+4. [x] Smoke-test the production Android build (universal APK from the production AAB, versionCode 3) on the `cs-test` AVD per the 0003 spec: first run, load sample data, sell (SGD 8.50, 9% GST incl, FIFO margin 54%), tender/change, **refund** (restock 21 → 22), PIN/user-switch flow, **offline sale** (0 connected networks), X-report, close shift + Z-report (variance 0.00 Exact), Settings > Language (**English / Bahasa Melayu / Filipino** present). Cloud setup wizard **NOT tested** (no throwaway Supabase project available) — see `docs/handoff/reports/0003-report.md`. ⚠️ Opening-float input anomaly found and reported (10× inflation; not patched per spec).
+5. [x] Release-build checks already passed on a clean 1.0.0 APK: no dev menu, no logs with record contents, `allowBackup=false`, manifest permissions minimal. Build config unchanged since that pass (version numbers only) → no re-run needed.
 
 ## 6. Submit to internal tracks  [OpenCode submits, Mas confirms]
 
-- [ ] Android: `eas submit --platform android --path <aab> --non-interactive`. Confirm the build appears under internal testing and is not halted/rejected (`tools/play_check.py com.nurlogic.nurledger`, `halted` = rejected). Never trust "finished" alone.
-- [ ] iOS: `eas submit --platform ios --path <ipa> --non-interactive`. Wait for processing, answer export compliance if asked (the app declares `ITSAppUsesNonExemptEncryption = false`), assign the build to the internal group. Check App Store Connect/TestFlight, not just the CLI.
-- [ ] Testers receive the link / TestFlight invite and can install.
+- [ ] Android: `eas submit --platform android --path <aab> --non-interactive`. Confirm the build appears under internal testing and is not halted/rejected (`tools/play_check.py com.nurlogic.nurledger`, `halted` = rejected). Never trust "finished" alone. — **⛔ BLOCKED 2026-11-09:** submit scheduled correctly to the `internal` track, but failed: "Google Play cannot find the app… upload the first version manually in Play Console." `tools/play_check.py com.nurlogic.nurledger` → `404 Package not found`. The app record does not exist in Play Console and a service account cannot create it — **[Mas]** must create the app (§4) first, then upload `/tmp/opencode/nurledger-artifacts/nurledger.aab` (1.0.0 / versionCode 3) to the internal track (or grant the SA + internal track and re-run `eas submit`).
+- [ ] iOS: `eas submit --platform ios --path <ipa> --non-interactive`. Wait for processing, answer export compliance if asked (the app declares `ITSAppUsesNonExemptEncryption = false`), assign the build to the internal group. Check App Store Connect/TestFlight, not just the CLI. — **⏳ PARTIAL 2026-11-09:** binary uploaded (exit 0); **build 3 = VALID** in ASC; placeholder version renamed to **1.0.0** and build attached (manual REST). App Store review submission is **blocked by the missing store listing** (screenshots, description, pricing, category, content rating, app-privacy answers, review contact, privacy/support URLs — all §4/§8 [Mas] work); an empty review-submission shell exists for the later one-pass submit. **Internal TestFlight needs no review submission — [Mas]: add build 3 (1.0.0) to the internal TestFlight group in the console.**
+- [ ] Testers receive the link / TestFlight invite and can install. (pending both platforms landing on their internal tracks)
 
 ## 7. Brief the testers  [Mas]
 
@@ -113,6 +111,6 @@ Do not move to closed/open testing or production until these are done:
 | Sections 1-2 (code, docs, hygiene) | OpenCode / Mas | |
 | Section 3 (policy and support pages live) | Mas / legal | |
 | Section 4 (consoles ready) | Mas | |
-| Section 5 (builds verified) | OpenCode | |
+| Section 5 (builds verified) | OpenCode | 2026-11-09 (1.0.0/3 both platforms; smoke + anomaly in 0003-report) |
 | Section 6 (internal tracks live) | OpenCode / Mas | |
 | Section 7 (testers briefed) | Mas | |
