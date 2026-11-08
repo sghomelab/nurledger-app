@@ -207,7 +207,7 @@ const en = {
   'settings.cloudNote':
     'Optional. Link this store to its own free Supabase project (BYO — your data stays in your project). Everything keeps working offline either way; queued sales sync when you turn it on.',
   'settings.connect': 'Connect your backend',
-  'settings.owner': 'owner: {email}',
+  'settings.owner': 'Signed in as: {email}',
   'settings.syncNow': 'Sync now',
   'settings.disconnect': 'Disconnect',
   'settings.disconnectTitle': 'Disconnect backend?',
@@ -656,6 +656,7 @@ const en = {
   'stList.productsBlind': '{n} products · blind',
   'shiftPrompts.amountHint': '{currency} — major units (e.g. 50.00)',
   'insights.stockoutHint': 'Days of stock left at the {period} velocity.',
+  'pin.backspace': 'Delete last digit',
 } as const;
 
 export default en;

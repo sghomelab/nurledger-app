@@ -206,7 +206,7 @@ const ms: Record<keyof EnDict, string> = {
   'settings.cloudNote':
     'Pilihan. Hubungkan kedai ini kepada projek Supabase percuma anda sendiri (BYO — data anda kekal dalam projek anda). Semuanya terus berfungsi secara luar talian; jualan yang bergilir akan disegerak apabila anda menghidupkannya.',
   'settings.connect': 'Sambungkan backend anda',
-  'settings.owner': 'pemilik: {email}',
+  'settings.owner': 'Log masuk sebagai: {email}',
   'settings.syncNow': 'Segerak sekarang',
   'settings.disconnect': 'Putuskan',
   'settings.disconnectTitle': 'Putuskan backend?',
@@ -655,6 +655,7 @@ const ms: Record<keyof EnDict, string> = {
   'stList.productsBlind': '{n} produk · kiraan buta',
   'shiftPrompts.amountHint': '{currency} — unit utama (cth. 50.00)',
   'insights.stockoutHint': 'Baki hari stok mengikut laju {period}.',
+  'pin.backspace': 'Padam digit terakhir',
 };
 
 export default ms;

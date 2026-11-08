@@ -106,6 +106,8 @@ export function PinPrompt({ visible, action, users, onSuccess, onCancel }: Props
                 key={i}
                 style={[styles.key, k === '' && styles.keyDisabled]}
                 disabled={k === ''}
+                accessibilityRole={k === '' ? undefined : 'button'}
+                accessibilityLabel={k === 'back' ? t('pin.backspace') : undefined}
                 onPress={() => {
                   if (k === 'back') setPin(pin.slice(0, -1));
                   else if (k !== '') press(k);

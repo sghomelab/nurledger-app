@@ -347,7 +347,7 @@ export default function SellTab() {
       {!shiftOpen && (
         <View style={styles.lockBanner}>
           <Ionicons name="lock-closed" size={16} color={colors.danger} />
-          <Text style={styles.lockText} numberOfLines={2}>
+          <Text style={styles.lockText}>
             {t('sell.lockBanner')}
           </Text>
           <Pressable style={styles.lockBtn} onPress={() => setPrompt({ kind: 'openshift' })} hitSlop={6}>

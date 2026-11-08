@@ -10,10 +10,10 @@ when Mas gives the GO. (Red line: "ship/prepare" ≠ build GO.)
 |---|---|
 | Display name | Nurledger |
 | App id / bundle id | `com.nurlogic.nurledger` |
-| Version (first store release) | 0.1.0 → **bump to 1.0.0 in app.json before the first store build** (one commit for both platforms) |
-| Android versionCode | 1 (EAS `autoIncrement` — will become 2+ on first build) |
+| Version (first store release) | **1.0.0** (set in app.json for both platforms in one commit; do not change it per platform) |
+| Android versionCode | 2 for 1.0.0 (set in app.json; EAS `autoIncrement` raises it on later builds). Verify from the built artifact |
 | iOS buildNumber | "1" (EAS builds `max(configured, store-max)+1`; verify actual from the IPA `Info.plist`) |
-| Platform minimums | Android 10+ (spec), iOS 14+ (spec); Expo SDK 58 / React Native 0.88 defaults apply (verify the effective minimums in the generated project) |
+| Platform minimums | Android 7.0+ (API 24, the Expo SDK 58 / RN 0.88 default, measured in the 1.0.0 build; the original spec said Android 10+, supporting older devices is intentional unless you raise `minSdkVersion`), iOS 14+ (spec; verify in the generated project) |
 | Deep link scheme | `nurledger://` (dev-client URL) |
 
 ## 2. Build profiles (`eas.json`)
@@ -45,9 +45,9 @@ auto-versioning. All profiles use `credentialsSource: "remote"`.
 
 ## 4. Store submission runbook (on GO)
 
-1. **Version bump commit first** (Apple version-train rule): `1.0.0` in
-   `app.json` (both `version` and the platform build numbers left to EAS
-   auto-increment), committed + pushed. BOTH platforms build from the SAME
+1. **Version bump commit first** (Apple version-train rule): `1.0.0` is set
+   in `app.json` (`version`, plus the Android `versionCode`; iOS `buildNumber`
+   is raised by EAS), committed + pushed. BOTH platforms build from the SAME
    commit.
 2. **Check quota** — free-tier credit balance is visible ONLY on the
    expo.dev dashboard (no CLI). If unknown, stop and ask Mas. One hypothesis
@@ -85,8 +85,8 @@ auto-versioning. All profiles use `credentialsSource: "remote"`.
   Keychain `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` / Android Keystore); Android backup is
   disabled (`allowBackup=false`) — local data is NOT restored from a device backup, so
   tell users to enable cloud sync or export CSV.
-- **Submit config:** `eas.json` has no `submit` block yet — add it (ASC key / Play
-  service account) before step 5/6 of the runbook.
+- **Submit config:** `eas.json` now has `submit` profiles; the iOS one still needs the App Store Connect app id (`ascAppId`) once the app exists. Check the Play
+  service account and ASC key before step 5/6 of the runbook.
 
 ## 4b. Philippines (first target store, 2026-11-07)
 

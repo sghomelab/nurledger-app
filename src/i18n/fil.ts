@@ -19,6 +19,7 @@ const fil: Record<keyof EnDict, string> = {
   'common.remove': 'Bawasan',
   'tab.sell': 'Benta',
   'tab.inventory': 'Imbentaryo',
+  // 'Expiry' and 'Shift' are the everyday Filipino retail terms (loanwords); kept on purpose. Native reviewer may choose otherwise.
   'tab.expiry': 'Expiry',
   'tab.insights': 'Ulat',
   'tab.shift': 'Shift',
@@ -170,7 +171,7 @@ const fil: Record<keyof EnDict, string> = {
   'settings.cloud': 'Cloud sync',
   'settings.cloudNote': 'Opsyonal. Ikonekta ang tindahang ito sa sarili nitong libreng Supabase project (BYO — nananatili ang datos mo sa project mo). Gumagana pa rin ang lahat offline; masi-sync ang mga naipong benta kapag binuksan mo ito.',
   'settings.connect': 'Ikonekta ang backend mo',
-  'settings.owner': 'may-ari: {email}',
+  'settings.owner': 'Naka-sign in bilang: {email}',
   'settings.syncNow': 'I-sync ngayon',
   'settings.disconnect': 'Idiskonekta',
   'settings.disconnectTitle': 'Idiskonekta ang backend?',
@@ -601,6 +602,7 @@ const fil: Record<keyof EnDict, string> = {
   'stList.productsBlind': '{n} produk · blind count',
   'shiftPrompts.amountHint': '{currency} — pangunahing unit (hal. 50.00)',
   'insights.stockoutHint': 'Araw ng stock na natitira ayon sa bilis na {period}.',
+  'pin.backspace': 'Burahin ang huling digit',
 };
 
 export default fil;
