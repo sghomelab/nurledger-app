@@ -571,7 +571,7 @@ const ms: Record<keyof EnDict, string> = {
   'stDetail.applyVariance': 'Gunakan perbezaan ({net})',
   'shift.noUser': 'Tiada pengguna',
   'shift.lockedBody': 'Tiada syif dibuka. Buka syif dengan modal permulaan untuk membolehkan jualan. Setiap jualan merekodkan juruwang dan syif.',
-  'shift.pinNote': 'PIN pemilik/pengurus membuka tindakan terkawal (ubah harga, diskaun, tutup syif, tetapan kedai). Juruwang tidak memerlukan PIN.',
+  'shift.pinNote': 'PIN pemilik/pengurus membuka tindakan terkawal (ubah harga, diskaun, tutup syif, tetapan kedai). Menukar ke pemilik atau pengurus, menambahnya dan menukar PIN juga memerlukan PIN pemilik/pengurus. Juruwang tidak memerlukan PIN.',
   'shift.roleOwner': 'Pemilik',
   'shift.roleManager': 'Pengurus',
   'shift.roleCashier': 'Juruwang',
@@ -656,6 +656,16 @@ const ms: Record<keyof EnDict, string> = {
   'shiftPrompts.amountHint': '{currency} — unit utama (cth. 50.00)',
   'insights.stockoutHint': 'Baki hari stok mengikut laju {period}.',
   'pin.backspace': 'Padam digit terakhir',
+  'gate.switch_user': 'Tukar pengguna',
+  'gate.add_user': 'Tambah pengguna',
+  'gate.change_pin': 'Tukar PIN',
+  'shift.changePin': 'Tukar PIN…',
+  'shift.changePinWho': 'Tukar PIN siapa?',
+  'shift.changePinTitle': 'Tukar PIN untuk {name}',
+  'shift.newPin': 'PIN baharu (4–8 digit)',
+  'shift.pinChanged': 'PIN telah ditukar',
+  'shift.changePinFailed': 'Tidak dapat menukar PIN',
+  'shift.pinRequiredForRole': 'Pengguna pemilik dan pengurus memerlukan PIN 4–8 digit.',
 };
 
 export default ms;

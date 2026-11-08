@@ -518,7 +518,7 @@ const fil: Record<keyof EnDict, string> = {
   'stDetail.applyVariance': 'Ilapat ang pagkakaiba ({net})',
   'shift.noUser': 'Walang user',
   'shift.lockedBody': 'Walang bukas na shift. Magbukas ng shift na may panimulang cash para makapagbenta. Itinatala ng bawat benta ang kahera at ang shift.',
-  'shift.pinNote': 'Ang PIN ng may-ari/manager ang nagbubukas ng mga pinaghihigpitang aksyon (palitan ang presyo, diskwento, isara ang shift, setting ng tindahan). Hindi kailangan ng PIN ng mga kahera.',
+  'shift.pinNote': 'Ang PIN ng may-ari/manager ang nagbubukas ng mga pinaghihigpitang aksyon (palitan ang presyo, diskwento, isara ang shift, setting ng tindahan). Kailangan din ng PIN ng may-ari/manager para lumipat sa may-ari o manager, magdagdag ng isa, at magpalit ng PIN. Hindi kailangan ng PIN ng mga kahera.',
   'shift.roleOwner': 'May-ari',
   'shift.roleManager': 'Manager',
   'shift.roleCashier': 'Kahera',
@@ -603,6 +603,16 @@ const fil: Record<keyof EnDict, string> = {
   'shiftPrompts.amountHint': '{currency} — pangunahing unit (hal. 50.00)',
   'insights.stockoutHint': 'Araw ng stock na natitira ayon sa bilis na {period}.',
   'pin.backspace': 'Burahin ang huling digit',
+  'gate.switch_user': 'Magpalit ng user',
+  'gate.add_user': 'Magdagdag ng user',
+  'gate.change_pin': 'Palitan ang PIN',
+  'shift.changePin': 'Palitan ang PIN…',
+  'shift.changePinWho': 'Kaninong PIN ang papalitan?',
+  'shift.changePinTitle': 'Palitan ang PIN ni {name}',
+  'shift.newPin': 'Bagong PIN (4–8 digit)',
+  'shift.pinChanged': 'Napalitan na ang PIN',
+  'shift.changePinFailed': 'Hindi mapalitan ang PIN',
+  'shift.pinRequiredForRole': 'Kailangan ng PIN na 4–8 digit ang mga user na may-ari at manager.',
 };
 
 export default fil;

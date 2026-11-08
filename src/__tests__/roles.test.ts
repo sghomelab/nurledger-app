@@ -56,3 +56,37 @@ describe('GATE_ACTION_LABELS', () => {
     }
   });
 });
+
+describe('PIN hardening: switching up / adding / changing PIN', () => {
+  const owner = user('owner', 's:0123456789abcdef:abcdef');
+  const manager = user('manager', 's:0123456789abcdef:abcdef');
+  const cashier = user('cashier');
+  const { switchRankNeeded, addUserRankNeeded, changePinRankNeeded } = require('../lib/roles');
+
+  it('cashier cannot switch to manager/owner without a PIN of that rank', () => {
+    expect(switchRankNeeded(cashier, manager)).toBe(1);
+    expect(switchRankNeeded(cashier, owner)).toBe(2);
+  });
+  it('manager needs the owner PIN to become owner, but not to go to manager/cashier', () => {
+    expect(switchRankNeeded(manager, owner)).toBe(2);
+    expect(switchRankNeeded(manager, manager)).toBe(0);
+    expect(switchRankNeeded(manager, cashier)).toBe(0);
+  });
+  it('owner switches freely; no active user is treated as cashier', () => {
+    expect(switchRankNeeded(owner, manager)).toBe(0);
+    expect(switchRankNeeded(owner, cashier)).toBe(0);
+    expect(switchRankNeeded(null, owner)).toBe(2);
+  });
+  it('cannot mint a role above your own without a PIN of that rank', () => {
+    expect(addUserRankNeeded(cashier, 'cashier')).toBe(0);
+    expect(addUserRankNeeded(cashier, 'manager')).toBe(1);
+    expect(addUserRankNeeded(cashier, 'owner')).toBe(2);
+    expect(addUserRankNeeded(manager, 'owner')).toBe(2);
+    expect(addUserRankNeeded(owner, 'owner')).toBe(0);
+  });
+  it('changing a PIN always needs an unlocker; owner PIN only for the owner', () => {
+    expect(changePinRankNeeded(cashier)).toBe(1);
+    expect(changePinRankNeeded(manager)).toBe(1);
+    expect(changePinRankNeeded(owner)).toBe(2);
+  });
+});
