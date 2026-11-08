@@ -11,10 +11,13 @@ Status line to keep updated: `Last updated: 2026-11-08 · main @ 50d1f69 (pre-1.
 - [x] Price: Free, no in-app purchases. Category: Business.
 - [x] First user is in the Philippines. App ships English, Bahasa Melayu, Filipino (Malay and Filipino text are machine-drafted and need native review).
 - [x] Internal testers first; iOS and iPad are **not verified on a device** (no Mac available). Accepted for internal testing.
+- [x] Support contact: **hello@nurlogic.ai**, reply "within 3 working days". Legal entity: **Nurlogic** (Mas to confirm the registered spelling, e.g. "NurLogic" on the site, and use it consistently in policy, support page and consoles).
+- [x] PIN model hardened (merged to main 7c4c063, device-verified): switching to a manager/owner, adding one, and changing a PIN all need an owner/manager PIN; "Change PIN…" exists; lost owner PIN = Reset all data on that device (Owner PIN returns to the default 1234).
 - [ ] **[Mas] iPad:** decide `ios.supportsTablet`. Recommended `false` for 1.0 (iPad layout unverified, avoids iPad screenshots). Turn on later after an iPad check.
 
 ## 1. Code and docs are ready  [OpenCode]
 
+- [x] PIN hardening merged (main 7c4c063) with 544/544 tests in two timezones.
 - [ ] `claude/prerelease-fixes` merged; OpenCode's 1.0.0 version commit pushed; `origin/main` is the commit you intend to build.
 - [ ] Docs-only follow-up merged (PACKAGING.md: iOS buildNumber, three languages, credentialsSource, Android submit key note, HTTPS-only note).
 - [ ] Gates on that exact commit: `npx tsc --noEmit` = 0, `npx jest` passes in two timezones (e.g. default and `TZ=America/Los_Angeles`), `npm run test:strict` = 0 skipped.
@@ -32,10 +35,10 @@ Status line to keep updated: `Last updated: 2026-11-08 · main @ 50d1f69 (pre-1.
 
 Draft text is in `nurledger-privacy-policy-draft.md` (workspace folder). It is a draft and **not legal advice**.
 
-- [ ] Fill the placeholders: legal entity name, support email, effective date.
+- [ ] Placeholders: entity (Nurlogic) and support email (hello@nurlogic.ai) are filled in the drafts; **effective date** is still Mas's to set.
 - [ ] Legal owner reviews the policy (including the Philippine Data Privacy Act and Malaysia PDPA questions, and the optional cloud-sync wording).
 - [ ] Publish the Nurledger section at `https://nurlogic.ai/privacy` (the privacy worker must include Nurledger).
-- [ ] Create `https://nurlogic.ai/support` with the FAQ from the listing pack and the support email.
+- [ ] Create `https://nurlogic.ai/support` (built on the `nurlogic-ai` branch `claude/website-deploy-a`, not deployed; ships later as "Deploy A2" after legal review, with the Nurledger privacy section and guide claims). The "forgot PIN" answer assumes the PIN-hardening build.
 - [ ] Open both URLs on a phone and confirm they load.
 
 ## 4. Store console setup  [Mas]
@@ -79,10 +82,11 @@ Send this with the invite:
 - Filipino and Malay translations are drafts; tell us wording that is wrong or awkward.
 - Payments (cash, card, GCash, Maya, QR Ph) are **recorded, not processed**. The app is not a BIR-registered receipting or e-invoicing system.
 - Cloud sync is optional and needs your own free Supabase project over HTTPS. Without sync, local data is **not** restored from device backups (Android); use CSV export or sync.
+- The default Owner PIN is 1234: change it first (Shift tab → Switch → Change PIN…). If the only owner PIN is lost, the way back in is Settings → Reset all data on that device, which erases local data.
 - Use "Load sample data" on first run to explore. Do not enter real customer data you cannot afford to lose until the group has used it for a while.
 - How to report: the support email, with phone model, Android/iOS version, app language and what you were doing. Do not include secrets or tokens.
 
-What to try: a full day's flow (open shift, several sales including split payment and a weighed item, a refund, stock adjustment, expiry radar, close shift and Z-report), switching languages, the PIN prompt with a cashier and an owner, offline selling then reconnecting, and (if they use sync) adding a second device with an invite code.
+What to try: a full day's flow (open shift, several sales including split payment and a weighed item, a refund, stock adjustment, expiry radar, close shift and Z-report), switching languages, the PIN prompt with a cashier and an owner (a cashier switching to a manager/owner must be asked for a PIN; Change PIN…), offline selling then reconnecting, and (if they use sync) adding a second device with an invite code.
 
 ## 8. Before widening beyond internal testers
 
