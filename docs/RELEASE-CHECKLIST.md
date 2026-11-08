@@ -13,7 +13,7 @@ Status line to keep updated: `Last updated: 2026-11-08 · main @ 50d1f69 (pre-1.
 - [x] Internal testers first; iOS and iPad are **not verified on a device** (no Mac available). Accepted for internal testing.
 - [x] Support contact: **hello@nurlogic.ai**, reply "within 3 working days". Legal entity: **Nurlogic** (Mas to confirm the registered spelling, e.g. "NurLogic" on the site, and use it consistently in policy, support page and consoles).
 - [x] PIN model hardened (merged to main 7c4c063, device-verified): switching to a manager/owner, adding one, and changing a PIN all need an owner/manager PIN; "Change PIN…" exists; lost owner PIN = Reset all data on that device (Owner PIN returns to the default 1234).
-- [ ] **[Mas] iPad:** decide `ios.supportsTablet`. Recommended `false` for 1.0 (iPad layout unverified, avoids iPad screenshots). Turn on later after an iPad check.
+- [x] **iPad:** Mas decided to ship iPad support (`ios.supportsTablet` stays `true`). iPad layout is NOT verified on a device (no Mac), accepted for internal testing. iPad screenshots (13" and 11") are required before any App Store review or public release; TestFlight internal testing does not need them.
 
 ## 1. Code and docs are ready  [OpenCode]
 
