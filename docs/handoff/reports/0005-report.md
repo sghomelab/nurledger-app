@@ -185,4 +185,30 @@ Branch `claude/website-rename-nurledger` from main @ `5817aa0`:
 - Verified: ESM syntax OK; node smoke test of worker routes `/`, `/support`, `/privacy`, `/nurledger-guide`, `/conscious-spending-guide` → all 200, **0** old "Nurledger" occurrences, expected "NurLedger" counts
 - Out-of-section-11 notes: 2–3 privacy-body mentions outside section 11 (~lines 1103/1125/1162) were renamed for consistency — flagged in the diff review for Mas to veto
 - Lowercase company "Nurlogic" left untouched (app display-name rename only)
-- **Status: diff + changed-sentence list presented; deploy awaiting Mas's GO** (no wrangler deploy run)
+- **Status: DEPLOYED 2026-11-09 after Mas's GO** — see Part C outcome below
+
+### Part C outcome — deployed (2026-11-09)
+
+- Mas's GO: deploy with all 3 flagged sentences kept renamed; `/privacy` "Last updated" set to the actual deploy date (section 11 "takes effect on 8 November 2026" untouched).
+- Extra commit `ffdaa8d`: `/privacy` meta → "Last updated: 9 November 2026" (the NurSpend page's "July 4, 2026" is a different app's page — untouched).
+- **Deployed: wrangler worker version `ecf0a4e2-0b59-4e6d-babe-1c9f723bd505`** (raspy-math-274a), 4.78s.
+- Live verification (curl + python, bodies checked programmatically) — **ALL PASS**:
+
+| Route | HTTP | old "Nurledger" | "NurLedger" |
+|---|---|---|---|
+| `/` | 200 | 0 | 2 |
+| `/support` | 200 | 0 | 6 |
+| `/privacy` | 200 | 0 | 8 |
+| `/nurledger-guide` | 200 | 0 | 27 |
+| `/conscious-spending-guide` | 200 | 0 | 0 (unchanged) |
+
+- `/privacy` live: "Last updated: 9 November 2026" present; section 11 "takes effect on 8 November 2026" present.
+- Merged fast-forward to nurlogic-ai main (`5817aa0` → `ffdaa8d`), pushed.
+
+### Note — why `npx jest` showed 54 skipped in this run (vs 544/544 earlier)
+
+Not a regression — different Node versions:
+
+- Plain `npx jest` in the Part B gate run executed under the **default Node v20.20.2**. 54 of the suites exercise the `node:sqlite` built-in module, which only exists from **Node ≥ 22.5**; on older Node those suites are **skipped by design** (not failing) → 490 passed / 54 skipped.
+- The 544/544 with **0 skipped** result is `npm run test:strict` run under **Node 22.23.3**, where all node:sqlite suites actually execute; `test:strict` additionally *fails* if anything is skipped, so it is the authoritative gate on test coverage.
+- Both commands ran the same 544 tests; the difference is purely which runtime is active. That is why the Part B gates list both: plain jest (quick sanity, any Node) + test:strict (Node ≥ 22.5, zero skips allowed).
