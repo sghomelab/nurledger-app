@@ -9,6 +9,7 @@ Audited code state: **main @ `02287b6`** (the release-checklist merge). The docs
 - `docs/handoff/` (README + task files + reports dir) brought onto main by cherry-picking the files from `origin/claude/handoff-nurledger` (task allowed merge or cherry-pick; keeps exactly one merge commit).
 - One-line handoff pointer added to `AGENTS.md` (`docs/handoff/README.md`).
 - `RELEASE-CHECKLIST.md` status line + Section 1 boxes updated for what was verified here; Mas's boxes and later sections left unticked.
+- Post-report update: the task file was amended on the branch (`d5f9720`) with Mas's final iPad decision (support ships) — this report's audit table and to-do list now reflect it (checklist §0 iPad box ticked in the same pass).
 
 ## Audit results (step 2)
 
@@ -20,7 +21,7 @@ Audited code state: **main @ `02287b6`** (the release-checklist merge). The docs
 | Android `versionCode` | PASS | `2` |
 | iOS `buildNumber` | PASS | `"2"` |
 | Bundle/package id | PASS | `com.nurlogic.nurledger` (both `ios.bundleIdentifier` and `android.package`) |
-| `ios.supportsTablet` | REPORT (unchanged) | **`true`** — Mas's message did not contain "SET supportsTablet=false", so nothing was changed; this is Mas's decision (checklist section 0, recommended `false` for 1.0) |
+| `ios.supportsTablet` | REPORT (unchanged) | **`true`** — Mas decided (2026-11-08) to **ship iPad support**; nothing was changed. iPad layout is **unverified on a real iPad** (no Mac). iPad screenshots (**13" and 11"**) are required before App Store review / public release — not needed for TestFlight internal testing |
 | `ITSAppUsesNonExemptEncryption` | PASS | `false` (export-compliance answer pre-declared) |
 | Permissions (main manifest) | PASS | Minimal Expo set: `INTERNET`, `READ_EXTERNAL_STORAGE` (maxSdk 32), `WRITE_EXTERNAL_STORAGE` (maxSdk 32), `SYSTEM_ALERT_WINDOW`, `VIBRATE` |
 | `allowBackup` | PASS | `false` (app.json + AndroidManifest) — device backups can't carry local data/keys |
@@ -69,7 +70,7 @@ A `production` build from this commit produces: non-debuggable store build, vers
 
 ## What Mas must still supply or do (exact list)
 
-1. **iPad decision** (checklist §0): decide `ios.supportsTablet` — currently `true`; recommended `false` for 1.0. (A message containing "SET supportsTablet=false" triggers the change.)
+1. **iPad** (decision recorded 2026-11-08): support ships, `ios.supportsTablet` stays `true`. Before App Store review / public release (not for TestFlight internal): real-iPad device check + **13" and 11" iPad screenshots** (checklist §0 / §8).
 2. **Security hygiene** (checklist §2): rotate any Supabase `service_role` key ever pasted into an older build/chat; confirm the dev Supabase project holds no real data; remove/revoke leftover test accounts.
 3. **Policy & support pages** (checklist §3, cross-repo `nurlogic-ai`): publish the Nurledger section at `https://nurlogic.ai/privacy`, create `https://nurlogic.ai/support` (website branch `claude/website-deploy-a`, "Deploy A2"), set the **effective date**, legal review, then open both URLs on a phone.
 4. **Legal entity**: confirm the registered spelling ("Nurlogic" vs "NurLogic") for consistent use in policy, support page and consoles.

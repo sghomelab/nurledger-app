@@ -15,5 +15,5 @@ Do NOT start EAS builds, submits or store actions. 0001 (PIN hardening) is done 
    - docs/PACKAGING.md and USER-GUIDE.md consistent with the above (version, minSdk 24, three languages, HTTPS-only BYO Supabase, PIN section).
    - A release-style Android build is NOT to be made now; just confirm from config what the production profile will produce.
 3. Update the status line and the Section 1 boxes of docs/RELEASE-CHECKLIST.md that you have verified (leave Mas's and later sections unticked). Commit docs only.
-4. iPad decision: if Mas's message pointing you here contains "SET supportsTablet=false", set `ios.supportsTablet` to false in app.json as its own commit (message: "ios: supportsTablet=false for 1.0 (iPad unverified)"), rerun gates, and note it in the report. Otherwise change nothing and just report the current value.
+4. iPad decision (Mas, 2026-11-08): iPad support SHIPS. Keep `ios.supportsTablet` = `true`; change nothing. Report its current value, and confirm in the report that the iPad layout is unverified on a real iPad (no Mac) and that iPad screenshots (13" and 11") will be needed before App Store review/public release (not for TestFlight internal testing).
 5. Report: PASS/FAIL table, the exact list of what Mas must still supply or do (consoles, ascAppId, service-account key path, website pages, build credit, GO), and the main hash. Then stop.
