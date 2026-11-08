@@ -12,7 +12,7 @@ when Mas gives the GO. (Red line: "ship/prepare" ≠ build GO.)
 | App id / bundle id | `com.nurlogic.nurledger` |
 | Version (first store release) | **1.0.0** (set in app.json for both platforms in one commit; do not change it per platform) |
 | Android versionCode | 2 for 1.0.0 (set in app.json; EAS `autoIncrement` raises it on later builds). Verify from the built artifact |
-| iOS buildNumber | "1" (EAS builds `max(configured, store-max)+1`; verify actual from the IPA `Info.plist`) |
+| iOS buildNumber | "2" (set in app.json; EAS builds `max(configured, store-max)+1`; verify actual from the IPA `Info.plist`) |
 | Platform minimums | Android 7.0+ (API 24, the Expo SDK 58 / RN 0.88 default, measured in the 1.0.0 build; the original spec said Android 10+, supporting older devices is intentional unless you raise `minSdkVersion`), iOS 14+ (spec; verify in the generated project) |
 | Deep link scheme | `nurledger://` (dev-client URL) |
 
@@ -25,7 +25,8 @@ when Mas gives the GO. (Red line: "ship/prepare" ≠ build GO.)
 | `production` | store builds | `autoIncrement: true`, channel `production` |
 
 `appVersionSource: "local"` — versions come from `app.json`, not EAS
-auto-versioning. All profiles use `credentialsSource: "remote"`.
+auto-versioning. All build profiles set `credentialsSource: "remote"`
+(explicitly in eas.json; `remote` is also EAS's default).
 
 ## 3. Store-asset readiness
 
@@ -39,9 +40,9 @@ auto-versioning. All profiles use `credentialsSource: "remote"`.
   **no data collected by the app itself** (see §5 for the BYO-cloud nuance).
 - **Encryption:** `ITSAppUsesNonExemptEncryption: false` already declared
   (HTTPS-only, no custom crypto).
-- **Localization:** UI ships EN + Bahasa Melayu (FR-115, device-local toggle —
-  no store-side localization metadata required for launch; Malay strings are
-  in-app, not in store-listing metadata).
+- **Localization:** UI ships English + Bahasa Melayu + Filipino (Tagalog) (FR-115,
+  device-local toggle — no store-side localization metadata required for launch;
+  all strings are in-app, not in store-listing metadata).
 
 ## 4. Store submission runbook (on GO)
 
@@ -58,8 +59,11 @@ auto-versioning. All profiles use `credentialsSource: "remote"`.
    manifest), then sync `app.json` to the actuals in a follow-up commit.
 5. **Google Play:** shared service account
    `play-store-uploads@ai-agent-497901.iam.gserviceaccount.com` — copy the key
-   to `secrets/` (gitignored), `eas submit --platform android --path <aab>
-   --non-interactive`, verify via Play API (`tools/play_check.py
+   to `secrets/` (gitignored). **Release-time step (Mas):** the `eas.json`
+   android submit profile currently sets only `channel: internal` — set
+   `serviceAccountKeyPath` there to that Play service-account JSON key in
+   `secrets/` BEFORE running `eas submit --platform android --path <aab>
+   --non-interactive`. Verify via Play API (`tools/play_check.py
    com.nurlogic.nurledger`; `halted` = rejected).
    **UI-only, Mas:** Play Console → app creation + content rating +
    data-safety form + privacy-policy URL (`https://nurlogic.ai/privacy` —
@@ -85,7 +89,8 @@ auto-versioning. All profiles use `credentialsSource: "remote"`.
   Keychain `AFTER_FIRST_UNLOCK_THIS_DEVICE_ONLY` / Android Keystore); Android backup is
   disabled (`allowBackup=false`) — local data is NOT restored from a device backup, so
   tell users to enable cloud sync or export CSV.
-- **Submit config:** `eas.json` now has `submit` profiles; the iOS one still needs the App Store Connect app id (`ascAppId`) once the app exists. Check the Play
+- **Submit config:** `eas.json` now has `submit` profiles; the iOS one still needs the App Store Connect app id (`ascAppId`) once the app exists, and the
+  android one has no `serviceAccountKeyPath` yet (release-time step — see runbook step 5). Check the Play
   service account and ASC key before step 5/6 of the runbook.
 
 ## 4b. Philippines (first target store, 2026-11-07)
@@ -107,6 +112,8 @@ auto-versioning. All profiles use `credentialsSource: "remote"`.
 - **BYO cloud (ADR-010):** sync goes to the store's OWN free Supabase
   project — the vendor (Nurlogic) does not host or access store data. The
   only remote calls are to the store's own Supabase project (REST + JWT).
+  A self-hosted Supabase must be reachable over HTTPS; release builds block
+  plain http (only local-development addresses are accepted in debug builds).
 - **No analytics, no crash reporting, no ad SDKs, no PII collected.**
   Cashier names are user-entered labels, not identifiers, and stay local /
   in the store's own project.

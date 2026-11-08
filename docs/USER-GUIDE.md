@@ -322,6 +322,9 @@ the shop then connects using the same details.
    - **Project URL** — looks like `https://abcdefg.supabase.co`
    - **anon / public key** — a long key labelled `anon public` (this is safe to share with the app)
 
+> A self-hosted Supabase must be reachable over HTTPS; release builds block plain
+> http (only local-development addresses are accepted in debug builds).
+
 > **Never paste the `service_role` key into Nurledger.** It is a master password for
 > your database and the app does not need it (older versions asked for it — if you
 > ever pasted it, go to Project settings → API and **rotate/regenerate it**; current
