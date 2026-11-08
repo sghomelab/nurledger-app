@@ -4,7 +4,7 @@ Goal: get 1.0.0 to **internal testers only** (Google Play internal testing + Tes
 
 Who does what: **[Mas]** needs a person with console/legal access, **[OpenCode]** is repo/build/device work, **[Both]** is shared. Do not start EAS builds or store actions without Mas's GO (see `docs/PACKAGING.md` §4). Items marked **(verify)** are store-console rules that change over time: check the console's own wording before relying on them.
 
-Status line to keep updated: `Last updated: 2026-11-08 · main @ 50d1f69 (pre-1.0.0) · state: draft`
+Status line to keep updated: `Last updated: 2026-11-08 · main @ 02287b6 (audited; a docs-only handoff commit follows as the tip) · state: audited`
 
 ## 0. Decisions already made
 
@@ -18,11 +18,11 @@ Status line to keep updated: `Last updated: 2026-11-08 · main @ 50d1f69 (pre-1.
 ## 1. Code and docs are ready  [OpenCode]
 
 - [x] PIN hardening merged (main 7c4c063) with 544/544 tests in two timezones.
-- [ ] `claude/prerelease-fixes` merged; OpenCode's 1.0.0 version commit pushed; `origin/main` is the commit you intend to build.
-- [ ] Docs-only follow-up merged (PACKAGING.md: iOS buildNumber, three languages, credentialsSource, Android submit key note, HTTPS-only note).
-- [ ] Gates on that exact commit: `npx tsc --noEmit` = 0, `npx jest` passes in two timezones (e.g. default and `TZ=America/Los_Angeles`), `npm run test:strict` = 0 skipped.
-- [ ] `app.json`: `version` 1.0.0, Android `versionCode` 2 (or higher), iOS `buildNumber` matches your plan; one commit for both platforms.
-- [ ] Working tree clean: no stray files, no tracked `node_modules`, no secrets (`git status`, `git ls-files | grep -i -E "secret|\.env|\.jks|\.p8|service.?account"` returns nothing you did not expect).
+- [x] `claude/prerelease-fixes` merged (149095d); OpenCode's 1.0.0 version commit on main (`b201059`); `origin/main` is the commit you intend to build.
+- [x] Docs-only follow-up merged (PACKAGING.md: iOS buildNumber, three languages, credentialsSource, Android submit key note, HTTPS-only note) — `300b417`.
+- [x] Gates on that exact commit: `npx tsc --noEmit` = 0, `npx jest` passes in two timezones (default and `TZ=America/Los_Angeles`, 544/544), `npm run test:strict` = 0 skipped — verified on `02287b6`.
+- [x] `app.json`: `version` 1.0.0, Android `versionCode` 2, iOS `buildNumber` "2"; one commit for both platforms (`b201059`).
+- [x] Working tree clean: no stray files, no tracked `node_modules`, no secrets (scan returns nothing; `secrets/` gitignored).
 - [ ] `ios.supportsTablet` set per the decision in section 0.
 
 ## 2. Security hygiene  [Mas]

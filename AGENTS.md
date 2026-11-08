@@ -37,4 +37,5 @@ Expo SDK 58 / RN 0.88 / React 19.3 / expo-router / expo-sqlite (ADR-009 supersed
 
 - `docs/FR-COVERAGE.md` — update when implementing any FR (audited per milestone)
 - `docs/SPEC-DEVIATION.md` — log spec conflicts as DEV-NNN
+- Claude ↔ OpenCode handoffs go through the repo — see `docs/handoff/README.md` (tasks in `docs/handoff/`, reports in `docs/handoff/reports/`)
 - Spec + handoff: `/home/mars/.hermes/projects/03-nurlogic/nurledger/`
