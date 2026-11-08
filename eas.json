@@ -24,7 +24,6 @@
   "submit": {
     "production": {
       "android": {
-        "channel": "internal",
         "serviceAccountKeyPath": "./secrets/google-play-service-account.json"
       },
       "ios": {
