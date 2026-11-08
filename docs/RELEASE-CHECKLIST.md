@@ -44,14 +44,14 @@ Draft text is in `nurledger-privacy-policy-draft.md` (workspace folder). It is a
 ## 4. Store console setup  [Mas]
 
 Google Play Console
-- [ ] Create the app (`com.nurlogic.nurledger`), name "Nurledger: Offline POS & Stock", free, category Business.
+- [ ] Create the app (`com.nurlogic.nurledger`), name "NurLedger: Offline POS & Stock", free, category Business.
 - [ ] Add the privacy policy URL, support email and contact details (verify which fields are required before an internal-testing release).
 - [ ] Content rating questionnaire (expected: lowest tier; answer honestly).
 - [ ] Data safety form using the proposed answers in the listing pack, section 7 (optional transmission to a user-configured server; encrypted in transit; deletion available in-app). Have legal confirm the wording. (verify whether internal testing requires it; complete it anyway before widening.)
 - [ ] Create the internal testing track and add the tester email list.
 
 App Store Connect
-- [ ] Create the app (bundle id `com.nurlogic.nurledger`) and note its numeric app id.
+- [ ] Create the app (bundle id `com.nurlogic.nurledger`, name "NurLedger: Offline POS & Stock") and note its numeric app id.
 - [ ] Add the app id as `ascAppId` in the iOS submit profile in `eas.json` (OpenCode commits it).
 - [ ] App privacy answers: "Data Not Collected" per the listing pack, with the same legal confirmation.
 - [ ] Create the internal testing group and add testers (they must be users on the App Store Connect team; internal testing does not need beta app review (verify)).
