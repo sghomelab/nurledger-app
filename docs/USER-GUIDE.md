@@ -1,9 +1,9 @@
-# Nurledger — User Guide
+# NurLedger — User Guide
 
-A guide for store owners and staff. Nurledger is a complete shop: selling,
+A guide for store owners and staff. NurLedger is a complete shop: selling,
 stock, shifts and reports — all on one device.
 
-> **Good to know first:** Nurledger works **completely offline**. You can run a
+> **Good to know first:** NurLedger works **completely offline**. You can run a
 > whole day of sales, stock and shifts with no internet at all. Cloud sync is an
 > **optional extra** that (a) keeps a backup of your data and (b) lets more than
 > one tablet/phone in the shop share the same stock and sales. **It is switched
@@ -12,7 +12,7 @@ stock, shifts and reports — all on one device.
 > about 5–10 minutes).
 
 **Contents**
-- [Why Nurledger works the way it does](#why-nurledger-works-the-way-it-does)
+- [Why NurLedger works the way it does](#why-nurledger-works-the-way-it-does)
 - [The five tabs](#the-five-tabs)
 - [Selling (the register)](#selling-the-register)
 - [Refunds](#refunds)
@@ -29,7 +29,7 @@ stock, shifts and reports — all on one device.
 
 ---
 
-## Why Nurledger works the way it does
+## Why NurLedger works the way it does
 
 - **Your shop runs on your device.** Every sale, stock movement and shift is written to
   a database *on the tablet or phone you are holding* — not to a remote server. The
@@ -37,7 +37,7 @@ stock, shifts and reports — all on one device.
   dead zone, nothing changes. You keep selling, the numbers stay correct, and anything
   queued goes up later when sync is on.
 - **Your data is yours.** When you do turn on cloud sync, it points at **your own** free
-  Supabase account — not a Nurledger server. The people who make Nurledger never see
+  Supabase account — not a NurLedger server. The people who make NurLedger never see
   your sales, stock or shifts, and you can delete the whole project at any time (the app
   keeps working from the device either way).
 - **Every number can be explained.** Stock is the sum of an append-only ledger of
@@ -55,7 +55,7 @@ stock, shifts and reports — all on one device.
   (e.g. GST 9% inclusive, SST 10% inclusive, VAT — or any custom rate) and the payment
   methods are settings you choose for your store. The same app works in Singapore,
   Malaysia, the EU, or anywhere else.
-- **No special permissions.** Nurledger asks for nothing unusual — no camera, no
+- **No special permissions.** NurLedger asks for nothing unusual — no camera, no
   Bluetooth. Barcodes are scanned with a USB/Bluetooth *keyboard-wedge* scanner or typed
   in, and printing (receipts, labels, purchase orders) works by generating a file you
   can print on any device, any printer.
@@ -167,7 +167,7 @@ For products without scannable barcodes (or to reprint):
    **copies per product** (default 5).
 3. Pick the paper: **58 mm roll** (one label per 58×40 mm cut) or **A4 sheet**
    (labels in a 3-column grid for scissors).
-4. **Generate & Share** — Nurledger creates a print-ready HTML file and opens
+4. **Generate & Share** — NurLedger creates a print-ready HTML file and opens
    the share sheet. Open it in any browser on any phone/computer and print on
    any printer — no special hardware needed.
 
@@ -287,16 +287,16 @@ all syncs later.
 
 ## Setting up cloud sync
 
-Cloud sync connects Nurledger to **your own free Supabase account**. Supabase is a
+Cloud sync connects NurLedger to **your own free Supabase account**. Supabase is a
 free online database service. Because it's *your* account, **your data belongs to you** —
-the people who make Nurledger can never see it. You can switch it off or delete it at
+the people who make NurLedger can never see it. You can switch it off or delete it at
 any time, and your data on the device is never affected.
 
 You only need to do this **once per shop** (about 5–10 minutes). Every other device in
 the shop then connects using the same details.
 
 ### What you'll need
-- A phone or tablet with Nurledger installed (this "first" device).
+- A phone or tablet with NurLedger installed (this "first" device).
 - Internet access for the setup itself.
 - An email address for the Supabase account.
 
@@ -326,28 +326,28 @@ the shop then connects using the same details.
 > A self-hosted Supabase must be reachable over HTTPS; release builds block plain
 > http (only local-development addresses are accepted in debug builds).
 
-> **Never paste the `service_role` key into Nurledger.** It is a master password for
+> **Never paste the `service_role` key into NurLedger.** It is a master password for
 > your database and the app does not need it (older versions asked for it — if you
 > ever pasted it, go to Project settings → API and **rotate/regenerate it**; current
 > versions delete the stored copy from the phone automatically).
 
-### Step 4 — Connect it in Nurledger
-1. Open **Nurledger** on your first device.
+### Step 4 — Connect it in NurLedger
+1. Open **NurLedger** on your first device.
 2. Go to **Settings** (the gear / Store card).
 3. Find **Cloud sync** — it will say **Off**.
 4. Tap **Connect your store**.
 5. Choose **New store** (this is your first device) and paste the two details (Project URL, anon key), then tap **Continue**.
-   Nurledger checks that it can reach your project.
+   NurLedger checks that it can reach your project.
 
    **One manual step (about 1 minute):** Supabase does not let apps create tables in a
    project on your behalf, so you run a short setup script in the project yourself:
-   1. Nurledger shows the script on screen — tap **Copy** (it is long, do not type it).
+   1. NurLedger shows the script on screen — tap **Copy** (it is long, do not type it).
       It ends with a one-time claim line made just for this setup: only this phone can
       finish creating your store, nobody else who finds your project URL.
    2. Back in the Supabase dashboard, open **SQL Editor** (left menu) → **New query**.
    3. Paste the script into the editor box and tap **Run**.
    4. You should see a short success message (a few tables created).
-   5. Go back to Nurledger and tap **Check that the setup ran**. When it is right you
+   5. Go back to NurLedger and tap **Check that the setup ran**. When it is right you
       will see a **Connected** confirmation.
 
    This script is safe to re-run any time — it creates the tables and rules for your
@@ -383,14 +383,14 @@ time you turn it back on.
 ---
 
 ## Adding more devices (a second tablet or phone)
-1. Install Nurledger on the second device.
+1. Install NurLedger on the second device.
 2. On the second device: **Settings → Cloud sync → Connect your store**.
 3. Paste the **same** three details from your Supabase project (Step 3).
 4. Sign in with the **same owner email + password** from Step 5.
 5. Turn **Sync** **On**.
 
 Both devices now share the same shop: sell on one, and after it syncs, the other sees the
-updated stock, products, categories and sales. If two tablets sell the same item offline and both sync, Nurledger combines
+updated stock, products, categories and sales. If two tablets sell the same item offline and both sync, NurLedger combines
 them correctly — **no sale is counted twice**, and stock stays accurate. A refund made on
 one device appears on the other after it syncs.
 
@@ -405,7 +405,7 @@ Staff **don't need a Supabase account.** You (the owner) manage them on the **Sh
 - **Change PIN…** (in the Switch list) asks for an owner/manager PIN every time, then lets you set a new 4–8 digit PIN for the person you pick. Only an owner PIN can change the owner's PIN.
 - Discounts, price overrides, refunds, stocktakes, closing a shift and settings ask for the manager/owner PIN when a cashier is at the register.
 
-**If the owner PIN is lost:** Nurlogic cannot recover it (PINs exist only on the device, as a salted hash, and never go to Supabase). Options: use another owner's PIN if there is one; otherwise **Settings → Reset all data** on this device (this erases local data, so sync to the cloud first if you can, then sign in again afterwards). A fresh install starts with a default Owner PIN, so change it right away in **Change PIN…**.
+**If the owner PIN is lost:** NurLogic cannot recover it (PINs exist only on the device, as a salted hash, and never go to Supabase). Options: use another owner's PIN if there is one; otherwise **Settings → Reset all data** on this device (this erases local data, so sync to the cloud first if you can, then sign in again afterwards). A fresh install starts with a default Owner PIN, so change it right away in **Change PIN…**.
 
 The PIN is a **local safeguard against mistakes and casual misuse**, not a vault: someone with the unlocked phone and technical skills can get around it. Keep the phone itself secure.
 
@@ -430,11 +430,11 @@ There is no "deactivate user" action in version 1.0. To stop someone using the r
   - Needs the latest cloud setup script (schema v8): if you see "cloud setup is out of date",
     Disconnect → Connect, run the updated script in the Supabase SQL Editor, then try again.
 - **Delete everything yourself:** you can also delete the whole Supabase project from the
-  Supabase dashboard. Nurledger (the app) never has a copy of your data.
+  Supabase dashboard. NurLedger (the app) never has a copy of your data.
 
 ## Is my data private?
 Yes. Your data lives in **your own Supabase project**, under **your own account**. The
-Nurledger app is just a client that talks to your project. The people who build Nurledger
+NurLedger app is just a client that talks to your project. The people who build NurLedger
 do not have access to your data. You can verify any time by logging into
 <https://supabase.com> and opening your project.
 

@@ -45,7 +45,7 @@ describe('t() interpolation', () => {
   it('substitutes multiple params', () => {
     expect(t('en', 'pin.required', { action: 'Refund' })).toBe('Refund — PIN required');
     expect(t('ms', 'pay.stub', { detail: 'bayar melalui terminal kad luaran' })).toBe(
-      'bayar melalui terminal kad luaran — Nurledger merekodkan pembayaran tetapi tidak memprosesnya.',
+      'bayar melalui terminal kad luaran — NurLedger merekodkan pembayaran tetapi tidak memprosesnya.',
     );
   });
 

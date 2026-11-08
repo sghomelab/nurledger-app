@@ -101,7 +101,7 @@ const en = {
   'pay.due': '{amount} due',
   'pay.chargeTerminal': 'Charge on terminal',
   'pay.mobileWallet': 'Mobile wallet',
-  'pay.stub': '{detail} — Nurledger records the payment but does not process it.',
+  'pay.stub': '{detail} — NurLedger records the payment but does not process it.',
   'pay.cardDetail': 'tender via the external card terminal',
   'pay.mobileDetail': 'confirm the wallet payment at the counter',
   'pay.completeSale': 'Complete sale',
@@ -264,7 +264,7 @@ const en = {
   'cloudsetup.note.noSchema': 'Backend reachable — but the schema is not deployed yet.',
   'cloudsetup.note.upgrade':
     'Backend reachable — it runs schema v{old}, but this app needs v{new}. Run the updated script below (safe to re-run — it never touches existing data).',
-  'cloudsetup.note.deployed': 'Backend reachable and the Nurledger schema is deployed.',
+  'cloudsetup.note.deployed': 'Backend reachable and the NurLedger schema is deployed.',
   'cloudsetup.err.schemaNotDetected':
     'Schema still not detected. Make sure the SQL Editor query finished without errors, then check again.',
   'cloudsetup.err.schemaOld':
@@ -290,7 +290,7 @@ const en = {
   'cloudsetup.copiedMsg': 'SQL bundle copied — paste it into the SQL Editor.',
   'cloudsetup.yourProject': 'Your Supabase project',
   'cloudsetup.yourProjectHint':
-    'BYO cloud: create a FREE Supabase project (supabase.com) and paste its credentials here. Your data lives in YOUR project — Nurledger never operates or accesses it.',
+    'BYO cloud: create a FREE Supabase project (supabase.com) and paste its credentials here. Your data lives in YOUR project — NurLedger never operates or accesses it.',
   'cloudsetup.projectUrl': 'Project URL',
   'cloudsetup.anonKey': 'anon / public key',
   'cloudsetup.ownerEmail': 'Owner email',

@@ -29,7 +29,7 @@ import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens'
  * BYO cloud setup wizard (ADR-010, FR-504/FR-505).
  *
  * The store brings its own (free) Supabase project. The app is a pure client —
- * there is no Nurledger-operated backend and the creator never sees store data.
+ * there is no NurLedger-operated backend and the creator never sees store data.
  *
  *  1. **Connection** — paste the project URL + anon key (NEVER the service_role
  *     key: since schema v7 the app neither asks for nor stores it). Pick "New

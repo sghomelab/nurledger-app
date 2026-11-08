@@ -1,10 +1,10 @@
-# AGENTS.md — Nurledger
+# AGENTS.md — NurLedger
 
-Offline-first POS + inventory for small grocery shops. **Nurlogic.ai.**
+Offline-first POS + inventory for small grocery shops. **by NurLogic — nurlogic.ai**
 
 ## Non-negotiables (from the build prompt)
 
-- App id `com.nurlogic.nurledger`. Display name **Nurledger**.
+- App id `com.nurlogic.nurledger`. Display name **NurLedger**.
 - **Offline-first** — the register must never block on the network. All reads/writes hit local SQLite (`expo-sqlite`); sync is an outbox (M5).
 - **Money = integer minor units + ISO currency. Never float.** (`src/lib/money.ts`)
 - **Immutable stock ledger** (`stock_ledger`) — no UPDATE/DELETE paths, ever. Stock = projection. (ADR-002)

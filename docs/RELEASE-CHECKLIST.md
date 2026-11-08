@@ -1,4 +1,4 @@
-# Nurledger 1.0.0 — Internal-tester release checklist
+# NurLedger 1.0.0 — Internal-tester release checklist
 
 Goal: get 1.0.0 to **internal testers only** (Google Play internal testing + TestFlight internal testers). This is not a public store release; the public-release gates are listed in section 8.
 
@@ -11,7 +11,7 @@ Status line to keep updated: `Last updated: 2026-11-08 · main @ 02287b6 (code s
 - [x] Price: Free, no in-app purchases. Category: Business.
 - [x] First user is in the Philippines. App ships English, Bahasa Melayu, Filipino (Malay and Filipino text are machine-drafted and need native review).
 - [x] Internal testers first; iOS and iPad are **not verified on a device** (no Mac available). Accepted for internal testing.
-- [x] Support contact: **hello@nurlogic.ai**, reply "within 3 working days". Legal entity: **Nurlogic** (Mas to confirm the registered spelling, e.g. "NurLogic" on the site, and use it consistently in policy, support page and consoles).
+- [x] Support contact: **hello@nurlogic.ai**, reply "within 3 working days". Legal entity: **NurLogic** (registered spelling confirmed by Mas 2026-11-08; use it consistently in policy, support page and consoles).
 - [x] PIN model hardened (merged to main 7c4c063, device-verified): switching to a manager/owner, adding one, and changing a PIN all need an owner/manager PIN; "Change PIN…" exists; lost owner PIN = Reset all data on that device (Owner PIN returns to the default 1234).
 - [x] **iPad:** Mas decided to ship iPad support (`ios.supportsTablet` stays `true`). iPad layout is NOT verified on a device (no Mac), accepted for internal testing. iPad screenshots (13" and 11") are required before any App Store review or public release; TestFlight internal testing does not need them.
 
@@ -35,10 +35,10 @@ Status line to keep updated: `Last updated: 2026-11-08 · main @ 02287b6 (code s
 
 Draft text is in `nurledger-privacy-policy-draft.md` (workspace folder). It is a draft and **not legal advice**.
 
-- [ ] Placeholders: entity (Nurlogic) and support email (hello@nurlogic.ai) are filled in the drafts; **effective date** is still Mas's to set.
+- [ ] Placeholders: entity (NurLogic) and support email (hello@nurlogic.ai) are filled in the drafts; **effective date** is still Mas's to set.
 - [ ] Legal owner reviews the policy (including the Philippine Data Privacy Act and Malaysia PDPA questions, and the optional cloud-sync wording).
-- [ ] Publish the Nurledger section at `https://nurlogic.ai/privacy` (the privacy worker must include Nurledger).
-- [ ] Create `https://nurlogic.ai/support` (built on the `nurlogic-ai` branch `claude/website-deploy-a`, not deployed; ships later as "Deploy A2" after legal review, with the Nurledger privacy section and guide claims). The "forgot PIN" answer assumes the PIN-hardening build.
+- [ ] Publish the NurLedger section at `https://nurlogic.ai/privacy` (the privacy worker must include NurLedger).
+- [ ] Create `https://nurlogic.ai/support` (built on the `nurlogic-ai` branch `claude/website-deploy-a`, not deployed; ships later as "Deploy A2" after legal review, with the NurLedger privacy section and guide claims). The "forgot PIN" answer assumes the PIN-hardening build.
 - [ ] Open both URLs on a phone and confirm they load.
 
 ## 4. Store console setup  [Mas]

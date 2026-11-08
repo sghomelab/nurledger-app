@@ -1,4 +1,4 @@
-# PACKAGING — Nurledger (M6, store-submission prep)
+# PACKAGING — NurLedger (M6, store-submission prep)
 
 Status: **prepared, not queued.** No EAS build or store submission has been
 queued for this app; everything below is readiness + the exact runbook for
@@ -8,7 +8,7 @@ when Mas gives the GO. (Red line: "ship/prepare" ≠ build GO.)
 
 | Field | Value |
 |---|---|
-| Display name | Nurledger |
+| Display name | NurLedger |
 | App id / bundle id | `com.nurlogic.nurledger` |
 | Version (first store release) | **1.0.0** (set in app.json for both platforms in one commit; do not change it per platform) |
 | Android versionCode | 2 for 1.0.0 (set in app.json; EAS `autoIncrement` raises it on later builds). Verify from the built artifact |
@@ -67,12 +67,12 @@ auto-versioning. All build profiles set `credentialsSource: "remote"`
    com.nurlogic.nurledger`; `halted` = rejected).
    **UI-only, Mas:** Play Console → app creation + content rating +
    data-safety form + privacy-policy URL (`https://nurlogic.ai/privacy` —
-   add Nurledger to the privacy worker first).
+   add NurLedger to the privacy worker first).
 6. **Apple:** `eas submit --platform ios --path <ipa> --non-interactive` with
    the working ASC key in the eas.json submit config. For a NEW app Mas first
    creates the app in App Store Connect (UI) and provides the `ascAppId`.
    Verify via ASC API + TestFlight — never trust `finished`.
-7. Store listings: app name "Nurledger", short description, description,
+7. Store listings: app name "NurLedger", short description, description,
    keywords, category **Business** (both stores), screenshots (Sell / Inventory / Expiry /
    Insights / Settings, 6.1" portrait).
 
@@ -110,7 +110,7 @@ auto-versioning. All build profiles set `credentialsSource: "remote"`
 - **Offline-first:** all sales/stock live in local SQLite. The network is
   never required for a sale.
 - **BYO cloud (ADR-010):** sync goes to the store's OWN free Supabase
-  project — the vendor (Nurlogic) does not host or access store data. The
+  project — the vendor (NurLogic) does not host or access store data. The
   only remote calls are to the store's own Supabase project (REST + JWT).
   A self-hosted Supabase must be reachable over HTTPS; release builds block
   plain http (only local-development addresses are accepted in debug builds).

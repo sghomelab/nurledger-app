@@ -1,5 +1,5 @@
 /**
- * Nurledger domain types.
+ * NurLedger domain types.
  *
  * Money rule (ADR-004): ALL monetary values are integer minor units
  * (cents/cents-equivalent for the outlet currency). Never floats.

@@ -100,7 +100,7 @@ const ms: Record<keyof EnDict, string> = {
   'pay.due': 'Perlu dibayar {amount}',
   'pay.chargeTerminal': 'Caj melalui terminal',
   'pay.mobileWallet': 'Dompet mudah alih',
-  'pay.stub': '{detail} — Nurledger merekodkan pembayaran tetapi tidak memprosesnya.',
+  'pay.stub': '{detail} — NurLedger merekodkan pembayaran tetapi tidak memprosesnya.',
   'pay.cardDetail': 'bayar melalui terminal kad luaran',
   'pay.mobileDetail': 'sahkan bayaran dompet di kaunter',
   'pay.completeSale': 'Siapkan jualan',
@@ -263,7 +263,7 @@ const ms: Record<keyof EnDict, string> = {
   'cloudsetup.note.noSchema': 'Backend boleh dihubungi — tetapi schema belum dipasang.',
   'cloudsetup.note.upgrade':
     'Backend boleh dihubungi — ia menggunakan schema v{old}, tetapi aplikasi ini memerlukan v{new}. Jalankan skrip yang dikemas kini di bawah (selamat dijalankan semula — ia tidak menyentuh data sedia ada).',
-  'cloudsetup.note.deployed': 'Backend boleh dihubungi dan schema Nurledger telah dipasang.',
+  'cloudsetup.note.deployed': 'Backend boleh dihubungi dan schema NurLedger telah dipasang.',
   'cloudsetup.err.schemaNotDetected':
     'Schema masih tidak dikesan. Pastikan query SQL Editor selesai tanpa ralat, kemudian semak semula.',
   'cloudsetup.err.schemaOld':
@@ -289,7 +289,7 @@ const ms: Record<keyof EnDict, string> = {
   'cloudsetup.copiedMsg': 'Bundel SQL disalin — tampalkannya ke SQL Editor.',
   'cloudsetup.yourProject': 'Projek Supabase anda',
   'cloudsetup.yourProjectHint':
-    'Awan BYO: cipta projek Supabase PERCUMA (supabase.com) dan tampalkan kelayakannya di sini. Data anda berada dalam PROJEK ANDA — Nurledger tidak pernah mengendalikannya atau memaksanya.',
+    'Awan BYO: cipta projek Supabase PERCUMA (supabase.com) dan tampalkan kelayakannya di sini. Data anda berada dalam PROJEK ANDA — NurLedger tidak pernah mengendalikannya atau memaksanya.',
   'cloudsetup.projectUrl': 'URL projek',
   'cloudsetup.anonKey': 'kunci anon / awam',
   'cloudsetup.ownerEmail': 'Emel pemilik',

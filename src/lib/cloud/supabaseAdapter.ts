@@ -2,7 +2,7 @@
  * SupabaseAdapter — the M5 reference CloudAdapter implementation (ADR-010).
  *
  * BYO model: every call uses the STORE's own project (cfg.url + keys). The
- * app is a pure client; nothing here points at a Nurledger-owned backend.
+ * app is a pure client; nothing here points at a NurLedger-owned backend.
  *
  * Session storage is injected (KV shim backed by the local DB) so this module
  * stays free of DB imports — the repository layer supplies the shim.

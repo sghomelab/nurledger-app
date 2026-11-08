@@ -1,6 +1,6 @@
-# Nurledger
+# NurLedger
 
-**Offline-first POS + inventory for small grocery/provision shops — by Nurlogic.ai.**
+**Offline-first POS + inventory for small grocery/provision shops. By NurLogic — nurlogic.ai.**
 
 Every movement flows through an immutable, append-only stock ledger; stock on hand is a
 projection of that ledger. The app runs a full day offline — selling, stock decrement,
@@ -11,7 +11,7 @@ shifts — and syncs opportunistically (M5).
 - **Offline-first, always.** The register must never wait on the network. Every read and
   write hits local SQLite; a full day of selling, stock decrements and shift close works
   with zero connectivity. Sync is an outbox (M5) that drains when it can.
-- **The owner owns the data.** There is no Nurledger backend. Cloud sync is **BYO
+- **The owner owns the data.** There is no NurLedger backend. Cloud sync is **BYO
   Supabase** (ADR-010 / DEV-006): the store points the app at *its own* free Supabase
   project, so the data lives under the owner's account — the vendor never sees it, and
   deleting the project deletes it. Sync is off by default.

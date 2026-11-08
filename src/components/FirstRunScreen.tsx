@@ -49,7 +49,7 @@ export function FirstRunScreen() {
       <View style={styles.card}>
         <View style={styles.brandRow}>
           <Ionicons name="storefront" size={34} color={colors.primary} />
-          <Text style={styles.appName}>Nurledger</Text>
+          <Text style={styles.appName}>NurLedger</Text>
         </View>
         <Text style={styles.title}>{t('firstRun.title')}</Text>
         <Text style={styles.body}>{t('firstRun.body')}</Text>
