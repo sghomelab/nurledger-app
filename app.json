@@ -45,6 +45,17 @@
       ],
       "expo-status-bar",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "router": {
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "3b5ed027-890a-4bb9-8657-0f2a0c166aaa"
+      }
+    },
+    "owner": "sghomelab"
   }
 }
