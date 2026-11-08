@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nurlogic.nurledger",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -23,7 +23,7 @@
       },
       "package": "com.nurlogic.nurledger",
       "allowBackup": false,
-      "versionCode": 2
+      "versionCode": 3
     },
     "web": {
       "bundler": "metro",
