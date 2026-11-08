@@ -4,7 +4,7 @@ Goal: get 1.0.0 to **internal testers only** (Google Play internal testing + Tes
 
 Who does what: **[Mas]** needs a person with console/legal access, **[OpenCode]** is repo/build/device work, **[Both]** is shared. Do not start EAS builds or store actions without Mas's GO (see `docs/PACKAGING.md` §4). Items marked **(verify)** are store-console rules that change over time: check the console's own wording before relying on them.
 
-Status line to keep updated: `Last updated: 2026-11-08 · main @ 02287b6 (audited; a docs-only handoff commit follows as the tip) · state: audited`
+Status line to keep updated: `Last updated: 2026-11-08 · main @ 02287b6 (code state audited; commits after it are docs-only) · state: audited`
 
 ## 0. Decisions already made
 
