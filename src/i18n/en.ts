@@ -572,7 +572,7 @@ const en = {
   'stDetail.applyVariance': 'Apply variance ({net})',
   'shift.noUser': 'No user',
   'shift.lockedBody': 'No shift is open. Open a shift with a starting float to unlock selling. Every sale records the cashier and shift.',
-  'shift.pinNote': 'Owner/manager PINs unlock gated actions (price override, discounts, close shift, store settings). Cashiers don\'t need a PIN.',
+  'shift.pinNote': "Owner/manager PINs unlock gated actions (price override, discounts, close shift, store settings). Switching to an owner or manager, adding one, and changing a PIN also need an owner/manager PIN. Cashiers don't need a PIN.",
   'shift.roleOwner': 'Owner',
   'shift.roleManager': 'Manager',
   'shift.roleCashier': 'Cashier',
@@ -657,6 +657,16 @@ const en = {
   'shiftPrompts.amountHint': '{currency} — major units (e.g. 50.00)',
   'insights.stockoutHint': 'Days of stock left at the {period} velocity.',
   'pin.backspace': 'Delete last digit',
+  'gate.switch_user': 'Switch user',
+  'gate.add_user': 'Add user',
+  'gate.change_pin': 'Change PIN',
+  'shift.changePin': 'Change PIN…',
+  'shift.changePinWho': 'Change whose PIN?',
+  'shift.changePinTitle': 'Change PIN for {name}',
+  'shift.newPin': 'New PIN (4–8 digits)',
+  'shift.pinChanged': 'PIN changed',
+  'shift.changePinFailed': 'Could not change PIN',
+  'shift.pinRequiredForRole': 'Owner and manager users need a PIN of 4–8 digits.',
 } as const;
 
 export default en;

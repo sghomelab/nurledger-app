@@ -265,8 +265,9 @@ all syncs later.
 ## Settings
 
 - **Store** — the shop's name (shown on receipts and reports).
-- **Language** — the app's interface language: **English** or
-  **Bahasa Melayu**. This is a **per-device** choice (each staff member's
+- **Language** — the app's interface language: **English**, **Bahasa Melayu**
+  or **Filipino**. Until you choose one, the app follows your phone's language
+  (and uses English if your language is not supported). This is a **per-device** choice (each staff member's
   tablet can be in a different language) and it does **not** change the shop's
   currency or tax.
 - **Currency** — what you sell in. Pick a preset or any ISO currency code.
@@ -277,8 +278,8 @@ all syncs later.
   exclusive). Nothing is hardcoded to a country — the same app works
   anywhere.
 - **Receipt width** — 58 mm or 80 mm.
-- **Staff** — add cashiers (name, role, PIN). Cashiers sign in on a shared
-  tablet by tapping their name; PIN-gated actions (discounts, price overrides,
+- **Staff** — managed on the **Shift** tab (see *Adding cashiers and managing
+  PINs* below), not in Settings. PIN-gated actions (discounts, price overrides,
   refunds, stocktakes, closing shifts, settings) ask for the manager/owner PIN.
 - **Cloud sync** — see below.
 
@@ -393,16 +394,22 @@ updated stock, products, categories and sales. If two tablets sell the same item
 them correctly — **no sale is counted twice**, and stock stays accurate. A refund made on
 one device appears on the other after it syncs.
 
-## Adding cashiers (staff)
-Staff **don't need a Supabase account.** You (the owner) add them in the app:
-1. **Settings → Staff** (or when opening a shift, pick "Add cashier").
-2. Give the person a **name**, a **role** (e.g. Cashier), and a **PIN**.
-3. On a shared tablet, that person taps their name and enters their PIN to take the register.
+## Adding cashiers and managing PINs
+Staff **don't need a Supabase account.** You (the owner) manage them on the **Shift** tab:
+1. Tap **Switch** (or **Add user**) next to the name at the top of the Shift tab.
+2. **Add user**: give the person a **name**, a **role** (Cashier, Manager or Owner) and, for Manager and Owner, a **PIN** of 4–8 digits (optional for cashiers).
+3. To take the register, tap **Switch** and pick the person.
 
-The PIN is used only on the device (for permissions like discounts, refunds,
-stocktakes and closing a shift).
-The PIN is never sent to Supabase. To remove someone, just deactivate their account — they
-lose access immediately, and their past sales stay in your records.
+**Who needs a PIN for what**
+- Switching to a **Manager** or **Owner**, or **adding** a Manager or Owner, asks for an owner/manager PIN of at least that level. A cashier cannot make themselves an owner. (An owner can switch to anyone and add anyone without being asked.)
+- **Change PIN…** (in the Switch list) asks for an owner/manager PIN every time, then lets you set a new 4–8 digit PIN for the person you pick. Only an owner PIN can change the owner's PIN.
+- Discounts, price overrides, refunds, stocktakes, closing a shift and settings ask for the manager/owner PIN when a cashier is at the register.
+
+**If the owner PIN is lost:** Nurlogic cannot recover it (PINs exist only on the device, as a salted hash, and never go to Supabase). Options: use another owner's PIN if there is one; otherwise **Settings → Reset all data** on this device (this erases local data, so sync to the cloud first if you can, then sign in again afterwards). A fresh install starts with a default Owner PIN, so change it right away in **Change PIN…**.
+
+The PIN is a **local safeguard against mistakes and casual misuse**, not a vault: someone with the unlocked phone and technical skills can get around it. Keep the phone itself secure.
+
+There is no "deactivate user" action in version 1.0. To stop someone using the register, ask them to hand back the device and change the PIN of any manager/owner account they know.
 
 ---
 

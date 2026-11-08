@@ -22,7 +22,10 @@ export type GateAction =
   | 'close_shift' // FR-202 — "manager PIN on close" (prototype)
   | 'store_settings' // outlet currency/tax locale changes
   | 'refund' // FR-110 — refund create (manager PIN, spec FR-501)
-  | 'stocktake_apply'; // FR-304 — apply a counted stocktake (manager PIN, spec FR-501)
+  | 'stocktake_apply' // FR-304 — apply a counted stocktake (manager PIN, spec FR-501)
+  | 'switch_user' // switching UP to a higher-privileged user (owner/manager)
+  | 'add_user' // creating a user with a higher role than the active user
+  | 'change_pin'; // set/reset a user's PIN (always re-authenticated)
 
 export const GATE_ACTION_LABELS: Record<GateAction, string> = {
   discount: 'Discount',
@@ -32,6 +35,9 @@ export const GATE_ACTION_LABELS: Record<GateAction, string> = {
   store_settings: 'Store settings',
   refund: 'Refund',
   stocktake_apply: 'Apply stocktake',
+  switch_user: 'Switch user',
+  add_user: 'Add user',
+  change_pin: 'Change PIN',
 };
 
 /** Owner and Manager pass every M4 gate directly (see header note). */
@@ -52,4 +58,31 @@ export function roleRank(role: UserRole): number {
  */
 export function canUnlock(user: AppUser): boolean {
   return roleCanAct(user.role, 'discount') && user.pinHash !== null;
+}
+
+/**
+ * Minimum unlocker rank needed to switch the register to `target`.
+ * 0 = no PIN needed (switching sideways or down). Switching UP to a
+ * higher-privileged user needs a PIN of at least that rank — otherwise any
+ * cashier could become the owner and bypass every PIN gate.
+ */
+export function switchRankNeeded(active: AppUser | null, target: AppUser): number {
+  const have = active ? roleRank(active.role) : 0;
+  const want = roleRank(target.role);
+  return want > have ? want : 0;
+}
+
+/** Same rule for creating a user: you cannot mint a role above your own without a PIN of that rank. */
+export function addUserRankNeeded(active: AppUser | null, newRole: UserRole): number {
+  const have = active ? roleRank(active.role) : 0;
+  const want = roleRank(newRole);
+  return want > have ? want : 0;
+}
+
+/**
+ * Changing a PIN always re-authenticates: an unlocker (owner/manager PIN) of at
+ * least the target's rank (cashier targets: manager or owner).
+ */
+export function changePinRankNeeded(target: AppUser): number {
+  return Math.max(1, roleRank(target.role));
 }

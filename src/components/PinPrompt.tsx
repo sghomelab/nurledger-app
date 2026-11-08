@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { canUnlock, type GateAction } from '../lib/roles';
+import { canUnlock, roleRank, type GateAction } from '../lib/roles';
 import { pinEntryOutcome, PIN_MAX_LENGTH, PIN_MIN_LENGTH, verifyPin } from '../lib/pin';
 import { useT } from '../hooks/useT';
 import type { MsgKey } from '../i18n';
@@ -14,8 +14,10 @@ interface Props {
   action: GateAction;
   /** The active users; any of them with a matching PIN can unlock. */
   users: AppUser[];
+  /** Only unlockers of at least this rank count (0 = any owner/manager). */
+  minRank?: number;
   /** Fired when a PIN matches an owner/manager user (single-action, session-scoped). */
-  onSuccess: () => void;
+  onSuccess: (unlocker: AppUser) => void;
   onCancel: () => void;
 }
 
@@ -28,6 +30,9 @@ const GATE_KEYS: Record<GateAction, MsgKey> = {
   store_settings: 'gate.store_settings',
   refund: 'gate.refund',
   stocktake_apply: 'gate.stocktake_apply',
+  switch_user: 'gate.switch_user',
+  add_user: 'gate.add_user',
+  change_pin: 'gate.change_pin',
 };
 
 /**
@@ -39,12 +44,15 @@ const GATE_KEYS: Record<GateAction, MsgKey> = {
  * Numeral keypad (not a TextInput) — PIN entry is short, and the keypad keeps
  * the kiosk pattern (no IME to fight, no autocorrect surprises).
  */
-export function PinPrompt({ visible, action, users, onSuccess, onCancel }: Props) {
+export function PinPrompt({ visible, action, users, minRank = 0, onSuccess, onCancel }: Props) {
   const { t } = useT();
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const unlockers = useMemo(() => users.filter((u) => canUnlock(u)), [users]);
+  const unlockers = useMemo(
+    () => users.filter((u) => canUnlock(u) && roleRank(u.role) >= minRank),
+    [users, minRank],
+  );
 
   const press = (d: string) => {
     setError(null);
@@ -60,8 +68,9 @@ export function PinPrompt({ visible, action, users, onSuccess, onCancel }: Props
       (candidate) => unlockers.some((u) => verifyPin(u.pinHash, candidate)),
     );
     if (outcome.kind === 'matched') {
+      const unlocker = unlockers.find((u) => verifyPin(u.pinHash, next));
       setPin('');
-      onSuccess();
+      if (unlocker) onSuccess(unlocker);
     } else if (outcome.kind === 'definite-failure') {
       setError(t('pin.wrong'));
       setPin('');

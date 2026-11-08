@@ -11,6 +11,7 @@ import {
   listActiveUsers,
   setActiveUser,
   createUser,
+  setUserPin,
 } from '../repositories/userRepository';
 import {
   addCashMove as repoAddCashMove,
@@ -64,6 +65,7 @@ export interface UseUsers {
   reload: () => Promise<void>;
   switchUser: (id: string) => Promise<void>;
   addUser: (name: string, role: UserRole, pin?: string | null) => Promise<AppUser>;
+  changePin: (id: string, pin: string) => Promise<void>;
 }
 
 export function useUsers(): UseUsers {
@@ -99,7 +101,15 @@ export function useUsers(): UseUsers {
     [reload],
   );
 
-  return { users, active, reload, switchUser, addUser };
+  const changePin = useCallback(
+    async (id: string, pin: string) => {
+      await setUserPin(id, pin);
+      await reload();
+    },
+    [reload],
+  );
+
+  return { users, active, reload, switchUser, addUser, changePin };
 }
 
 export interface UseShift {

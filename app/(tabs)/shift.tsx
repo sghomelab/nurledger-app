@@ -17,7 +17,9 @@ import { useShift, useUsers } from '../../src/hooks/useShift';
 import { getDeviceId, type Shift } from '../../src/repositories/shiftRepository';
 import { taxEngineLabel } from '../../src/lib/currency';
 import { formatMoney } from '../../src/lib/money';
-import { roleCanAct, type GateAction } from '../../src/lib/roles';
+import { addUserRankNeeded, changePinRankNeeded, roleCanAct, switchRankNeeded, type GateAction } from '../../src/lib/roles';
+import { isValidPin } from '../../src/lib/pin';
+import type { AppUser } from '../../src/types';
 import type { XReport, ZReport } from '../../src/lib/shift';
 import type { UserRole } from '../../src/types';
 import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
@@ -53,7 +55,7 @@ export default function ShiftTab() {
   const { t } = useT();
   const router = useRouter();
   const { outlet } = useOutlet();
-  const { users, active, switchUser, addUser } = useUsers();
+  const { users, active, switchUser, addUser, changePin } = useUsers();
   const { open, snapshot, history, openShift, addCashMove, closeShift, xReport } = useShift();
 
   const [userSheet, setUserSheet] = useState(false);
@@ -62,6 +64,10 @@ export default function ShiftTab() {
   const [cashMove, setCashMove] = useState<{ type: 'in' | 'out' } | null>(null);
   const [closeVisible, setCloseVisible] = useState(false);
   const [gate, setGate] = useState<GateAction | null>(null);
+  // Re-authentication gate for user management (switch up / add privileged / change PIN).
+  const [userGate, setUserGate] = useState<{ action: GateAction; minRank: number; run: () => void } | null>(null);
+  const [pinPicker, setPinPicker] = useState(false);
+  const [pinTarget, setPinTarget] = useState<AppUser | null>(null);
   const [report, setReport] = useState<ZReport | XReport | null>(null);
   const [newUser, setNewUser] = useState({ name: '', role: 'cashier' as UserRole, pin: '' });
 
@@ -133,25 +139,70 @@ export default function ShiftTab() {
 
   const doSwitchUser = useCallback(
     async (id: string) => {
-      try {
-        await switchUser(id);
+      const target = (users ?? []).find((u) => u.id === id);
+      if (!target) return;
+      const perform = async () => {
+        try {
+          await switchUser(id);
+          setUserSheet(false);
+        } catch (e) {
+          Alert.alert(t('shift.switchFailed'), errMsg(e));
+        }
+      };
+      // Switching UP (e.g. cashier -> owner) needs that role's PIN, or any
+      // cashier could become the owner and bypass every PIN gate.
+      const need = switchRankNeeded(active, target);
+      if (need > 0) {
         setUserSheet(false);
-      } catch (e) {
-        Alert.alert(t('shift.switchFailed'), errMsg(e));
+        setUserGate({ action: 'switch_user', minRank: need, run: () => void perform() });
+        return;
       }
+      await perform();
     },
-    [switchUser],
+    [switchUser, users, active, t],
   );
 
   const doAddUser = useCallback(async () => {
-    try {
-      await addUser(newUser.name, newUser.role, newUser.pin || null);
-      setNewUser({ name: '', role: 'cashier', pin: '' });
-      setAddUserVisible(false);
-    } catch (e) {
-      Alert.alert(t('shift.addUserFailed'), errMsg(e));
+    const pin = newUser.pin;
+    if (newUser.role !== 'cashier' && !isValidPin(pin)) {
+      Alert.alert(t('shift.addUserFailed'), t('shift.pinRequiredForRole'));
+      return;
     }
-  }, [newUser, addUser]);
+    const perform = async () => {
+      try {
+        await addUser(newUser.name, newUser.role, pin || null);
+        setNewUser({ name: '', role: 'cashier', pin: '' });
+        setAddUserVisible(false);
+      } catch (e) {
+        Alert.alert(t('shift.addUserFailed'), errMsg(e));
+      }
+    };
+    const need = addUserRankNeeded(active, newUser.role);
+    if (need > 0) {
+      setUserGate({ action: 'add_user', minRank: need, run: () => void perform() });
+      return;
+    }
+    await perform();
+  }, [newUser, addUser, active, t]);
+
+  const startChangePin = useCallback((target: AppUser) => {
+    setPinPicker(false);
+    setUserGate({ action: 'change_pin', minRank: changePinRankNeeded(target), run: () => setPinTarget(target) });
+  }, []);
+
+  const doChangePin = useCallback(
+    async (pin: string) => {
+      if (!pinTarget) return;
+      try {
+        await changePin(pinTarget.id, pin);
+        setPinTarget(null);
+        Alert.alert(t('shift.pinChanged'));
+      } catch (e) {
+        Alert.alert(t('shift.changePinFailed'), errMsg(e));
+      }
+    },
+    [pinTarget, changePin, t],
+  );
 
   return (
     <ScrollView contentContainerStyle={[styles.content, wideColumn]}>
@@ -283,8 +334,39 @@ export default function ShiftTab() {
               onPress: () => void doSwitchUser(u.id),
             })),
             { key: '__add', label: '+ Add user', sublabel: '', onPress: () => { setUserSheet(false); setAddUserVisible(true); } },
+            { key: '__pin', label: t('shift.changePin'), sublabel: '', onPress: () => { setUserSheet(false); setPinPicker(true); } },
           ]}
           onClose={() => setUserSheet(false)}
+        />
+      )}
+
+      {pinPicker && (
+        <PickerOverlay
+          title={t('shift.changePinWho')}
+          rows={(users ?? []).map((u) => ({
+            key: u.id,
+            label: u.name,
+            sublabel: t(ROLE_KEY[u.role]),
+            onPress: () => startChangePin(u),
+          }))}
+          onClose={() => setPinPicker(false)}
+        />
+      )}
+
+      {pinTarget && <SetPinSheet name={pinTarget.name} onSave={(p) => void doChangePin(p)} onCancel={() => setPinTarget(null)} />}
+
+      {userGate && (
+        <PinPrompt
+          visible
+          action={userGate.action}
+          users={users ?? []}
+          minRank={userGate.minRank}
+          onSuccess={() => {
+            const run = userGate.run;
+            setUserGate(null);
+            run();
+          }}
+          onCancel={() => setUserGate(null)}
         />
       )}
 
@@ -397,6 +479,41 @@ function HistoryRow({ shift, currency, onOpen }: { shift: Shift; currency: strin
       </View>
       <Ionicons name="chevron-forward" size={18} color={colors.slate300} />
     </Pressable>
+  );
+}
+
+function SetPinSheet({ name, onSave, onCancel }: { name: string; onSave: (pin: string) => void; onCancel: () => void }) {
+  const { t } = useT();
+  const [pin, setPin] = useState('');
+  const ok = isValidPin(pin);
+  return (
+    <Modal visible animationType="slide" onRequestClose={onCancel}>
+      <Pressable style={styles.sheetBackdrop} onPress={onCancel}>
+        <Pressable style={styles.sheetBody} onPress={() => {}}>
+          <View style={styles.addForm}>
+            <Text style={styles.addTitle}>{t('shift.changePinTitle', { name })}</Text>
+            <TextInput
+              value={pin}
+              onChangeText={(v) => setPin(v.replace(/\D/g, '').slice(0, 8))}
+              placeholder={t('shift.newPin')}
+              placeholderTextColor={colors.slate400}
+              keyboardType="number-pad"
+              secureTextEntry
+              autoFocus
+              style={styles.inlineInput}
+            />
+            <View style={styles.buttons}>
+              <Pressable style={styles.cancelBtn} onPress={onCancel}>
+                <Text style={styles.cancelText}>{t('common.cancel')}</Text>
+              </Pressable>
+              <Pressable style={[styles.saveBtn, !ok && { opacity: 0.45 }]} onPress={() => onSave(pin)} disabled={!ok}>
+                <Text style={styles.saveText}>{t('common.save')}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 

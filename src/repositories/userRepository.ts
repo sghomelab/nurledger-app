@@ -96,3 +96,12 @@ export async function createUser(input: CreateUserInput): Promise<AppUser> {
   if (!user) throw new Error('User vanished after insert (should be impossible)');
   return user;
 }
+
+/** Set or replace a user's PIN (hashed, salted). Callers must have re-authenticated (GateAction 'change_pin'). */
+export async function setUserPin(id: string, pin: string): Promise<void> {
+  if (!isValidPin(pin)) throw new Error('PIN must be 4–8 digits');
+  const user = await getUser(id);
+  if (!user || !user.active) throw new Error('Unknown or inactive user');
+  const db = await getDb();
+  await db.runAsync('UPDATE app_user SET pin_hash = ? WHERE id = ?', [createPinHash(pin), id]);
+}
