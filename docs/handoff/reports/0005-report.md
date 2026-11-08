@@ -132,3 +132,57 @@ Anchor safety: USER-GUIDE TOC link `[Why Nurledger…](#why-nurledger-works-the-
 5. **Part B gates** (from task): tsc 0; jest both TZs; test:strict 0 skipped; `git grep "Nurledger"` shows only the intended leftovers (historical docs + lowercase identifiers) with an explanation list; device check of launcher label + first-run text + receipt + PIN prompt in all 3 languages on the `cs-test` AVD.
 
 **Nothing has been changed by this audit.** Awaiting Mas's "APPLY RENAME".
+
+---
+
+## Part B — Execution results (2026-11-08, commit `5101373`, pushed to main)
+
+Mas's decisions applied as given: (1) living docs only, historical records + handoff files byte-exact; (2) all-caps NURLEDGER left in receipt outlet fallback (`index.tsx:479`) + Supabase schema banner; (3) company line → "by NurLogic — nurlogic.ai"; (4) website rename on a separate branch (see Part C below).
+
+### Changes (14 files, 55/55)
+
+- `src/components/FirstRunScreen.tsx:52` — app-name heading
+- `src/i18n/{en,ms,fil}.ts` — 3 keys × 3 langs: `pay.stub`, `cloudsetup.note.deployed`, `cloudsetup.yourProjectHint`
+- `src/__tests__/i18n.test.ts` — ms assertion for `pay.stub`
+- 3 code comments: `app/cloud-setup.tsx:32`, `src/lib/cloud/supabaseAdapter.ts:5`, `src/types/index.ts:2`
+- Living docs: README, AGENTS.md, CLAUDE.md, docs/USER-GUIDE.md (23), docs/PACKAGING.md (4), docs/RELEASE-CHECKLIST.md (4) + company lines; checklist entity line now records Mas-confirmed spelling "NurLogic"
+- Bundle id, slug, scheme, paths, DB/seed namespaces, Supabase function names, lowercase identifiers: **unchanged**
+
+### Gates — all PASS
+
+| Gate | Result |
+|---|---|
+| `npx tsc --noEmit` | 0 errors |
+| `npx jest` (default TZ) | 490 passed, 54 skipped (node:sqlite needs Node ≥22.5) |
+| `npx jest` (TZ=America/Los_Angeles) | 490 passed, 54 skipped |
+| `npm run test:strict` (Node 22.23.3) | 544/544, **0 skipped** |
+| `git grep "Nurledger"` leftovers | only intended: historical docs (CODE-REVIEW, FR-COVERAGE, MILESTONE-REPORTS, SPEC-DEVIATION, SYNC-DESIGN, TABLET), docs/handoff/* (gate phrases "GO BUILD NURLEDGER"/"LEGAL SIGNED OFF NURLEDGER" intact), this report (quotes old strings as audit evidence) |
+
+### Device check — cs-test AVD (emulator-5554), debug build from `5101373`
+
+| Item | Result |
+|---|---|
+| Launcher label | `aapt2 dump badging` → `application-label:'NurLedger'` ✅ (also visible on home screen) |
+| First-run screen | "NurLedger" heading + "Set up your store" ✅ |
+| Receipt / pay.stub footer — EN | "tender via the external card terminal — **NurLedger** records the payment but does not process it." ✅ |
+| pay.stub — MS | "bayar melalui terminal kad luaran — **NurLedger** merekodkan pembayaran tetapi tidak memprosesnya." ✅ |
+| pay.stub — FIL | "magbayad sa panlabas na card terminal — **Itinatala ng NurLedger** ang bayad pero hindi nito pino-proseso." ✅ |
+| PIN prompt — EN | "Change PIN — PIN required" / "Enter the owner/manager PIN to continue (min 4 digits)." ✅ |
+| PIN prompt — MS | "Tukar PIN — PIN diperlukan" / "Masukkan PIN pemilik/urus tadbir untuk meneruskan (min. 4 digit)." ✅ |
+| PIN prompt — FIL | "Palitan ang PIN — kailangan ang PIN" / "Ilagay ang PIN ng may-ari/manager para magpatuloy (min. 4 digit)." ✅ |
+
+Native note: `android/` + `ios/` are untracked/gitignored (0 tracked files) — EAS store builds prebuild from `app.json`, so the store label comes from `app.json name: "NurLedger"` (fe8a47d). Local native dirs were re-synced via `npx expo prebuild --no-install` for this check (strings.xml + Info.plist CFBundleDisplayName = NurLedger).
+
+AVD restored after check (app uninstalled, Metro 8187 stopped).
+
+### Part C — Website rename (nurlogic-ai)
+
+Branch `claude/website-rename-nurledger` from main @ `5817aa0`:
+
+- `landing/privacy-worker.js` — 43 replacements (worker-served /support, /privacy, guide HTML constants)
+- `landing/nurledger-guide.html` — 27 replacements; **worker constant `NURLEDGER_GUIDE_HTML` re-synced byte-for-byte** (verified programmatically; `CONSCIOUS_SPENDING_GUIDE_HTML` untouched)
+- `landing/index.html` — landing card h3
+- Verified: ESM syntax OK; node smoke test of worker routes `/`, `/support`, `/privacy`, `/nurledger-guide`, `/conscious-spending-guide` → all 200, **0** old "Nurledger" occurrences, expected "NurLedger" counts
+- Out-of-section-11 notes: 2–3 privacy-body mentions outside section 11 (~lines 1103/1125/1162) were renamed for consistency — flagged in the diff review for Mas to veto
+- Lowercase company "Nurlogic" left untouched (app display-name rename only)
+- **Status: diff + changed-sentence list presented; deploy awaiting Mas's GO** (no wrangler deploy run)
