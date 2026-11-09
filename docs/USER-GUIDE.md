@@ -383,11 +383,16 @@ time you turn it back on.
 ---
 
 ## Adding more devices (a second tablet or phone)
-1. Install NurLedger on the second device.
-2. On the second device: **Settings → Cloud sync → Connect your store**.
-3. Paste the **same** three details from your Supabase project (Step 3).
-4. Sign in with the **same owner email + password** from Step 5.
-5. Turn **Sync** **On**.
+Each device signs in with its **own** account and **joins** the owner's store with an
+invite code — so one person logging out never signs anyone else out.
+
+1. **Owner:** on the first device, go to **Settings → Cloud sync → Invite a device**.
+   NurLedger shows an invite code — it is valid for 24 hours and works once.
+2. **Second device:** install NurLedger, then **Settings → Cloud sync → Connect your store**.
+3. Paste the **same two** project details (Project URL + anon key) from Step 3.
+4. Choose **Join with invite code** and enter the code the owner shared.
+5. Create a login with **your own email + password** (each device has its own account).
+6. Turn **Sync** **On**.
 
 Both devices now share the same shop: sell on one, and after it syncs, the other sees the
 updated stock, products, categories and sales. If two tablets sell the same item offline and both sync, NurLedger combines
