@@ -66,7 +66,8 @@ Reproducible on the production build. This is a money-amount input bug (affects 
 
 ## Submit to internal tracks (step 5)
 
-### Android — BLOCKED at first upload (verified: the app record does not exist)
+### Android — LIVE on the internal track (was blocked at first upload; resolved 2026-11-09)
+**RESOLVED:** Mas created the app `com.nurlogic.nurledger` in Play Console and granted the shared service account. `eas submit --platform android --path /tmp/opencode/nurledger-artifacts/nurledger.aab --non-interactive` → **Release track: internal, status COMPLETED**. Verified via the Play API (`tools/play_check.py`): `internal → release 1.0.0, versionCodes=['3'], status=completed` (not halted). The block below is the history of why the first submit failed.
 - `eas submit --platform android --path nurledger.aab --non-interactive` scheduled correctly to **Release track: internal**, but failed:
   > "Google Play cannot find the app. Check the package name and upload the first version manually in Play Console."
 - `tools/play_check.py com.nurlogic.nurledger` → **`404 Package not found: com.nurlogic.nurledger`**.
@@ -101,8 +102,8 @@ Reproducible on the production build. This is a money-amount input bug (affects 
 
 *(The 6 prior console items — pricing, category, screenshots, app-privacy, review contact, demo-account — are all done; submission is complete and WAITING_FOR_REVIEW.)*
 
-**Android (Play Console) — one-time app creation:**
-Create app `com.nurlogic.nurledger` (name "NurLedger: Offline POS & Stock"), then grant the service account `play-store-uploads@ai-agent-497901.iam.gserviceaccount.com` access. Then I land `/tmp/opencode/nurledger-artifacts/nurledger.aab` on the internal track via `eas submit` and verify with `tools/play_check.py` (`halted` = rejected). No further manual uploads needed for future versions.
+**Android (Play Console) — app is on the internal track; only testers left:**
+Mas created the app + granted the SA; I landed `1.0.0 / vc3` on the **internal** track (verified `status=completed`). **Mas:** in Play Console → Testing → Internal testing → add the tester email addresses (they must be Google accounts) → send them the opt-in URL. No further manual uploads needed for future versions (`eas submit` works now).
 
 **Testers** — once both are on internal tracks, send the invite links + the **§7 briefing text** (checklist section 7).
 
