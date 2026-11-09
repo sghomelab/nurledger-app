@@ -4,7 +4,7 @@ Goal: get 1.0.0 to **internal testers only** (Google Play internal testing + Tes
 
 Who does what: **[Mas]** needs a person with console/legal access, **[OpenCode]** is repo/build/device work, **[Both]** is shared. Do not start EAS builds or store actions without Mas's GO (see `docs/PACKAGING.md` §4). Items marked **(verify)** are store-console rules that change over time: check the console's own wording before relying on them.
 
-Status line to keep updated: `Last updated: 2026-11-09 · main @ 0957853 (app.json synced to build 3/3) · builds 1.0.0/3 finished from f40d0ce; Android BLOCKED at Play first-upload (app not in Play Console yet); iOS build 3 VALID + attached to version 1.0.0 (internal TF group = Mas in console; App Store review submission blocked by missing listing §4/§8) — see docs/handoff/reports/0003-report.md`
+Status line to keep updated: `Last updated: 2026-11-09 · iOS 1.0.0 (build 3) SUBMITTED FOR REVIEW — appStoreState WAITING_FOR_REVIEW (screenshots captured on exact-res AVDs + uploaded via ASC API: iPhone 1290×2796, iPad 13" 2064×2752); Android still BLOCKED at Play first-upload (app not in Play Console yet) — see docs/handoff/reports/0003-report.md`
 
 ## 0. Decisions already made
 
@@ -13,7 +13,7 @@ Status line to keep updated: `Last updated: 2026-11-09 · main @ 0957853 (app.js
 - [x] Internal testers first; iOS and iPad are **not verified on a device** (no Mac available). Accepted for internal testing.
 - [x] Support contact: **hello@nurlogic.ai**, reply "within 3 working days". Legal entity: **NurLogic** (registered spelling confirmed by Mas 2026-11-08; use it consistently in policy, support page and consoles).
 - [x] PIN model hardened (merged to main 7c4c063, device-verified): switching to a manager/owner, adding one, and changing a PIN all need an owner/manager PIN; "Change PIN…" exists; lost owner PIN = Reset all data on that device (Owner PIN returns to the default 1234).
-- [x] **iPad:** Mas decided to ship iPad support (`ios.supportsTablet` stays `true`). iPad layout is NOT verified on a device (no Mac), accepted for internal testing. iPad screenshots (13" and 11") are required before any App Store review or public release; TestFlight internal testing does not need them.
+- [x] **iPad:** Mas decided to ship iPad support (`ios.supportsTablet` stays `true`). iPad layout is NOT verified on a device (no Mac), accepted for internal testing. iPad 13" screenshot (2064×2752) captured on an exact-res AVD and uploaded — required slot for the App Store review, now satisfied.
 
 ## 1. Code and docs are ready  [OpenCode]
 
@@ -70,7 +70,7 @@ Both
 ## 6. Submit to internal tracks  [OpenCode submits, Mas confirms]
 
 - [ ] Android: `eas submit --platform android --path <aab> --non-interactive`. Confirm the build appears under internal testing and is not halted/rejected (`tools/play_check.py com.nurlogic.nurledger`, `halted` = rejected). Never trust "finished" alone. — **⛔ BLOCKED 2026-11-09:** submit scheduled correctly to the `internal` track, but failed: "Google Play cannot find the app… upload the first version manually in Play Console." Verified the app record does not exist: 9 package-name variants probed against the Play API, all `404 Package not found`; the Play API has no create-app endpoint (same one-time console step Rutini/Conscious Spending needed at first release). **[Mas]:** create the app (§4) + grant the SA access → then `eas submit` lands `/tmp/opencode/nurledger-artifacts/nurledger.aab` (1.0.0 / versionCode 3) on internal.
-- [ ] iOS: `eas submit --platform ios --path <ipa> --non-interactive`. Wait for processing, answer export compliance if asked (the app declares `ITSAppUsesNonExemptEncryption = false`), assign the build to the internal group. Check App Store Connect/TestFlight, not just the CLI. — **⏳ PARTIAL 2026-11-09:** binary uploaded (exit 0); **build 3 = VALID** in ASC; placeholder version renamed to **1.0.0** and build attached (manual REST). **All ASC API-settable metadata DONE** (description, keywords, subtitle, privacy/support URLs, copyright, content-rights, age rating → 4+). App Store review submission ("make it live") blocked by exactly **6 console-only items**: pricing Free · primary category Business · screenshots (iPhone 6.9" + iPad 13") · app-privacy data-usage answers · review contact name/phone (+63) · demo-account flag. When clear → one-pass API submit (submission shell `80d76d18-…` ready) → WAITING_FOR_REVIEW. **Internal TestFlight needs no review submission — [Mas]: add build 3 (1.0.0) to the internal TestFlight group in the console.**
+- [x] iOS: **SUBMITTED FOR REVIEW 2026-11-09 — `appStoreState = WAITING_FOR_REVIEW`.** Binary uploaded (build 3 = VALID); version renamed to **1.0.0** + build attached (manual REST); **all ASC API-settable metadata DONE** (description, keywords, subtitle, privacy/support URLs, copyright, content-rights, age rating → 4+). The 6 console blockers (pricing Free · primary category Business · screenshots · app-privacy answers · review contact · demo-account flag) were cleared (Mas did the console items). **Screenshots captured on exact-res AVDs from the production universal APK** (RN UI is platform-identical): **iPhone 1290×2796** (sell + insights + inventory) via set type `APP_IPHONE_67`, and **iPad 13" 2064×2752** (sell + inventory) via set type `APP_IPAD_PRO_3GEN_129` — the `IPAD_13_PROFILE` required slot. Status bar cropped, gesture pill erased, edge-sampled bg padding. Uploaded via ASC API (reserve → PUT → commit MD5 → poll COMPLETE). Submission: `POST /reviewSubmissionItems` → `PATCH submitted:true` → verified **WAITING_FOR_REVIEW** (build 3 VALID, not expired). **Remaining for Mas:** (1) add build 3 to the **internal TestFlight group** in the console (independent — needs no review submission); (2) watch App Store Connect for Apple's review decision; (3) if rejected, reply in the Resolution Center web UI.
 - [ ] Testers receive the link / TestFlight invite and can install. (pending both platforms landing on their internal tracks)
 
 ## 7. Brief the testers  [Mas]
@@ -92,7 +92,7 @@ Do not move to closed/open testing or production until these are done:
 - [ ] iPad/iOS device checks (Keychain after reboot, privacy manifest in the IPA, ATS) or iOS dropped from the release.
 - [ ] Native-speaker review of Malay and Filipino text and store listings.
 - [ ] Legal sign-off on the privacy policy, Data-safety/App-privacy answers, and any Philippines-specific wording (BIR/accountant confirmation for local use).
-- [ ] Store listing finished: description, keywords, screenshots (phone, Android tablet; iPad only if iPad is supported), feature graphic, "What's new". Claims must match `nurledger-store-listing.md` ("Do NOT claim" list).
+- [ ] Store listing finished: description, keywords, screenshots (phone, Android tablet; iPad only if iPad is supported), feature graphic, "What's new". Claims must match `nurledger-store-listing.md` ("Do NOT claim" list). — **iOS screenshots DONE** (iPhone 1290×2796 + iPad 13" 2064×2752 uploaded 2026-11-09); Android tablet/phone screenshots + feature graphic still pending (blocked on Play app creation).
 - [ ] Real-device failure paths on a real iPhone and real Android (rejected uploads, session expiry, airplane mode).
 - [ ] Support process in place: who answers the support email and how fast.
 - [ ] Tester feedback triaged; blocking bugs fixed in a new version.
@@ -112,5 +112,5 @@ Do not move to closed/open testing or production until these are done:
 | Section 3 (policy and support pages live) | Mas / legal | |
 | Section 4 (consoles ready) | Mas | |
 | Section 5 (builds verified) | OpenCode | 2026-11-09 (1.0.0/3 both platforms; smoke + anomaly in 0003-report) |
-| Section 6 (internal tracks live) | OpenCode / Mas | |
+| Section 6 (internal tracks live) | OpenCode / Mas | iOS 2026-11-09: 1.0.0/build 3 **SUBMITTED FOR REVIEW** (WAITING_FOR_REVIEW); internal TF group = Mas in console. Android: ⛔ blocked on Play app creation. |
 | Section 7 (testers briefed) | Mas | |
