@@ -227,4 +227,4 @@ master, FR-314 CSV import/export, FR-320 margin-compression UI.
       resolutions in SPEC-DEVIATION)
 - [x] MILESTONE-REPORTS M6 (matrix + bugs + live outputs) (2026-10-31)
 - [x] README M6 row (2026-10-31)
-- [ ] tsc 0 + jest green + device-verified → single commit → tag m6 → push
+- [x] tsc 0 + jest green + device-verified → single commit → tag m6 → push

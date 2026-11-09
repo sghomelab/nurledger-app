@@ -816,3 +816,68 @@ independently from the pulled device DB)
 - Locale labels ("PayNow QR"), amount-desc ordering, and period switching
   verified on screen; the surrounding KPI cards still show the CR-09
   figures (net 28.96 today / 59.24 all-time, COGS 25.35) — no regression.
+
+## 1.0.0 — Release (2026-11-09)
+
+First store release of the app. Built, verified, smoke-tested, submitted to
+both stores. Full execution detail: `docs/handoff/reports/0003-report.md`;
+release notes + store states: `docs/RELEASE-NOTES.md`.
+
+### Provenance
+
+| | |
+|---|---|
+| Commit | `f40d0ce` (both platforms, same commit) |
+| EAS builds | `5d5508e7-e84d-4577-83f8-2f586987ad85` (Android) / `0c0adea6-b985-4bfc-9608-e9275d96c845` (iOS) |
+| Actual numbers | **1.0.0 / versionCode 3 / buildNumber 3** (configured 2 → EAS autoIncrement → 3; verified from the AAB manifest + IPA `Info.plist`, not the CLI) |
+| app.json sync | `0957853` |
+| Gates | tsc 0 errors; jest 544/544; production-AAB smoke test (below) |
+
+### Smoke summary (production AAB on cs-test AVD)
+
+Full register day on the real release binary: first run + sample data → open
+shift → sell (SGD 8.50, 9% GST incl, FIFO margin 54%) → tender change →
+refund (restock 21→22, reason sheet) → PIN gates (progressive 4–8 matching,
+CR-15) → Insights consistency → **offline sale with wifi+data disabled** →
+X-report → close shift + Z-report (variance 0.00 Exact) → language
+(EN/BM/Fil all present). All pass.
+
+### ⚠️ Anomaly found (reported, not patched — KNOW-1)
+
+The shift **opening-float** numeric field puts the cursor at index 0 (before
+the initial "0" of "0.00"), so typed digits **prepend**: typed `100` stored
+`1,000.00` (persisted on the shift card). Reproducible on the production
+build; state-dependent (the close-shift counted-cash field behaved correctly
+in one pass). Money-amount input bug — shipped open with disclosure
+(`RELEASE-NOTES.md` → Known issues); fix + full numeric-field audit committed
+to 1.0.1 (`TODO.md`).
+
+### Store submissions
+
+- **Android (vc3):** internal track first (`status=completed`, Play API),
+  then store presence completed via Play API (title/short/full description,
+  icon, feature graphic, 3 phone screenshots), privacy policy + website +
+  445-char release notes set in the console, Mas clicked "Start rollout to
+  production" (the first production publish on a draft app is console-only —
+  the Play API refuses it). Verified `production → 1.0.0, vc3,
+  status=completed`. In Google's first-release review; becomes Available when
+  it clears. The app is now "activated" — all future releases
+  API-automatable.
+- **iOS (build 3):** `eas submit --path` → binary VALID in ASC (build id
+  `7ae4d0ee-1837-49f0-b9fb-cfa91f52d9ea`); manual ASC REST recipe (the
+  placeholder version "1.0" renamed to 1.0.0 + build attached); all
+  API-reachable metadata set + re-read; six console-only blockers cleared by
+  Mas (pricing Free, category Business, app-privacy answers, review contact,
+  demo account, screenshots — the latter uploaded via API from
+  exact-resolution AVD captures: iPhone 1290×2796 `APP_IPHONE_67` ×3, iPad
+  13″ 2064×2752 `APP_IPAD_PRO_3GEN_129` ×2). Submitted → verified
+  **`WAITING_FOR_REVIEW`**. Awaits Apple's review; if rejected → Resolution
+  Center reply (web UI) then API resubmit.
+
+### Not tested before submission (stated)
+
+Real iPad/iPhone device checks (store screenshots came from exact-resolution
+Android AVDs); cloud wizard on a **hosted** Supabase project (verified only
+against a local instance); release-build hygiene re-run (config unchanged
+since the prior clean 1.0.0 APK pass). All remain §8 widening gates
+(`TODO.md`).

@@ -433,10 +433,22 @@ There is no "deactivate user" action in version 1.0. To stop someone using the r
   Supabase dashboard. NurLedger (the app) never has a copy of your data.
 
 ## Is my data private?
-Yes. Your data lives in **your own Supabase project**, under **your own account**. The
-NurLedger app is just a client that talks to your project. The people who build NurLedger
-do not have access to your data. You can verify any time by logging into
-<https://supabase.com> and opening your project.
+Yes. Everything is stored on your device first. Cloud sync is optional: when you turn it
+on, your data lives in **your own Supabase project**, under **your own account** — the
+app sends it only to that project, over HTTPS. The NurLedger app is just a client that
+talks to your project. The people who build NurLedger do not have access to your data.
+You can verify any time by logging into <https://supabase.com> and opening your project.
+
+NurLedger has **no ads, no analytics and no tracking**, and NurLogic does not collect
+your business data. Payments are **recorded, not processed**: the app notes how a
+customer paid (cash, card, e-wallet, QR) but does not process or move money. And
+NurLedger is **not a registered receipting or e-invoicing system** (for example, it is
+not BIR-registered in the Philippines) — it applies your tax settings and shows a
+receipt you can share; check your local requirements with your accountant or tax
+authority.
+
+Need help? See the [NurLedger support page](https://nurlogic.ai/support) or email
+<hello@nurlogic.ai> (we aim to reply within 3 working days).
 
 ## Troubleshooting
 | Problem | What to do |

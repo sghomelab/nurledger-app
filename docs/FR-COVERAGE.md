@@ -48,7 +48,7 @@ is persisted (NFR-3) and `completeSale` is one atomic transaction (FIFO consume 
 | FR-100 | Camera scan (MLKit/`expo-camera`) | 🔜 v2 | camera stub in `index.tsx` (DEV-004; deferred past M6 — no special permissions in the release build; keyboard-wedge + manual entry cover scanning) |
 | FR-103 | Weighed items (weight × unit price) | 🔜 M5 | `CartLine.qty` is base units; weighed grams path in M5 (DEV-004) |
 | FR-104 | Embedded-weight EAN-13 parse (per-locale BarcodeParser) | 🔜 M5 | engine lands in M5 (DEV-004) |
-| FR-106 | Held / parked orders | 🔜 M3 | `current_order` is single-active today; parking in M3 |
+| FR-106 | Held / parked orders | 🔜 v2 | `current_order` is single-active today; **decision at the 1.0.0 release (2026-11-09): parked for v2** — schema exists, no UI was ever built; see `REQUIREMENTS.md` + `RELEASE-NOTES.md` |
 
 **Cart persistence + kill test (NFR-3):** ✅ schema v2 (`current_order`/`current_order_line`) + v1→v2
 migration (`database.ts`); `useCart` persists every mutation; `completeSale` clears the cart in the
@@ -236,7 +236,7 @@ schema-ready, no v1 UI (S1 scope).
 | — | Category sync (cloud schema v3) — the R2 fix | ✅ | Categories are now a synced entity: BYO bundle v3 (`category` table + RLS + idempotent `apply_category` LWW RPC — **deliberately NO UNIQUE(outlet_id,name)**: same-name/different-id duplicates remap on pull, never stall the FIFO drain), `SyncEntity` += `category`, enqueue-at-write (`createCategory` + CSV auto-create), `buildCategoryPayload` (op_id = category.id), `backfillCategoriesOnce` (flag `cloud.backfill_v3` — seed/CSV categories predate the entity), local `category.created_at/updated_at` (`ensureM6` self-heal: guarded ALTER + NULL backfill), pull **categories FIRST** in `applyPullLocally` + pure `resolveCategoryDelta` (LWW by id + same-name (NOCASE) remap incl. in-batch dedupe; pulled products re-keyed `category_id` through the remap) + 9 new `sync.test.ts` tests |
 | FR-100 | Camera scan | 🔜 v2 | visible stub on Sell tab (DEV-004); deferred past M6 — the release build ships no special permissions; keyboard-wedge + manual entry + scale barcodes cover scanning |
 | FR-109/FR-604 tail | Physical ESC/POS print + re-print | 🔜 v2 | on-screen receipts + printable label HTML done; Bluetooth printer hardware deferred (DEV-005 tail) |
-| Packaging | Play / App Store readiness | ✅ (prep) | `eas.json` profiles (development = dev-client / preview = internal / production = autoIncrement), icon 1024 + adaptive + splash assets, `docs/PACKAGING.md` (identity, profile table, no-special-permissions rationale, Play/ASC runbook, privacy posture: offline-first, BYO cloud ADR-010, no analytics/PII); **NO EAS build queued** — awaits Mas's build GO (version bump to 1.0.0 deferred to build time) |
+| Packaging | Play / App Store readiness → **1.0.0 built + submitted** | ✅ (2026-11-09) | `eas.json` profiles + `submit` (Android `serviceAccountKeyPath`, iOS `ascAppId` 6832286475), icon 1024 + adaptive + splash assets, `docs/PACKAGING.md` (identity, profile table, no-special-permissions rationale, Play/ASC runbook, privacy posture). Built from `f40d0ce` (EAS `5d5508e7…` / `0c0adea6…`), artifacts verified **1.0.0 / vc3 / build 3**; Android internal + production rollout started (status=completed), iOS build 3 WAITING_FOR_REVIEW — see `RELEASE-NOTES.md` |
 
 **Device E2E (2026-10-31, two emulators + local Supabase):** R1 offline refund
 (per-line, restock on; stock + FIFO layer restored; cashier PIN enforced) ·
@@ -277,3 +277,29 @@ round-trip live + persisted · supplier master CRUD + PO picker · margin card +
 
 **Standing regression:** `npx tsc --noEmit` (0 errors) + `npx jest`
 (392 tests, 26 suites — Post-M6) green.
+
+## 1.0.0 release (2026-11-09, submitted to both stores)
+
+Release-state changes landed after the Post-M6 audit. 1.0.0 was
+built from `f40d0ce` (EAS `5d5508e7…` Android / `0c0adea6…` iOS),
+artifact-verified **1.0.0 / versionCode 3 / buildNumber 3** (EAS
+autoIncrement from configured 2; app.json sync `0957853`). Provenance
++ smoke test + store states: `RELEASE-NOTES.md` +
+`docs/handoff/reports/0003-report.md`.
+
+| FR | Requirement | Status | Files / tests |
+|----|-------------|--------|---------------|
+| FR-115 | i18n — **third language: Filipino (Tagalog)** added on top of EN + MS | ✅ | `src/i18n/fil.ts` (typed `Record<keyof EnDict,string>` — compiler-enforced parity, same pattern as `ms.ts`); device-verified in the 1.0.0 smoke (Settings → Language: English / Bahasa Melayu / Filipino all present, "Applies to this device only", locale intact); `i18n.test.ts` parity covers all three dictionaries |
+| FR-600 | **Philippines tax preset** (first target store) | ✅ | `src/lib/currency.ts` preset `flat:ph-vat-12-inclusive` (PHP, `en-PH`); en-PH payment methods Cash / Card / GCash / Maya / QR Ph (recorded tenders) |
+| FR-501 | **PIN hardening (CR-15 + Post-M6 audit)** | ✅ | progressive 4–8 digit matching (a longer PIN cannot be satisfied by a shorter prefix and vice versa), definite fail at 8, salted-hash storage — device-verified in the 1.0.0 smoke (8 wrong digits → "Wrong PIN"; 1234 unlocks) |
+| FR-505/506 | **Cloud schema v8** — invite/claim codes, `delete_my_account`, rejected-upload quarantine | ✅ | `src/lib/cloud/schemaSql.ts` (`CLOUD_SCHEMA_VERSION = 8`): new-store = claim code, extra device = invite code (24h), owner erase path, rejected-op quarantine with per-device retry/discard UI; the wizard's upgrade step re-runs the idempotent script; `USER-GUIDE.md` documents all three user-facing paths |
+| — | **Release gates + known issue** | ⚠️ | KNOW-1 (opening-float 10× input) reported on the production build, **not patched in 1.0.0** — fix + numeric-field audit committed to 1.0.1 (`TODO.md`); §8 widening gates (real iPad/iPhone checks, hosted-cloud wizard run, native Fil/MS review, legal sign-off, failure paths, support process) open — `TODO.md` |
+
+**Decision (2026-11-09):** FR-106 (held/parked orders) **parked for
+v2** — schema exists, no UI was ever built, and it will not ship
+half-done (row updated in the M2 section).
+
+**Standing regression:** `npx tsc --noEmit` (0 errors) + `npx jest`
+(**544 tests** — 392 at Post-M6, the delta from the code-review
+remediation + insights + sync hardening) green, verified 2026-11-09
+at the docs sync.
