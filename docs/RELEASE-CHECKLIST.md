@@ -4,7 +4,7 @@ Goal: get 1.0.0 to **internal testers only** (Google Play internal testing + Tes
 
 Who does what: **[Mas]** needs a person with console/legal access, **[OpenCode]** is repo/build/device work, **[Both]** is shared. Do not start EAS builds or store actions without Mas's GO (see `docs/PACKAGING.md` §4). Items marked **(verify)** are store-console rules that change over time: check the console's own wording before relying on them.
 
-Status line to keep updated: `Last updated: 2026-11-09 · iOS 1.0.0 (build 3) SUBMITTED FOR REVIEW — appStoreState WAITING_FOR_REVIEW (screenshots captured on exact-res AVDs + uploaded via ASC API: iPhone 1290×2796, iPad 13" 2064×2752); Android 1.0.0 (vc3) LIVE on internal track + store presence done via API (title/descriptions/icon/feature graphic/3 phone screenshots) + 1.0.0/vc3 STAGED as a DRAFT on the production track — the first production rollout is a one-click in Play Console (Google blocks API first-publish on a "draft app"); after that, all releases are API-automatable — see docs/handoff/reports/0003-report.md`
+Status line to keep updated: `Last updated: 2026-11-09 · iOS 1.0.0 (build 3) SUBMITTED FOR REVIEW — appStoreState WAITING_FOR_REVIEW (screenshots captured on exact-res AVDs + uploaded via ASC API: iPhone 1290×2796, iPad 13" 2064×2752); Android 1.0.0 (vc3) production ROLLOUT STARTED (status=completed via Play API; store presence done via API) — first-release review pending, then Available. Both platforms now in their public-release pipeline — see docs/handoff/reports/0003-report.md`
 
 ## 0. Decisions already made
 
