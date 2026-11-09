@@ -55,6 +55,15 @@ M3→M6 deferrals (DEV-005) all landed in M6: stocktake UI, label printing, marg
 Full requirements: `/home/mars/.hermes/projects/03-nurlogic/nurledger/spec/nurledger-requirements-design.md`
 (prototype layout authority: `handoff/PROTOTYPE-REFERENCE.md`).
 
+## Release history (App Store / Google Play)
+
+Store releases, newest first. Full per-release detail (build numbers, store
+status, device checks) is in [docs/RELEASE-NOTES.md](docs/RELEASE-NOTES.md).
+
+| Version | Date | What shipped |
+|---|---|---|
+| **1.0.0** | 2026-11-09 | First store release: fast checkout (barcode scan, cash with auto change, recorded card/QR/e-wallet), live stock with FIFO cost & margin, stocktakes, expiry radar, one-tap refunds with restock + return reasons, shifts with X-/Z-reports and cash variance, PIN-protected owner/manager/cashier roles, works with zero internet, optional BYO-Supabase cloud sync (invite codes, in-app account deletion, rejected-upload quarantine); English · Bahasa Melayu · Filipino. Known issue: opening-float numeric input (KNOW-1) — fix in 1.0.1 |
+
 ## Stack
 
 - Expo SDK 58 · React Native 0.88 · expo-router · **expo-sqlite** (offline-first, ADR-002)
