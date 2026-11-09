@@ -26,6 +26,7 @@ stock, shifts and reports — all on one device.
 - [Adding more devices / cashiers](#adding-more-devices-a-second-tablet-or-phone)
 - [Turning it off / leaving / privacy](#turning-it-all-off--leaving)
 - [Troubleshooting](#troubleshooting)
+- [FAQ](#faq)
 
 ---
 
@@ -469,3 +470,63 @@ Need help? See the [NurLedger support page](https://nurlogic.ai/support) or emai
 | Free project paused (after ~1 week idle) | Open your project in the Supabase dashboard once; it wakes up and sync resumes. |
 | A weighed item shows the wrong weight | Re-check the scale's barcode format matches your locale's scale (Settings → the store's locale drives the barcode parser). You can always edit the weight before adding it to the order. |
 | Printed labels don't scan | Make sure you printed at 100% scale (no "fit to page"). Regenerate and print again; the barcodes are standard UPC-A/Code 39 and scan with any scanner. |
+
+## FAQ
+
+### Does NurLedger work without internet?
+Yes. The whole register — selling, stock, refunds and shifts — runs on your device. You
+can run a full day with no internet at all; anything queued goes to the cloud later, when
+sync is on and the device is back online.
+
+### What happens if two tablets sell the same item offline?
+NurLedger combines them correctly when both sync: **no sale is counted twice**, and stock
+stays accurate.
+
+### Can I use a barcode scanner?
+Yes. Any USB or Bluetooth *keyboard-wedge* scanner works — it types into the scan field
+like a keyboard. You can also type barcodes by hand. (Scanning with the camera is on the
+roadmap.)
+
+### Do I need a receipt printer?
+No. The receipt appears on screen, and receipts, labels and purchase orders can be
+generated as files you can print on any device, any printer. (Connecting a physical
+printer directly is on the roadmap.)
+
+### How do refunds work?
+Open a sale and tap **Refund** to refund the whole sale or individual lines. Returned
+items are restocked, you record a reason, and cashiers are asked for the manager/owner
+PIN.
+
+### Who needs a PIN?
+You (the owner) and any managers — a 4–8 digit PIN each; cashiers don't have one. When a
+cashier is at the register, the PIN gates discounts, price overrides, refunds, stocktakes,
+closing shifts and settings.
+
+### Which currencies and taxes can I use?
+Any ISO currency. For tax, pick a regime (for example Singapore GST 9% inclusive,
+Malaysia SST 10% inclusive, EU VAT 21% exclusive) or set a **custom rate** (0–40%,
+inclusive or exclusive). Nothing is hardcoded to a country — the same app works anywhere.
+
+### Is NurLedger a BIR-registered or legal e-invoicing system?
+No — it is not a registered receipting or e-invoicing system. It applies your tax
+settings and shows a receipt you can share. Check your local requirements with your
+accountant or tax authority.
+
+### Which languages does it support?
+**English**, **Bahasa Melayu** and **Filipino** — change it in Settings and the whole app
+updates immediately. It is a per-device choice, so each staff tablet can be in a
+different language.
+
+### What if my tablet breaks, is lost, or I need a new one?
+If cloud sync is on, your data is backed up in your own Supabase project. On the new
+device, join the store again with an invite code and it downloads your latest products,
+stock and sales.
+
+### How do I back up my data?
+Cloud sync keeps a backup in your own Supabase project (see *Setting up cloud sync*
+above). You can also export your whole product list as a CSV at any time.
+
+### Does NurLogic see or collect my sales data?
+No. Everything is stored on your device first; optional cloud sync goes only to your own
+Supabase project. There are no ads, no analytics and no tracking — see *Is my data
+private?* above.
