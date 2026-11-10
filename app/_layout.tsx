@@ -103,7 +103,7 @@ export default function RootLayout() {
 }
 
 /** Shared header style for stack screens outside the tab group. */
-const headerOptions = {
+export const headerOptions = {
   headerShown: true,
   headerStyle: { backgroundColor: colors.slate50 },
   headerTitleStyle: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate900 },

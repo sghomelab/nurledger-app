@@ -2,6 +2,7 @@ import { useT } from '../src/hooks/useT';
 import { centeredColumn } from '../src/lib/layout';
 import { useState } from 'react';
 import { useRouter, Stack } from 'expo-router';
+import { headerOptions } from './_layout';
 import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
@@ -71,7 +72,7 @@ export default function ProductDataScreen() {
 
   return (
     <View style={styles.wrap}>
-      <Stack.Screen options={{ title: t('nav.productDataCsv'), headerBackVisible: true }} />
+      <Stack.Screen options={{ ...headerOptions, title: t('nav.productDataCsv') }} />
       <ScrollView contentContainerStyle={[{ padding: spacing.lg, paddingBottom: 48 }, centeredColumn]}>
         <Text style={styles.intro}>
           {t('csv.intro')}

@@ -2,6 +2,7 @@ import { useT } from '../src/hooks/useT';
 import { centeredColumn } from '../src/lib/layout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
+import { headerOptions } from './_layout';
 import { getPickedFile } from '../src/lib/pickedFile';
 import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -84,7 +85,7 @@ export default function ImportCsvScreen() {
 
   return (
     <View style={styles.wrap}>
-      <Stack.Screen options={{ title: t('nav.importProducts'), headerBackVisible: true }} />
+      <Stack.Screen options={{ ...headerOptions, title: t('nav.importProducts') }} />
 
       {state.phase === 'loading' && (
         <View style={styles.center}>

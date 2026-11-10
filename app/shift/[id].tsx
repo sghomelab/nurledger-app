@@ -2,6 +2,7 @@ import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useState } from 'react';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
+import { headerOptions } from '../_layout';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../../src/components/Screen';
@@ -48,7 +49,7 @@ export default function ShiftDetail() {
 
   return (
     <View style={styles.wrap}>
-      <Stack.Screen options={{ title: t('nav.shift'), headerBackTitle: t('nav.shifts') }} />
+      <Stack.Screen options={{ ...headerOptions, title: t('nav.shift'), headerBackTitle: t('nav.shifts') }} />
       {notFound ? (
         <View style={styles.center}>
           <Text style={styles.notFound}>{t('shiftDetail.shiftNotFound')}</Text>
