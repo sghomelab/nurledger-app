@@ -210,8 +210,15 @@ export function createSupabaseAdapter(storage: KeyValueStorage): CloudAdapter {
       // True reachability probe: the auth health endpoint exists on every
       // Supabase project BEFORE the BYO schema is deployed (a data query would
       // 404 on the missing table and mask "wrong URL" as "schema not run").
+      // Hosted Supabase key-auths EVERY path (health included) at the gateway —
+      // a keyless request 401s ("api identity required") on a perfectly valid
+      // project — so the probe carries the anon key (safe to ship). Without
+      // this, "Check connection" can never succeed against a real hosted
+      // project (only self-hosted stacks leave /health open).
       try {
-        const res = await fetch(`${cfg.url.replace(/\/+$/, '')}/auth/v1/health`);
+        const res = await fetch(`${cfg.url.replace(/\/+$/, '')}/auth/v1/health`, {
+          headers: { apikey: cfg.anonKey, Authorization: `Bearer ${cfg.anonKey}` },
+        });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return true;
       } catch (e) {
