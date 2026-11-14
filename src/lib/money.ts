@@ -41,6 +41,18 @@ export function formatMoneyBare(minor: number): string {
 }
 
 /**
+ * Initial text for a money input pre-filled with `minor`.
+ * Zero → '' (empty; the "0.00" placeholder shows instead). Pre-filling "0.00"
+ * is the KNOW-1 bug: on the right-aligned + auto-focused field the cursor
+ * lands BEFORE the initial "0", so every typed digit prepends — typing 100
+ * stored 1000.00 (10×). Non-zero values are pre-filled so "edit the current
+ * value" flows (line price) work.
+ */
+export function initialMoneyText(minor: number): string {
+  return minor > 0 ? formatMoneyBare(minor) : '';
+}
+
+/**
  * Round a division of minor units to nearest minor unit.
  * Uses integer math: round(num / den) = floor((num*2 + den) / (den*2)) for positive den.
  */

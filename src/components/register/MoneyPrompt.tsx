@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { formatMoneyBare, parseMoneyToMinor } from '../../lib/money';
+import { initialMoneyText, parseMoneyToMinor } from '../../lib/money';
 import { useT } from '../../hooks/useT';
 import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
 
@@ -18,7 +18,7 @@ interface Props {
  * price adjust). PIN-gating is deferred (SPEC-DEVIATION DEV-003).
  */
 export function MoneyPrompt({ title, currency, initialMinor, onSave, onCancel }: Props) {
-  const [text, setText] = useState(formatMoneyBare(initialMinor));
+  const [text, setText] = useState(() => initialMoneyText(initialMinor));
   const { t } = useT();
   const value = parseMoneyToMinor(text);
 

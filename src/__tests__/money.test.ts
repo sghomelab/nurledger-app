@@ -1,4 +1,12 @@
-import { formatMoney, formatMoneyBare, roundDivide, percentOf, marginPct } from '../lib/money';
+import {
+  formatMoney,
+  formatMoneyBare,
+  roundDivide,
+  percentOf,
+  marginPct,
+  initialMoneyText,
+  parseMoneyToMinor,
+} from '../lib/money';
 
 describe('money — integer minor units (ADR-004, NFR-8)', () => {
   it('formats minor units as currency (acceptance: 1290 = $12.90)', () => {
@@ -50,5 +58,29 @@ describe('money — integer minor units (ADR-004, NFR-8)', () => {
     expect(marginPct(1200, 750)).toBe(38); // worked example §4.3.1: 37.5% → 38 rounded
     expect(marginPct(0, 100)).toBe(0); // no-revenue guard
     expect(marginPct(1000, 1000)).toBe(0);
+  });
+});
+
+describe('initialMoneyText — KNOW-1 regression (opening-float 10× input)', () => {
+  it('zero initial value renders EMPTY (placeholder shows), never "0.00"', () => {
+    expect(initialMoneyText(0)).toBe('');
+  });
+
+  it('non-zero initial value is pre-filled (line-price edit flow)', () => {
+    expect(initialMoneyText(1550)).toBe('15.50');
+    expect(initialMoneyText(1550)).toBe(formatMoneyBare(1550));
+  });
+
+  it('typed digits are the value, not a prepend onto an initial "0"', () => {
+    // Old behavior: field initialized "0.00", cursor at index 0 → typing "100"
+    // produced "1000.00" (10×, reproducible on the production build).
+    // Contract now: zero initial → empty text, so "100" types in as "100".
+    const typed = initialMoneyText(0) + '100';
+    expect(typed).toBe('100');
+    expect(parseMoneyToMinor(typed)).toBe(10_000); // 100.00 — NOT 1000.00
+  });
+
+  it('empty field still parses to zero (zero float / zero discount remain legal)', () => {
+    expect(parseMoneyToMinor(initialMoneyText(0))).toBe(0);
   });
 });
