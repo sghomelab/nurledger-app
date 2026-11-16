@@ -1,4 +1,5 @@
 import { useT } from '../../src/hooks/useT';
+import { useTopInset } from '../../src/hooks/useTopInset';
 import { centeredColumn } from '../../src/lib/layout';
 import { useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -35,6 +36,7 @@ const DEFAULT_COPIES = 5;
  */
 export default function LabelsScreen() {
   const { t } = useT();
+  const topInset = useTopInset();
   const router = useRouter();
   const params = useLocalSearchParams<{ product?: string }>();
   const { outlet } = useOutlet();
@@ -107,7 +109,7 @@ export default function LabelsScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: topInset + spacing.lg }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={colors.slate700} />
         </Pressable>

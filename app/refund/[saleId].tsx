@@ -1,4 +1,5 @@
 import { useT } from '../../src/hooks/useT';
+import { useTopInset } from '../../src/hooks/useTopInset';
 import type { MsgKey } from '../../src/i18n';
 import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -62,6 +63,7 @@ interface LineState {
  */
 export default function RefundScreen() {
   const { t } = useT();
+  const topInset = useTopInset();
   const router = useRouter();
   const { saleId } = useLocalSearchParams<{ saleId: string }>();
   const { outlet } = useOutlet();
@@ -226,7 +228,7 @@ export default function RefundScreen() {
         contentContainerStyle={[{ padding: spacing.lg, paddingBottom: 140 }, centeredColumn]}
         refreshControl={<RefreshControl refreshing={false} tintColor={colors.slate300} onRefresh={() => void load()} />}
       >
-        <View style={styles.header}>
+        <View style={[styles.header, { marginTop: topInset }]}>
           <Pressable onPress={() => router.back()} hitSlop={10} accessibilityLabel={t('importCsv.back')}>
             <Ionicons name="chevron-back" size={24} color={colors.slate700} />
           </Pressable>

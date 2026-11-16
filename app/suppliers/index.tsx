@@ -1,4 +1,5 @@
 import { useT } from '../../src/hooks/useT';
+import { useTopInset } from '../../src/hooks/useTopInset';
 import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -20,6 +21,7 @@ import type { Supplier } from '../../src/types';
 export default function SuppliersScreen() {
   const { t } = useT();
   const router = useRouter();
+  const topInset = useTopInset();
   const [suppliers, setSuppliers] = useState<ReturnType<typeof listSuppliers> extends Promise<infer T> ? T : never>([]);
   const [loaded, setLoaded] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
@@ -95,7 +97,7 @@ export default function SuppliersScreen() {
 
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: topInset + spacing.lg }]}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
           <Ionicons name="chevron-back" size={24} color={colors.slate700} />
         </Pressable>

@@ -1,4 +1,5 @@
 import { useT } from '../../src/hooks/useT';
+import { useTopInset } from '../../src/hooks/useTopInset';
 import { centeredColumn } from '../../src/lib/layout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -43,6 +44,7 @@ import type { AppUser } from '../../src/types';
  */
 export default function StocktakeDetailScreen() {
   const { t } = useT();
+  const topInset = useTopInset();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
@@ -156,7 +158,7 @@ export default function StocktakeDetailScreen() {
   return (
     <View style={styles.wrap}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { marginTop: topInset + spacing.lg }]}>
         <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={10}>
           <Ionicons name="arrow-back" size={22} color={colors.slate500} />
         </Pressable>
