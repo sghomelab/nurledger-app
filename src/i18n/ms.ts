@@ -548,6 +548,7 @@ const ms: Record<keyof EnDict, string> = {
   'nav.shift': 'Syif',
   'nav.shifts': 'Syif',
   'nav.productDataCsv': 'Data Produk (CSV)',
+  'nav.settings': 'Tetapan',
   'nav.importProducts': 'Import Produk',
   'insights.periodToday': 'Hari ini',
   'insights.periodCurrent': 'Tempoh Semasa',

@@ -549,6 +549,7 @@ const en = {
   'nav.shift': 'Shift',
   'nav.shifts': 'Shifts',
   'nav.productDataCsv': 'Product Data (CSV)',
+  'nav.settings': 'Settings',
   'nav.importProducts': 'Import Products',
   'insights.periodToday': 'Today',
   'insights.periodCurrent': 'Current Period',

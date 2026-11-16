@@ -1,6 +1,7 @@
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, touchTarget } from '../../src/theme/tokens';
+import { Pressable, StyleSheet } from 'react-native';
+import { colors, fonts, spacing, touchTarget } from '../../src/theme/tokens';
 import { useProducts } from '../../src/hooks/useAppData';
 import { useT } from '../../src/hooks/useT';
 
@@ -11,6 +12,7 @@ import { useT } from '../../src/hooks/useT';
 export default function TabLayout() {
   const { lowStock } = useProducts();
   const { t } = useT();
+  const router = useRouter();
 
   return (
     <Tabs
@@ -34,6 +36,19 @@ export default function TabLayout() {
         options={{
           title: t('tab.sell'),
           tabBarIcon: ({ color, size }) => <Ionicons name="cart" size={size} color={color as string} />,
+          // Global settings entry point (issue #6): without it, Store settings
+          // was reachable only via the Shift tab's "Change" button.
+          headerRight: () => (
+            <Pressable
+              onPress={() => router.push('/settings')}
+              hitSlop={12}
+              style={styles.headerBtn}
+              accessibilityRole="button"
+              accessibilityLabel={t('nav.settings')}
+            >
+              <Ionicons name="settings-outline" size={22} color={colors.slate700} />
+            </Pressable>
+          ),
         }}
       />
       <Tabs.Screen
@@ -69,3 +84,7 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  headerBtn: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+});

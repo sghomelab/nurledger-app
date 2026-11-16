@@ -495,6 +495,7 @@ const fil: Record<keyof EnDict, string> = {
   'nav.shift': 'Shift',
   'nav.shifts': 'Mga Shift',
   'nav.productDataCsv': 'Data ng Produkto (CSV)',
+  'nav.settings': 'Mga setting',
   'nav.importProducts': 'I-import ang mga Produkto',
   'insights.periodToday': 'Ngayong araw',
   'insights.periodCurrent': 'Kasalukuyang Panahon',
