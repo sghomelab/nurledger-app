@@ -321,3 +321,22 @@ export async function setReceiptWidth(width: ReceiptWidthSetting): Promise<void>
     width,
   ]);
 }
+
+const EMAIL_RECEIPTS_KEY = 'receipt.emailAsk';
+
+/** Issue #19: when ON, the register offers to email the receipt after each payment. */
+export async function getEmailReceipts(): Promise<boolean> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM settings WHERE key = '${EMAIL_RECEIPTS_KEY}'`,
+  );
+  return row?.value === '1';
+}
+
+export async function setEmailReceipts(on: boolean): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [
+    EMAIL_RECEIPTS_KEY,
+    on ? '1' : '0',
+  ]);
+}

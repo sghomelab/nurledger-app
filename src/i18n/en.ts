@@ -668,6 +668,36 @@ const en = {
   'shift.pinChanged': 'PIN changed',
   'shift.changePinFailed': 'Could not change PIN',
   'shift.pinRequiredForRole': 'Owner and manager users need a PIN of 4–8 digits.',
+
+  // ── barcode scanner overlay ───────────────────────────────────────────
+  'scan.title': 'Scan barcode',
+  'scan.cameraDenied': 'Camera access is needed to scan barcodes.',
+  'scan.openSettings': 'Open Settings',
+  'scan.torch': 'Torch',
+  'scan.close': 'Close scanner',
+
+  // ── email receipt ─────────────────────────────────────────────────────
+  'receipt.email': 'Email receipt',
+  'receipt.emailTitle': 'Email this receipt',
+  'receipt.emailAddress': 'Customer email',
+  'receipt.emailScanQr': 'Scan QR',
+  'receipt.emailPlaceholder': 'name@example.com',
+  'receipt.emailInvalid': 'Enter a valid email address',
+  'receipt.emailReady': 'Opening your mail app…',
+  'receipt.emailSend': 'Email receipt',
+  'receipt.emailHint': 'Opens your mail app with a pre-filled draft — works offline with any account',
+  'receipt.emailSubject': 'Receipt {number} — {outlet}',
+  'settings.emailReceipts': 'Ask to email the receipt',
+  'settings.emailReceiptsDesc': 'After each payment, offer to email the receipt to the customer.',
+
+  // ── shift report export ───────────────────────────────────────────────
+  'report.xTitle': 'X-Report',
+  'report.zTitle': 'Z-Report',
+  'report.print': 'Print',
+  'report.sharePdf': 'Save / share PDF',
+  'report.prepareFailed': 'Could not prepare the report',
+  'report.xHint': 'Snapshot — does not close the shift',
+  'report.zHint': 'Closes the shift — count the cash first',
 } as const;
 
 export default en;

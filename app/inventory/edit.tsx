@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PickerOverlay } from '../../src/components/PickerOverlay';
+import { BarcodeScanner } from '../../src/components/BarcodeScanner';
 import { useCategories, useOutlet, useProducts } from '../../src/hooks/useAppData';
 import { createProduct, getProduct, updateProduct, type ProductInput } from '../../src/repositories/productRepository';
 import { listSuppliers } from '../../src/repositories/supplierRepository';
@@ -44,6 +45,8 @@ export default function ProductFormScreen() {
   const [loaded, setLoaded] = useState(isNew);
   const [saving, setSaving] = useState(false);
   const [catPicker, setCatPicker] = useState(false);
+  /** Which barcode field the camera scanner fills (issues #10/#11). */
+  const [scanTarget, setScanTarget] = useState<'barcode' | 'carton' | null>(null);
 
   // FR-313: supplier master link
   const [supplierId, setSupplierId] = useState<string | null>(null);
@@ -151,7 +154,7 @@ export default function ProductFormScreen() {
         <Field label={t('invEdit.name')}><TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('invEdit.eGRice5kg')} /></Field>
         <View style={styles.row}>
           <View style={styles.colHalf}><Field label={t('invEdit.sku')}><TextInput style={styles.input} value={sku} onChangeText={setSku} placeholder="RICE-5KG" autoCapitalize="characters" autoCorrect={false} /></Field></View>
-          <View style={styles.colHalf}><Field label={t('invDetail.barcode')}><TextInput style={styles.input} value={barcode} onChangeText={setBarcode} placeholder={t('invEdit.scanOrType')} keyboardType="number-pad" autoCapitalize="characters" autoCorrect={false} /></Field></View>
+          <View style={styles.colHalf}><Field label={t('invDetail.barcode')}><View style={styles.scanField}><TextInput style={[styles.input, { flex: 1 }]} value={barcode} onChangeText={setBarcode} placeholder={t('invEdit.scanOrType')} keyboardType="number-pad" autoCapitalize="characters" autoCorrect={false} /><Pressable style={styles.scanFieldBtn} onPress={() => setScanTarget('barcode')} accessibilityLabel={t('scan.title')}><Ionicons name="camera" size={18} color={colors.primary} /></Pressable></View></Field></View>
         </View>
 
         <Field label={t('invDetail.category')}>
@@ -184,7 +187,7 @@ export default function ProductFormScreen() {
           <View style={styles.colThird}><Field label={t('invDetail.max')}><TextInput style={styles.inputMono} value={maxQty} onChangeText={setMaxQty} placeholder="0" keyboardType="number-pad" /></Field></View>
           <View style={styles.colThird}><Field label={t('invEdit.cartonNUnits')}><TextInput style={styles.inputMono} value={cartonSize} onChangeText={setCartonSize} placeholder="1" keyboardType="number-pad" /></Field></View>
         </View>
-        <Field label={t('invEdit.cartonBarcodeFr322')}><TextInput style={styles.input} value={cartonBarcode} onChangeText={setCartonBarcode} placeholder={t('invEdit.optionalScansSellNUnits')} autoCapitalize="characters" autoCorrect={false} /></Field>
+        <Field label={t('invEdit.cartonBarcodeFr322')}><View style={styles.scanField}><TextInput style={[styles.input, { flex: 1 }]} value={cartonBarcode} onChangeText={setCartonBarcode} placeholder={t('invEdit.optionalScansSellNUnits')} autoCapitalize="characters" autoCorrect={false} /><Pressable style={styles.scanFieldBtn} onPress={() => setScanTarget('carton')} accessibilityLabel={t('scan.title')}><Ionicons name="camera" size={18} color={colors.primary} /></Pressable></View></Field>
         <Field label={t('invEdit.description')}><TextInput style={[styles.input, styles.multiline]} value={description} onChangeText={setDescription} placeholder={t('invEdit.optionalNotes')} multiline numberOfLines={3} /></Field>
       </ScrollView>
 
@@ -231,6 +234,19 @@ export default function ProductFormScreen() {
           onClose={() => setSupplierPicker(false)}
         />
       )}
+
+      {/* Camera scanner for product + carton barcodes (issues #10/#11) */}
+      {scanTarget && (
+        <BarcodeScanner
+          onClose={() => setScanTarget(null)}
+          onScanned={(code) => {
+            const target = scanTarget;
+            setScanTarget(null);
+            if (target === 'barcode') setBarcode(code);
+            else setCartonBarcode(code);
+          }}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -270,6 +286,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.mono, fontSize: 15, color: colors.slate900,
   },
   multiline: { minHeight: 72, textAlignVertical: 'top' },
+  scanField: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  scanFieldBtn: {
+    width: 42, height: 42, borderRadius: radius.control, borderWidth: 1, borderColor: colors.primary,
+    backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center',
+  },
   row: { flexDirection: 'row', gap: spacing.md },
   colHalf: { flex: 1 },
   colThird: { flex: 1 },

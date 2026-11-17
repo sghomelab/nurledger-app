@@ -1,21 +1,10 @@
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { formatMoney } from '../../lib/money';
-import { layoutReceipt, renderReceiptText, WIDTH_COLS, type ReceiptData, type ReceiptWidth } from '../../lib/receipt';
-import { PAYMENT_METHODS, paymentMethodsFor } from '../../lib/payment';
+import { layoutReceipt, renderReceiptText, WIDTH_COLS, receiptDataFrom, type ReceiptWidth } from '../../lib/receipt';
 import { useT } from '../../hooks/useT';
 import type { SaleReceipt } from '../../repositories/saleRepository';
 import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
-
-/** Locale-aware payment label (FR-601): 'PayNow QR' in en-SG, etc. */
-function methodLabel(id: string, locale: string | null | undefined): string {
-  return (
-    paymentMethodsFor(locale).find((m) => m.id === id)?.label ??
-    PAYMENT_METHODS.find((m) => m.id === id)?.label ??
-    id
-  );
-}
 
 interface Props {
   receipt: SaleReceipt;
@@ -27,6 +16,8 @@ interface Props {
   locale?: string | null;
   /** Chosen printer width (FR-109; Settings → Receipt). */
   width: ReceiptWidth;
+  /** Optional: offer to email the receipt (issue #19). Renders an extra button. */
+  onEmail?: () => void;
   onDone: () => void;
 }
 
@@ -37,9 +28,9 @@ interface Props {
  * (FR-108), weighed lines show grams (FR-103), QR payments carry their
  * reference (FR-601).
  */
-export function ReceiptView({ receipt, currency, changeMinor, outletName, cashierName, locale, width, onDone }: Props) {
+export function ReceiptView({ receipt, currency, changeMinor, outletName, cashierName, locale, width, onEmail, onDone }: Props) {
   const { t } = useT();
-  const { sale, totals } = receipt;
+  const { sale } = receipt;
   const number = sale.uuid.slice(0, 8).toUpperCase();
   const dt = new Date(sale.createdAt);
   const stamp = dt.toLocaleString('en-GB', {
@@ -51,36 +42,9 @@ export function ReceiptView({ receipt, currency, changeMinor, outletName, cashie
   });
 
   const text = useMemo(() => {
-    const data: ReceiptData = {
-      outletName,
-      number,
-      stamp,
-      cashierName: cashierName ?? null,
-      lines: sale.lines.map((l) => ({
-        name: l.name,
-        qty: l.qty,
-        qtyG: l.qtyG,
-        unitPriceMinor: l.unitPriceMinor,
-        lineTotalMinor: l.lineTotalMinor,
-      })),
-      subtotalMinor: sale.subtotalMinor,
-      discountMinor: sale.discountMinor,
-      mode: totals.tax.mode,
-      ratePct: totals.tax.ratePct,
-      taxLines: totals.tax.lines,
-      taxMinor: sale.taxMinor,
-      totalMinor: sale.totalMinor,
-      payments: sale.payments.map((p) => ({
-        label: methodLabel(p.method, locale),
-        amountMinor: p.amountMinor,
-        reference: p.reference ?? null,
-      })),
-      changeMinor: changeMinor > 0 ? changeMinor : undefined,
-      currency,
-      fmt: (minor) => formatMoney(minor, currency),
-    };
+    const data = receiptDataFrom(receipt, { outletName, cashierName, locale, currency, changeMinor });
     return renderReceiptText(layoutReceipt(data, width), WIDTH_COLS[width]);
-  }, [receipt, outletName, number, stamp, cashierName, locale, changeMinor, currency, width, totals]);
+  }, [receipt, outletName, cashierName, locale, changeMinor, currency, width]);
 
   return (
     <View style={styles.wrap}>
@@ -96,6 +60,12 @@ export function ReceiptView({ receipt, currency, changeMinor, outletName, cashie
         <Text style={styles.paper}>{text}</Text>
       </ScrollView>
 
+      {onEmail && (
+        <Pressable style={styles.emailBtn} onPress={onEmail}>
+          <Ionicons name="mail-outline" size={18} color={colors.primary} />
+          <Text style={styles.emailText}>{t('receipt.email')}</Text>
+        </Pressable>
+      )}
       <Pressable style={styles.doneBtn} onPress={onDone}>
         <Text style={styles.doneText}>{t('common.done')}</Text>
       </Pressable>
@@ -119,4 +89,6 @@ const styles = StyleSheet.create({
   paper: { fontFamily: fonts.mono, fontSize: 11, color: colors.slate900, lineHeight: 16 },
   doneBtn: { height: 54, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   doneText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
+  emailBtn: { minHeight: 48, borderRadius: radius.control, borderWidth: 1.5, borderColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  emailText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.primary },
 });

@@ -22,6 +22,8 @@ import {
 import {
   getReceiptWidth,
   setReceiptWidth,
+  getEmailReceipts,
+  setEmailReceipts,
   type ReceiptWidthSetting,
 } from '../src/repositories/saleRepository';
 import {
@@ -369,6 +371,16 @@ export default function SettingsScreen() {
     void setReceiptWidth(width);
   };
 
+  // ── Email receipts (issue #19, device-local) ─────────────────────────────
+  const [emailAsk, setEmailAskState] = useState(false);
+  useEffect(() => {
+    void getEmailReceipts().then(setEmailAskState);
+  }, []);
+  const onEmailAsk = (on: boolean) => {
+    setEmailAskState(on);
+    void setEmailReceipts(on);
+  };
+
   return (
     <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={[styles.content, centeredColumn]} keyboardShouldPersistTaps="handled">
@@ -555,6 +567,17 @@ export default function SettingsScreen() {
           <Field label={t('settings.printerWidth')}>
             <Segmented options={['58mm', '80mm']} value={receiptWidth} onChange={onReceiptWidth} />
           </Field>
+          <View style={styles.emailAskRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.emailAskLabel}>{t('settings.emailReceipts')}</Text>
+              <Text style={styles.emailAskDesc}>{t('settings.emailReceiptsDesc')}</Text>
+            </View>
+            <Switch
+              value={emailAsk}
+              onValueChange={onEmailAsk}
+              trackColor={{ true: colors.positive, false: colors.slate200 }}
+            />
+          </View>
           <Text style={styles.note}>{t('settings.receiptNote')}</Text>
         </Card>
 
@@ -683,6 +706,9 @@ const styles = StyleSheet.create({
   selectText: { fontFamily: fonts.sans, fontSize: 15, color: colors.slate900, flex: 1 },
   chevron: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate400, marginLeft: spacing.sm },
   note: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, lineHeight: 17 },
+  emailAskRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
+  emailAskLabel: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.slate900 },
+  emailAskDesc: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2, lineHeight: 16 },
   row: { flexDirection: 'row', gap: spacing.md },
   colHalf: { flex: 1 },
   segmented: { flexDirection: 'row', backgroundColor: colors.slate100, borderRadius: radius.control, padding: 3 },

@@ -3,8 +3,10 @@ import type { MsgKey } from '../../src/i18n';
 import { wideColumn } from '../../src/lib/layout';
 import { useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { Card } from '../../src/components/Screen';
 import { NumberText } from '../../src/components/NumberText';
 import { PickerOverlay } from '../../src/components/PickerOverlay';
@@ -17,6 +19,7 @@ import { useShift, useUsers } from '../../src/hooks/useShift';
 import { getDeviceId, type Shift } from '../../src/repositories/shiftRepository';
 import { taxEngineLabel } from '../../src/lib/currency';
 import { formatMoney } from '../../src/lib/money';
+import { buildReportHtml } from '../../src/lib/reportHtml';
 import { addUserRankNeeded, changePinRankNeeded, roleCanAct, switchRankNeeded, type GateAction } from '../../src/lib/roles';
 import { isValidPin } from '../../src/lib/pin';
 import type { AppUser } from '../../src/types';
@@ -69,6 +72,7 @@ export default function ShiftTab() {
   const [pinPicker, setPinPicker] = useState(false);
   const [pinTarget, setPinTarget] = useState<AppUser | null>(null);
   const [report, setReport] = useState<ZReport | XReport | null>(null);
+  const [reportBusy, setReportBusy] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', role: 'cashier' as UserRole, pin: '' });
 
   const currency = outlet?.currency ?? 'SGD';
@@ -136,6 +140,52 @@ export default function ShiftTab() {
     const r = await xReport();
     if (r) setReport(r);
   }, [xReport]);
+
+  /** Report export (issues #13/#14/#2): AirPrint via the system print dialog,
+   *  or a saved PDF handed to the share sheet. The HTML is the pure
+   *  `buildReportHtml` rendering of the same report the sheet shows. */
+  const doPrintReport = useCallback(
+    async (r: ZReport | XReport) => {
+      setReportBusy(true);
+      try {
+        const html = buildReportHtml(r, currency, {
+          outletName: outlet?.name ?? null,
+          hint: t(r.kind === 'Z' ? 'report.zHint' : 'report.xHint'),
+        });
+        await Print.printAsync({ html });
+      } catch (e) {
+        Alert.alert(t('report.prepareFailed'), errMsg(e));
+      } finally {
+        setReportBusy(false);
+      }
+    },
+    [currency, outlet?.name, t],
+  );
+
+  const doShareReport = useCallback(
+    async (r: ZReport | XReport) => {
+      setReportBusy(true);
+      try {
+        const html = buildReportHtml(r, currency, {
+          outletName: outlet?.name ?? null,
+          hint: t(r.kind === 'Z' ? 'report.zHint' : 'report.xHint'),
+        });
+        const { uri } = await Print.printToFileAsync({ html });
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(uri, {
+            mimeType: 'application/pdf',
+            UTI: 'com.adobe.pdf',
+            dialogTitle: t(r.kind === 'Z' ? 'report.zTitle' : 'report.xTitle'),
+          });
+        }
+      } catch (e) {
+        Alert.alert(t('report.prepareFailed'), errMsg(e));
+      } finally {
+        setReportBusy(false);
+      }
+    },
+    [currency, outlet?.name, t],
+  );
 
   const doSwitchUser = useCallback(
     async (id: string) => {
@@ -424,9 +474,39 @@ export default function ShiftTab() {
           <Pressable style={styles.sheetBackdrop} onPress={() => setReport(null)}>
             <Pressable style={styles.sheetBody} onPress={() => {}}>
               <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>{report.kind === 'Z' ? 'Z-Report' : 'X-Report'}</Text>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.sheetTitle}>{report.kind === 'Z' ? 'Z-Report' : 'X-Report'}</Text>
+                  {/* Plain-language explanation of the difference (issue #18) */}
+                  <Text style={styles.sheetHint}>{t(report.kind === 'Z' ? 'report.zHint' : 'report.xHint')}</Text>
+                </View>
                 <Pressable onPress={() => setReport(null)} hitSlop={12}>
                   <Ionicons name="close" size={24} color={colors.slate500} />
+                </Pressable>
+              </View>
+              <View style={styles.reportActions}>
+                <Pressable
+                  style={[styles.reportActionBtn, reportBusy && { opacity: 0.6 }]}
+                  onPress={() => void doPrintReport(report)}
+                  disabled={reportBusy}
+                >
+                  {reportBusy ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Ionicons name="print-outline" size={18} color={colors.primary} />
+                  )}
+                  <Text style={styles.reportActionText}>{t('report.print')}</Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.reportActionBtn, reportBusy && { opacity: 0.6 }]}
+                  onPress={() => void doShareReport(report)}
+                  disabled={reportBusy}
+                >
+                  {reportBusy ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <Ionicons name="document-text-outline" size={18} color={colors.primary} />
+                  )}
+                  <Text style={styles.reportActionText}>{t('report.sharePdf')}</Text>
                 </Pressable>
               </View>
               <View style={{ flex: 1 }}>
@@ -652,4 +732,8 @@ const styles = StyleSheet.create({
   sheetBody: { width: '100%', maxWidth: 640, alignSelf: 'center', backgroundColor: colors.white, borderTopLeftRadius: radius.card + 4, borderTopRightRadius: radius.card + 4, height: '78%' },
   sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingBottom: spacing.sm },
   sheetTitle: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
+  sheetHint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate500, marginTop: 2 },
+  reportActions: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+  reportActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 42, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200, backgroundColor: colors.white },
+  reportActionText: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.primary },
 });

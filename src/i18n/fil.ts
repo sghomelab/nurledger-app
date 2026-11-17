@@ -614,6 +614,36 @@ const fil: Record<keyof EnDict, string> = {
   'shift.pinChanged': 'Napalitan na ang PIN',
   'shift.changePinFailed': 'Hindi mapalitan ang PIN',
   'shift.pinRequiredForRole': 'Kailangan ng PIN na 4–8 digit ang mga user na may-ari at manager.',
+
+  // ── overlay ng scanner ng barcode ─────────────────────────────────────
+  'scan.title': 'I-scan ang barcode',
+  'scan.cameraDenied': 'Kailangan ng access sa camera upang i-scan ang barcode.',
+  'scan.openSettings': 'Buksan ang Settings',
+  'scan.torch': 'Torch',
+  'scan.close': 'Isara ang scanner',
+
+  // ── i-email na resit ──────────────────────────────────────────────────
+  'receipt.email': 'I-email ang resit',
+  'receipt.emailTitle': 'I-email ang resit na ito',
+  'receipt.emailAddress': 'Email ng customer',
+  'receipt.emailScanQr': 'I-scan ang QR',
+  'receipt.emailPlaceholder': 'pangalan@example.com',
+  'receipt.emailInvalid': 'Ilagay ang wastong email address',
+  'receipt.emailReady': 'Binubuksan ang mail app mo…',
+  'receipt.emailSend': 'Ipadala ang resit',
+  'receipt.emailHint': 'Binubuksan ang mail app mo na may na-fill na draft — gumagana kahit offline',
+  'receipt.emailSubject': 'Resit {number} — {outlet}',
+  'settings.emailReceipts': 'Magtanong upang i-email ang resit',
+  'settings.emailReceiptsDesc': 'Pagkatapos ng bawat bayad, magtanong kung i-eemail ang resit sa customer.',
+
+  // ── export ng ulat ng shift ───────────────────────────────────────────
+  'report.xTitle': 'X-Report',
+  'report.zTitle': 'Z-Report',
+  'report.print': 'I-print',
+  'report.sharePdf': 'I-save / i-share ang PDF',
+  'report.prepareFailed': 'Hindi maipanganda ang ulat',
+  'report.xHint': 'Snapshot — hindi isasara ang shift',
+  'report.zHint': 'Isasarado ang shift — suriin muna ang cash',
 };
 
 export default fil;

@@ -14,6 +14,8 @@ import { CartLineRow } from '../../src/components/register/CartLineRow';
 import { TotalsBlock } from '../../src/components/register/TotalsBlock';
 import { PaymentSheet } from '../../src/components/register/PaymentSheet';
 import { ReceiptView } from '../../src/components/register/ReceiptView';
+import { EmailReceiptSheet } from '../../src/components/register/EmailReceiptSheet';
+import { BarcodeScanner } from '../../src/components/BarcodeScanner';
 import { MoneyPrompt } from '../../src/components/register/MoneyPrompt';
 import { PinPrompt } from '../../src/components/PinPrompt';
 import { NumberText } from '../../src/components/NumberText';
@@ -21,7 +23,7 @@ import { formatMoney } from '../../src/lib/money';
 import { formatWeight, linePriceForWeight, parseWeightToG } from '../../src/lib/weighed';
 import { roleCanAct, type GateAction } from '../../src/lib/roles';
 import { getDeviceId } from '../../src/repositories/shiftRepository';
-import { getReceiptWidth, type ReceiptWidthSetting, type SaleReceipt } from '../../src/repositories/saleRepository';
+import { getEmailReceipts, getReceiptWidth, type ReceiptWidthSetting, type SaleReceipt } from '../../src/repositories/saleRepository';
 import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
 import type { PaymentAllocation, ProductWithStock } from '../../src/types';
 
@@ -62,15 +64,21 @@ export default function SellTab() {
   const [gate, setGate] = useState<{ action: GateAction; onOk: () => void } | null>(null);
   /** M5 (FR-103): weighed-item weight prompt (pre-filled from the scale barcode). */
   const [weigh, setWeigh] = useState<{ product: ProductWithStock; text: string } | null>(null);
+  /** Camera barcode scanner (issues #10/#11/#12). */
+  const [scanVisible, setScanVisible] = useState(false);
+  /** Email-receipt sheet (issue #19): auto-offered when enabled in Settings. */
+  const [emailReceipt, setEmailReceipt] = useState<SaleReceipt | null>(null);
 
   // M5 (FR-503): sync status for the banner + receipt width for the receipt.
   const sync = useSync();
   const [receiptWidth, setReceiptWidthState] = useState<ReceiptWidthSetting>('80mm');
-  // Reload on FOCUS (not just mount): the width is changed in Settings, which
-  // is a pushed screen — returning to this tab must pick up the new value.
+  const [emailAsk, setEmailAsk] = useState(false);
+  // Reload on FOCUS (not just mount): both are changed in Settings, which is a
+  // pushed screen — returning to this tab must pick up the new values.
   useFocusEffect(
     useCallback(() => {
       void getReceiptWidth().then(setReceiptWidthState);
+      void getEmailReceipts().then(setEmailAsk);
     }, []),
   );
 
@@ -151,11 +159,12 @@ export default function SellTab() {
 
   /** Barcode entry (FR-101) + keyboard wedge (FR-102): Enter submits; the field
    *  keeps focus (blurOnSubmit=false) so a wedge can fire scan after scan.
+   *  Camera scans pass the decoded code directly (issues #10/#11/#12).
    *  Blocked while the register is locked (no open shift — FR-200). */
-  const submitBarcode = useCallback(async () => {
-    const code = barcode.trim();
+  const submitBarcode = useCallback(async (codeArg?: string) => {
+    const code = (codeArg ?? barcode).trim();
     if (!code) return;
-    setBarcode('');
+    if (codeArg === undefined) setBarcode('');
     if (!shiftOpen) {
       Alert.alert(t('sell.registerLocked'), t('sell.registerLockedSell'));
       return;
@@ -248,12 +257,15 @@ export default function SellTab() {
         });
         setChangeMinor(change);
         setReceipt(r);
+        // Issue #19: when enabled in Settings, offer to email the receipt right
+        // after payment (the customer is still there).
+        if (emailAsk) setEmailReceipt(r);
         void reload(); // stock changed — refresh the product list (stock levels, chips)
       } catch (e) {
         Alert.alert(t('sell.saleFailed'), errMsg(e));
       }
     },
-    [cart, reload, active, shift.open],
+    [cart, reload, active, shift.open, emailAsk],
   );
 
   const promptLine =
@@ -308,7 +320,7 @@ export default function SellTab() {
   // Tablet: catalogue (scan, search, product grid) on the left, order on the right.
   const topSection = (
     <>
-      {/* Scan row — keyboard-wedge / typed barcode (camera scanning is v2) */}
+      {/* Scan row — keyboard-wedge / typed barcode + camera scanner (issues #10/#11/#12) */}
       <View style={styles.scanRow}>
         <View style={styles.scanBox}>
           <Ionicons name="barcode-outline" size={18} color={colors.primary} />
@@ -326,6 +338,14 @@ export default function SellTab() {
             blurOnSubmit={false}
           />
         </View>
+        <Pressable
+          style={styles.scanCamBtn}
+          onPress={() => setScanVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel={t('scan.title')}
+        >
+          <Ionicons name="camera" size={20} color={colors.primary} />
+        </Pressable>
       </View>
 
       {/* M5 (FR-503): sync status banner (replaces the old "offline queue" hint) */}
@@ -480,10 +500,35 @@ export default function SellTab() {
             cashierName={users?.find((u) => u.id === receipt.sale.cashierId)?.name ?? null}
             locale={cart.outlet?.locale ?? null}
             width={receiptWidth}
+            onEmail={() => setEmailReceipt(receipt)}
             onDone={() => setReceipt(null)}
           />
           </ModalFrame>
         )}
+      </Modal>
+
+      {/* Email receipt (issue #19) — manual entry or QR-scan the customer's
+          email, then hands a pre-filled draft to the device mail app. */}
+      <Modal visible={emailReceipt !== null} animationType="slide" onRequestClose={() => setEmailReceipt(null)}>
+        {emailReceipt && (
+          <EmailReceiptSheet
+            receipt={emailReceipt}
+            currency={currency}
+            outletName={cart.outlet?.name ?? 'NURLEDGER'}
+            onClose={() => setEmailReceipt(null)}
+          />
+        )}
+      </Modal>
+
+      {/* Camera barcode scanner (issues #10/#11/#12) */}
+      <Modal visible={scanVisible} animationType="fade" onRequestClose={() => setScanVisible(false)}>
+        <BarcodeScanner
+          onClose={() => setScanVisible(false)}
+          onScanned={(code) => {
+            setScanVisible(false);
+            void submitBarcode(code);
+          }}
+        />
       </Modal>
 
       {/* M5 (FR-103): weighed-item weight prompt (scale pre-fill or manual kg) */}
@@ -585,6 +630,16 @@ const styles = StyleSheet.create({
     height: 48,
   },
   scanInput: { flex: 1, fontFamily: fonts.monoMedium, fontSize: typography.body + 1, color: colors.slate900 },
+  scanCamBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.control,
+    borderWidth: 1.5,
+    borderColor: colors.primary,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   pendingBanner: {
     flexDirection: 'row',
     alignItems: 'center',

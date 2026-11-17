@@ -667,6 +667,36 @@ const ms: Record<keyof EnDict, string> = {
   'shift.pinChanged': 'PIN telah ditukar',
   'shift.changePinFailed': 'Tidak dapat menukar PIN',
   'shift.pinRequiredForRole': 'Pengguna pemilik dan pengurus memerlukan PIN 4–8 digit.',
+
+  // ── overlay imbas kod bar ─────────────────────────────────────────────
+  'scan.title': 'Imbas kod bar',
+  'scan.cameraDenied': 'Akses kamera diperlukan untuk mengimbas kod bar.',
+  'scan.openSettings': 'Buka Tetapan',
+  'scan.torch': 'Torch',
+  'scan.close': 'Tutup pembimbas',
+
+  // ── resit e-mel ───────────────────────────────────────────────────────
+  'receipt.email': 'Resit e-mel',
+  'receipt.emailTitle': 'Hantar resit ini',
+  'receipt.emailAddress': 'E-mel pelanggan',
+  'receipt.emailScanQr': 'Imbas QR',
+  'receipt.emailPlaceholder': 'nama@example.com',
+  'receipt.emailInvalid': 'Masukkan alamat e-mel yang sah',
+  'receipt.emailReady': 'Membuka aplikasi e-mel anda…',
+  'receipt.emailSend': 'Hantar resit',
+  'receipt.emailHint': 'Membuka aplikasi e-mel anda dengan draf yang telah diisi — berfungsi tanpa internet',
+  'receipt.emailSubject': 'Resit {number} — {outlet}',
+  'settings.emailReceipts': 'Tawarkan hantar resit e-mel',
+  'settings.emailReceiptsDesc': 'Selepas setiap pembayaran, tawarkan menghantar resit e-mel kepada pelanggan.',
+
+  // ── eksport laporan shift ─────────────────────────────────────────────
+  'report.xTitle': 'Laporan X',
+  'report.zTitle': 'Laporan Z',
+  'report.print': 'Cetak',
+  'report.sharePdf': 'Simpan / kongsi PDF',
+  'report.prepareFailed': 'Tidak dapat menyediakan laporan',
+  'report.xHint': 'Snapshot — tidak menutup shift',
+  'report.zHint': 'Menutup shift — kira wang tunai dahulu',
 };
 
 export default ms;

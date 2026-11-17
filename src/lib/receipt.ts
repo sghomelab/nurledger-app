@@ -8,6 +8,9 @@
  */
 
 import type { TaxLine, TaxMode } from './tax';
+import { PAYMENT_METHODS, paymentMethodsFor } from './payment';
+import { formatMoney } from './money';
+import type { SaleReceipt } from '../repositories/saleRepository';
 
 export type ReceiptWidth = '58mm' | '80mm';
 
@@ -159,4 +162,68 @@ export function renderReceiptText(rows: ReceiptRow[], cols = 48): string {
       return r.left ?? '';
     })
     .join('\n');
+}
+
+// ── SaleReceipt → ReceiptData (shared by the on-screen view and email) ──────
+
+/** Locale-aware payment label (FR-601): 'PayNow QR' in en-SG, etc. */
+export function paymentMethodLabel(id: string, locale: string | null | undefined): string {
+  return (
+    paymentMethodsFor(locale).find((m) => m.id === id)?.label ??
+    PAYMENT_METHODS.find((m) => m.id === id)?.label ??
+    id
+  );
+}
+
+export interface ReceiptDataFromOpts {
+  outletName: string;
+  cashierName?: string | null;
+  /** Outlet BCP-47 locale — localizes payment method labels (FR-601). */
+  locale?: string | null;
+  currency: string;
+  changeMinor?: number;
+}
+
+/**
+ * Builds the `ReceiptData` for a completed sale — the single source of truth
+ * for the on-screen receipt (FR-109) AND the emailed receipt body (issue #19),
+ * so the two can never drift.
+ */
+export function receiptDataFrom(receipt: SaleReceipt, opts: ReceiptDataFromOpts): ReceiptData {
+  const { sale, totals } = receipt;
+  const dt = new Date(sale.createdAt);
+  return {
+    outletName: opts.outletName,
+    number: sale.uuid.slice(0, 8).toUpperCase(),
+    stamp: dt.toLocaleString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+    cashierName: opts.cashierName ?? null,
+    lines: sale.lines.map((l) => ({
+      name: l.name,
+      qty: l.qty,
+      qtyG: l.qtyG,
+      unitPriceMinor: l.unitPriceMinor,
+      lineTotalMinor: l.lineTotalMinor,
+    })),
+    subtotalMinor: sale.subtotalMinor,
+    discountMinor: sale.discountMinor,
+    mode: totals.tax.mode,
+    ratePct: totals.tax.ratePct,
+    taxLines: totals.tax.lines,
+    taxMinor: sale.taxMinor,
+    totalMinor: sale.totalMinor,
+    payments: sale.payments.map((p) => ({
+      label: paymentMethodLabel(p.method, opts.locale),
+      amountMinor: p.amountMinor,
+      reference: p.reference ?? null,
+    })),
+    changeMinor: (opts.changeMinor ?? 0) > 0 ? opts.changeMinor : undefined,
+    currency: opts.currency,
+    fmt: (minor) => formatMoney(minor, opts.currency),
+  };
 }
