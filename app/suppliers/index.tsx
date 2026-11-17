@@ -142,7 +142,16 @@ export default function SuppliersScreen() {
         <Pressable style={styles.backdrop} onPress={() => setFormOpen(false)}>
           <Pressable style={styles.formCard} onPress={() => {}}>
             <Text style={styles.formTitle}>{editing ? t('suppliers.editSupplier') : t('suppliers.newSupplier')}</Text>
-            <Field label={t('invEdit.name')}>
+            {/* Scrollable fields + max-height card: with the keyboard up (Android
+                adjustResize) the card must not grow past the visible area, or the
+                title slides under the status bar (issue #4: "texts superimposed"). */}
+            <ScrollView
+              contentContainerStyle={{ gap: spacing.md }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              style={styles.formScroll}
+            >
+              <Field label={t('invEdit.name')}>
               <TextInput
                 style={styles.input}
                 value={name}
@@ -171,6 +180,7 @@ export default function SuppliersScreen() {
                 numberOfLines={3}
               />
             </Field>
+            </ScrollView>
             <View style={styles.formButtons}>
               <Pressable style={styles.cancelBtn} onPress={() => setFormOpen(false)}>
                 <Text style={styles.cancelText}>{t('common.cancel')}</Text>
@@ -234,10 +244,11 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', padding: spacing.xl,
   },
   formCard: {
-    width: '100%', maxWidth: 440,
+    width: '100%', maxWidth: 440, maxHeight: '88%',
     backgroundColor: colors.white, borderRadius: radius.card + 4,
     padding: spacing.lg, gap: spacing.md,
   },
+  formScroll: { flexShrink: 1 },
   formTitle: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate900, marginBottom: spacing.xs },
   field: { gap: 6 },
   label: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700 },
