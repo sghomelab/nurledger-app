@@ -1,6 +1,6 @@
 import { useLayout } from '../../src/hooks/useLayout';
 import { GridCell } from '../../src/components/GridCell';
-import { useCallback, useState } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { FlatList, Pressable, Switch, TextInput, View, Text, StyleSheet, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +8,8 @@ import { useProducts, useOutlet } from '../../src/hooks/useAppData';
 import { useT } from '../../src/hooks/useT';
 import { StatusChip } from '../../src/components/Chip';
 import { NumberText } from '../../src/components/NumberText';
-import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 import { formatMoney } from '../../src/lib/money';
 import type { ProductWithStock } from '../../src/types';
 
@@ -21,6 +22,8 @@ import type { ProductWithStock } from '../../src/types';
  * entry points.
  */
 export default function InventoryTab() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { products, lowStock, search, setSearch, reload } = useProducts();
   const { outlet } = useOutlet();
@@ -145,6 +148,8 @@ export default function InventoryTab() {
 }
 
 function ProductRow({ product, currency, onPress }: { product: ProductWithStock; currency: string; onPress: () => void }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Pressable
       onPress={onPress}
@@ -167,73 +172,77 @@ function ProductRow({ product, currency, onPress }: { product: ProductWithStock;
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.slate50 },
-  poRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    marginHorizontal: spacing.lg, marginTop: spacing.sm,
-    backgroundColor: colors.primarySoft, borderRadius: radius.control,
-    paddingHorizontal: spacing.md, paddingVertical: 12,
-  },
-  poText: { flex: 1, fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.primary },
-  searchRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  searchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.white,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    paddingHorizontal: spacing.md,
-    height: 44,
-  },
-  searchInput: { flex: 1, fontFamily: fonts.sans, fontSize: 15, color: colors.slate900, padding: 0 },
-  toggleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg + 2,
-    paddingVertical: spacing.md,
-  },
-  toggleLabel: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.slate700 },
-  toggleCount: { color: colors.warning, fontWeight: '600', marginLeft: 4 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.white,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md + 2,
-  },
-  rowMain: { flex: 1 },
-  rowName: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate900 },
-  rowMeta: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.slate500, marginTop: 2 },
-  rowRight: { alignItems: 'flex-end' },
-  rowPrice: { fontSize: 14.5, fontWeight: '500' },
-  rowStockRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 3 },
-  rowStock: { fontSize: 13, color: colors.slate700 },
-  empty: { alignItems: 'center', paddingTop: 80, gap: spacing.sm },
-  emptyText: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500 },
-  fab: {
-    position: 'absolute',
-    right: spacing.xl,
-    bottom: spacing.xl,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 4,
-    shadowColor: colors.slate900,
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-  },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, backgroundColor: colors.slate50 },
+    poRow: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+      marginHorizontal: spacing.lg, marginTop: spacing.sm,
+      backgroundColor: colors.primarySoft, borderRadius: radius.control,
+      paddingHorizontal: spacing.md, paddingVertical: 12,
+    },
+    poText: { flex: 1, fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.primary },
+    searchRow: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+    searchBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.white,
+      borderRadius: radius.control,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      paddingHorizontal: spacing.md,
+      height: 44,
+    },
+    searchInput: { flex: 1, fontFamily: fonts.sans, fontSize: 15, color: colors.slate900, padding: 0 },
+    toggleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg + 2,
+      paddingVertical: spacing.md,
+    },
+    toggleLabel: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.slate700 },
+    toggleCount: { color: colors.warning, fontWeight: '600', marginLeft: 4 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.white,
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.sm,
+      borderRadius: radius.card,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md + 2,
+    },
+    rowMain: { flex: 1 },
+    rowName: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate900 },
+    rowMeta: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.slate500, marginTop: 2 },
+    rowRight: { alignItems: 'flex-end' },
+    rowPrice: { fontSize: 14.5, fontWeight: '500' },
+    rowStockRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: 3 },
+    rowStock: { fontSize: 13, color: colors.slate700 },
+    empty: { alignItems: 'center', paddingTop: 80, gap: spacing.sm },
+    emptyText: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500 },
+    fab: {
+      position: 'absolute',
+      right: spacing.xl,
+      bottom: spacing.xl,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      elevation: 4,
+      shadowColor: colors.slate900,
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 4 },
+    },
+
+  });
+}

@@ -2,21 +2,24 @@ import { useT } from '../../src/hooks/useT';
 import type { TFn } from '../../src/i18n';
 import { useLayout } from '../../src/hooks/useLayout';
 import { GridCell } from '../../src/components/GridCell';
-import { useCallback, useState } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { FlatList, Pressable, Text, StyleSheet, RefreshControl, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { expiryRadar } from '../../src/repositories/stockRepository';
 import { type ExpiryRadarEntry, type ExpiryRadarSummary, type ExpiryUrgency } from '../../src/types';
 import { NumberText } from '../../src/components/NumberText';
-import { colors, fonts, radius, spacing } from '../../src/theme/tokens';
+import { fonts, radius, spacing, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 
-const URGENCY_META: Record<ExpiryUrgency, { color: string; bg: string }> = {
-  expired: { color: colors.danger, bg: colors.dangerSoft },
-  critical: { color: colors.danger, bg: colors.dangerSoft },
-  soon: { color: '#B45309', bg: colors.warningSoft },
-  ok: { color: colors.positive, bg: colors.positiveSoft },
-};
+function urgencyMeta(c: Palette): Record<ExpiryUrgency, { color: string; bg: string }> {
+  return {
+    expired: { color: c.danger, bg: c.dangerSoft },
+    critical: { color: c.danger, bg: c.dangerSoft },
+    soon: { color: '#B45309', bg: c.warningSoft },
+    ok: { color: c.positive, bg: c.positiveSoft },
+  };
+}
 
 function fmtDays(daysLeft: number, t: TFn): string {
   if (!Number.isFinite(daysLeft)) return '—';
@@ -32,6 +35,8 @@ function fmtDays(daysLeft: number, t: TFn): string {
  * opens the product detail.
  */
 export default function ExpiryTab() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const layout = useLayout();
   const router = useRouter();
@@ -65,7 +70,7 @@ export default function ExpiryTab() {
   };
 
   const renderItem = ({ item }: { item: ExpiryRadarEntry }) => {
-    const meta = URGENCY_META[item.urgency];
+    const meta = urgencyMeta(colors)[item.urgency];
     return (
       <Pressable
         style={styles.row}
@@ -132,6 +137,8 @@ export default function ExpiryTab() {
 }
 
 function SummaryCard({ label, value, color, icon, wide }: { label: string; value: string; color: string; icon: keyof typeof Ionicons.glyphMap; wide?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={[styles.card, wide && { flexBasis: '22%' }]}>
       <View style={styles.cardHead}>
@@ -143,32 +150,36 @@ function SummaryCard({ label, value, color, icon, wide }: { label: string; value
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.slate50 },
-  cards: {
-    flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md,
-    paddingHorizontal: spacing.lg, paddingTop: spacing.lg,
-  },
-  card: {
-    flexBasis: '46%', flexGrow: 1, backgroundColor: colors.white, borderRadius: radius.card,
-    borderWidth: 1, borderColor: colors.slate200, padding: spacing.md,
-  },
-  cardHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
-  cardLabel: { fontFamily: fonts.sansSemiBold, fontSize: 12, color: colors.slate500 },
-  cardVal: { fontFamily: fonts.mono, fontSize: 22 },
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.white, borderRadius: radius.card, borderWidth: 1, borderColor: colors.slate200,
-    padding: spacing.md, marginBottom: spacing.md,
-  },
-  dot: { width: 10, height: 10, borderRadius: 5 },
-  name: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate900 },
-  meta: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2 },
-  rowRight: { alignItems: 'flex-end', gap: 6 },
-  urgencyChip: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, overflow: 'hidden' },
-  urgencyText: { fontFamily: fonts.mono, fontSize: 12, fontWeight: '600' },
-  qty: { fontFamily: fonts.mono, fontSize: 15, color: colors.slate900 },
-  empty: { alignItems: 'center', paddingTop: 120 },
-  emptyTitle: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.slate700, marginTop: spacing.md },
-  emptySub: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500, marginTop: 4 },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, backgroundColor: colors.slate50 },
+    cards: {
+      flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md,
+      paddingHorizontal: spacing.lg, paddingTop: spacing.lg,
+    },
+    card: {
+      flexBasis: '46%', flexGrow: 1, backgroundColor: colors.white, borderRadius: radius.card,
+      borderWidth: 1, borderColor: colors.slate200, padding: spacing.md,
+    },
+    cardHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: spacing.sm },
+    cardLabel: { fontFamily: fonts.sansSemiBold, fontSize: 12, color: colors.slate500 },
+    cardVal: { fontFamily: fonts.mono, fontSize: 22 },
+    row: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+      backgroundColor: colors.white, borderRadius: radius.card, borderWidth: 1, borderColor: colors.slate200,
+      padding: spacing.md, marginBottom: spacing.md,
+    },
+    dot: { width: 10, height: 10, borderRadius: 5 },
+    name: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate900 },
+    meta: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2 },
+    rowRight: { alignItems: 'flex-end', gap: 6 },
+    urgencyChip: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, overflow: 'hidden' },
+    urgencyText: { fontFamily: fonts.mono, fontSize: 12, fontWeight: '600' },
+    qty: { fontFamily: fonts.mono, fontSize: 15, color: colors.slate900 },
+    empty: { alignItems: 'center', paddingTop: 120 },
+    emptyTitle: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.slate700, marginTop: spacing.md },
+    emptySub: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500, marginTop: 4 },
+
+  });
+}

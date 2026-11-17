@@ -3,9 +3,13 @@ import { NumberText } from '../NumberText';
 import { formatMoney } from '../../lib/money';
 import { useT } from '../../hooks/useT';
 import type { SaleTotals } from '../../lib/sale';
-import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
+import { useMemo } from 'react';
 
 function Row({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.row}>
       <Text style={[styles.label, accent ? { color: accent } : null]}>{label}</Text>
@@ -16,6 +20,8 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
 
 /** Subtotal / Discount / Tax / TOTAL + live gross margin (FIFO, FR-321/FR-108). */
 export function TotalsBlock({ totals, currency }: { totals: SaleTotals; currency: string }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const taxLabel = t('totals.tax', {
     rate: totals.tax.ratePct,
@@ -45,36 +51,40 @@ export function TotalsBlock({ totals, currency }: { totals: SaleTotals; currency
   );
 }
 
-const styles = StyleSheet.create({
-  block: {
-    backgroundColor: colors.white,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: 6,
-  },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  label: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate500 },
-  value: { fontSize: typography.body },
-  totalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.slate200,
-  },
-  totalLabel: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
-  totalValue: { fontFamily: fonts.monoSemiBold, fontSize: 22, color: colors.slate900 },
-  marginRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-  },
-  marginLabel: { fontFamily: fonts.sansMedium, fontSize: typography.caption, color: colors.slate500 },
-  marginValue: { fontFamily: fonts.monoMedium, fontSize: typography.caption, color: colors.positive },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    block: {
+      backgroundColor: colors.white,
+      borderRadius: radius.card,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      gap: 6,
+    },
+    row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    label: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate500 },
+    value: { fontSize: typography.body },
+    totalRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: spacing.xs,
+      paddingTop: spacing.sm,
+      borderTopWidth: 1,
+      borderTopColor: colors.slate200,
+    },
+    totalLabel: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
+    totalValue: { fontFamily: fonts.monoSemiBold, fontSize: 22, color: colors.slate900 },
+    marginRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: spacing.xs,
+    },
+    marginLabel: { fontFamily: fonts.sansMedium, fontSize: typography.caption, color: colors.slate500 },
+    marginValue: { fontFamily: fonts.monoMedium, fontSize: typography.caption, color: colors.positive },
+
+  });
+}

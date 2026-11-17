@@ -1,6 +1,8 @@
 import { View, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, fonts, radius, spacing, typography } from '../theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
+import { useMemo } from 'react';
 
 /** Placeholder for milestone-gated tabs (M2–M6) with scope label. */
 export function ComingSoon({
@@ -14,6 +16,8 @@ export function ComingSoon({
   milestone: string;
   bullets: string[];
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.wrap}>
       <View style={styles.iconCircle}>
@@ -35,40 +39,44 @@ export function ComingSoon({
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  iconCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-  },
-  title: {
-    fontFamily: fonts.sansBold,
-    fontSize: typography.title,
-    color: colors.slate900,
-    marginBottom: spacing.sm,
-  },
-  milestoneChip: {
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.chip,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    marginBottom: spacing.lg,
-  },
-  milestoneText: { fontFamily: fonts.sansSemiBold, fontSize: 12, color: colors.primary },
-  card: {
-    width: '100%',
-    backgroundColor: colors.white,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    padding: spacing.lg,
-  },
-  bulletRow: { flexDirection: 'row', paddingVertical: 5 },
-  bulletDot: { color: colors.primary, marginRight: spacing.sm, fontWeight: '700' },
-  bullet: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate700 },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+    iconCircle: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: colors.primarySoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.lg,
+    },
+    title: {
+      fontFamily: fonts.sansBold,
+      fontSize: typography.title,
+      color: colors.slate900,
+      marginBottom: spacing.sm,
+    },
+    milestoneChip: {
+      backgroundColor: colors.primarySoft,
+      borderRadius: radius.chip,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      marginBottom: spacing.lg,
+    },
+    milestoneText: { fontFamily: fonts.sansSemiBold, fontSize: 12, color: colors.primary },
+    card: {
+      width: '100%',
+      backgroundColor: colors.white,
+      borderRadius: radius.card,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      padding: spacing.lg,
+    },
+    bulletRow: { flexDirection: 'row', paddingVertical: 5 },
+    bulletDot: { color: colors.primary, marginRight: spacing.sm, fontWeight: '700' },
+    bullet: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate700 },
+
+  });
+}

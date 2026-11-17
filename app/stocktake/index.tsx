@@ -1,6 +1,6 @@
 import { useT } from '../../src/hooks/useT';
 import { useTopInset } from '../../src/hooks/useTopInset';
-import { useCallback, useState } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import {
   View,
@@ -32,7 +32,8 @@ function StocktakeChip({ applied }: { applied: boolean }) {
     <Chip label={t('stDetail.counting')} tone="primary" />
   );
 }
-import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 import type { Category } from '../../src/types';
 
 /**
@@ -44,6 +45,8 @@ import type { Category } from '../../src/types';
  * `stocktake_apply` gate (owner/manager PIN for cashiers).
  */
 export default function StocktakeListScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const router = useRouter();
   const topInset = useTopInset();
@@ -204,81 +207,85 @@ export default function StocktakeListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.slate50 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  backBtn: { paddingRight: spacing.xs },
-  title: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900 },
-  meta: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginTop: 2 },
-  newBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.primary,
-    borderRadius: radius.control,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 10,
-  },
-  newText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.white },
-  empty: { alignItems: 'center', paddingVertical: spacing.xl * 2, gap: spacing.sm },
-  emptyText: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate400 },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.xs,
-    backgroundColor: colors.white,
-    borderRadius: radius.card,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-  },
-  rowMain: { flex: 1 },
-  rowName: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate900 },
-  rowMeta: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginTop: 2 },
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
 
-  backdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.45)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: radius.card + 4,
-    borderTopRightRadius: radius.card + 4,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.xl,
-    gap: spacing.md,
-  },
-  sheetTitle: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900 },
-  fieldLabel: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate500 },
-  scopeBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: colors.slate300,
-    borderRadius: radius.control,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-  },
-  scopeText: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate900 },
-  blindRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.xs,
-  },
-  hint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginTop: 2 },
-  startBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.control,
-    alignItems: 'center',
-    paddingVertical: 14,
-    marginTop: spacing.sm,
-  },
-  startText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.white },
-});
+    wrap: { flex: 1, backgroundColor: colors.slate50 },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginHorizontal: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    backBtn: { paddingRight: spacing.xs },
+    title: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900 },
+    meta: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginTop: 2 },
+    newBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.primary,
+      borderRadius: radius.control,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 10,
+    },
+    newText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.white },
+    empty: { alignItems: 'center', paddingVertical: spacing.xl * 2, gap: spacing.sm },
+    emptyText: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate400 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: spacing.lg,
+      marginVertical: spacing.xs,
+      backgroundColor: colors.white,
+      borderRadius: radius.card,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+      gap: spacing.sm,
+    },
+    rowMain: { flex: 1 },
+    rowName: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate900 },
+    rowMeta: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginTop: 2 },
+
+    backdrop: { flex: 1, backgroundColor: 'rgba(15, 23, 42, 0.45)', justifyContent: 'flex-end' },
+    sheet: {
+      backgroundColor: colors.white,
+      borderTopLeftRadius: radius.card + 4,
+      borderTopRightRadius: radius.card + 4,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.lg,
+      paddingBottom: spacing.xl,
+      gap: spacing.md,
+    },
+    sheetTitle: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900 },
+    fieldLabel: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate500 },
+    scopeBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: colors.slate300,
+      borderRadius: radius.control,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 12,
+    },
+    scopeText: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate900 },
+    blindRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginTop: spacing.xs,
+    },
+    hint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginTop: 2 },
+    startBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: radius.control,
+      alignItems: 'center',
+      paddingVertical: 14,
+      marginTop: spacing.sm,
+    },
+    startText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.white },
+
+  });
+}

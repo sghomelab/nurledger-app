@@ -5,7 +5,9 @@ import { NumberText } from '../NumberText';
 import { formatMoney } from '../../lib/money';
 import { formatWeight } from '../../lib/weighed';
 import { useT } from '../../hooks/useT';
-import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
+import { useMemo } from 'react';
 import type { CartLine } from '../../types';
 
 interface Props {
@@ -25,6 +27,8 @@ interface Props {
  * qty stepper — qty is fixed at 1 and the price is per-amount, not per-unit.
  */
 export function CartLineRow({ line, currency, onQty, onRemove, onSetPrice, onSetDiscount }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const lineTotal = line.unitPriceMinor * line.qty - clampLineDiscount(line);
   const weighed = line.qtyG != null;
@@ -83,53 +87,57 @@ export function CartLineRow({ line, currency, onQty, onRemove, onSetPrice, onSet
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.slate100,
-  },
-  nameCol: { flex: 1, gap: 2 },
-  name: { fontFamily: fonts.sansMedium, fontSize: typography.body, color: colors.slate900 },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  meta: { fontSize: typography.caption, color: colors.slate500 },
-  weightChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.chip,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  metaTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.slate100,
-    borderRadius: radius.control,
-    paddingHorizontal: 2,
-  },
-  stepBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.control,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-  },
-  qty: { fontSize: typography.body, minWidth: 24, textAlign: 'center' },
-  rightCol: {
-    width: 84,
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    flexDirection: 'row',
-  },
-  lineTotal: { fontSize: typography.body },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.slate100,
+    },
+    nameCol: { flex: 1, gap: 2 },
+    name: { fontFamily: fonts.sansMedium, fontSize: typography.body, color: colors.slate900 },
+    metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    meta: { fontSize: typography.caption, color: colors.slate500 },
+    weightChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: colors.primarySoft,
+      borderRadius: radius.chip,
+      paddingHorizontal: 6,
+      paddingVertical: 1,
+    },
+    metaTag: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    stepper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.slate100,
+      borderRadius: radius.control,
+      paddingHorizontal: 2,
+    },
+    stepBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: radius.control,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.white,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+    },
+    qty: { fontSize: typography.body, minWidth: 24, textAlign: 'center' },
+    rightCol: {
+      width: 84,
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      flexDirection: 'row',
+    },
+    lineTotal: { fontSize: typography.body },
+
+  });
+}

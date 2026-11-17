@@ -3,7 +3,9 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatMoney } from '../../lib/money';
 import type { CashMove, SalesByMethod, XReport, ZReport } from '../../lib/shift';
-import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
+import { useMemo } from 'react';
 
 interface Props {
   report: ZReport | XReport;
@@ -17,6 +19,8 @@ interface Props {
  * source of truth; this view is one faithful rendering of it).
  */
 export function ReportView({ report, currency }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const isZ = report.kind === 'Z';
 
@@ -110,6 +114,8 @@ function fmtRange(openedAt: number, endAt: number | null, isZ: boolean): string 
 }
 
 function Row({ label, value, strong, indent }: { label: string; value: string; strong?: boolean; indent?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={[styles.row, indent && styles.rowIndent]}>
       <Text style={[styles.rowLabel, strong && styles.rowStrong]}>{label}</Text>
@@ -119,6 +125,8 @@ function Row({ label, value, strong, indent }: { label: string; value: string; s
 }
 
 function VarianceRow({ varianceMinor, varianceClass, currency }: { varianceMinor: number; varianceClass: 'exact' | 'over' | 'short'; currency: string }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const color = varianceClass === 'exact' ? colors.positive : varianceClass === 'over' ? colors.warning : colors.danger;
   const label = varianceClass === 'exact' ? 'Exact' : varianceClass === 'over' ? 'Over' : 'Short';
   return (
@@ -132,22 +140,28 @@ function VarianceRow({ varianceMinor, varianceClass, currency }: { varianceMinor
 }
 
 function Divider() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return <View style={styles.divider} />;
 }
 
-const styles = StyleSheet.create({
-  content: { padding: spacing.lg, gap: spacing.md },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  header: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
-  sub: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate500 },
-  section: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate700, marginTop: spacing.sm },
-  card: { backgroundColor: colors.white, borderRadius: radius.card, borderWidth: 1, borderColor: colors.slate200, padding: spacing.md, gap: spacing.sm },
-  empty: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400 },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: spacing.sm },
-  rowIndent: { paddingLeft: spacing.lg },
-  rowLabel: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500, flexShrink: 1 },
-  rowValue: { fontFamily: fonts.mono, fontSize: typography.caption, color: colors.slate900 },
-  rowStrong: { fontFamily: fonts.sansSemiBold, color: colors.slate900 },
-  divider: { height: 1, backgroundColor: colors.slate200, marginVertical: spacing.xs },
-  note: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate700 },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    content: { padding: spacing.lg, gap: spacing.md },
+    headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    header: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
+    sub: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate500 },
+    section: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate700, marginTop: spacing.sm },
+    card: { backgroundColor: colors.white, borderRadius: radius.card, borderWidth: 1, borderColor: colors.slate200, padding: spacing.md, gap: spacing.sm },
+    empty: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400 },
+    row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: spacing.sm },
+    rowIndent: { paddingLeft: spacing.lg },
+    rowLabel: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500, flexShrink: 1 },
+    rowValue: { fontFamily: fonts.mono, fontSize: typography.caption, color: colors.slate900 },
+    rowStrong: { fontFamily: fonts.sansSemiBold, color: colors.slate900 },
+    divider: { height: 1, backgroundColor: colors.slate200, marginVertical: spacing.xs },
+    note: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate700 },
+
+  });
+}

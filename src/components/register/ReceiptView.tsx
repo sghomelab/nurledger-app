@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { layoutReceipt, renderReceiptText, WIDTH_COLS, receiptDataFrom, type ReceiptWidth } from '../../lib/receipt';
 import { useT } from '../../hooks/useT';
 import type { SaleReceipt } from '../../repositories/saleRepository';
-import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface Props {
   receipt: SaleReceipt;
@@ -29,6 +30,8 @@ interface Props {
  * reference (FR-601).
  */
 export function ReceiptView({ receipt, currency, changeMinor, outletName, cashierName, locale, width, onEmail, onDone }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const { sale } = receipt;
   const number = sale.uuid.slice(0, 8).toUpperCase();
@@ -73,22 +76,26 @@ export function ReceiptView({ receipt, currency, changeMinor, outletName, cashie
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.slate50, padding: spacing.lg, gap: spacing.lg },
-  success: { alignItems: 'center', gap: 4, paddingVertical: spacing.sm },
-  successTitle: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900 },
-  successSub: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
-  receipt: {
-    flexGrow: 1,
-    backgroundColor: colors.white,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    padding: spacing.lg,
-  },
-  paper: { fontFamily: fonts.mono, fontSize: 11, color: colors.slate900, lineHeight: 16 },
-  doneBtn: { height: 54, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  doneText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
-  emailBtn: { minHeight: 48, borderRadius: radius.control, borderWidth: 1.5, borderColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  emailText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.primary },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, backgroundColor: colors.slate50, padding: spacing.lg, gap: spacing.lg },
+    success: { alignItems: 'center', gap: 4, paddingVertical: spacing.sm },
+    successTitle: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900 },
+    successSub: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
+    receipt: {
+      flexGrow: 1,
+      backgroundColor: colors.white,
+      borderRadius: radius.card,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      padding: spacing.lg,
+    },
+    paper: { fontFamily: fonts.mono, fontSize: 11, color: colors.slate900, lineHeight: 16 },
+    doneBtn: { height: 54, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+    doneText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
+    emailBtn: { minHeight: 48, borderRadius: radius.control, borderWidth: 1.5, borderColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+    emailText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.primary },
+
+  });
+}

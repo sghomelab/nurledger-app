@@ -28,7 +28,8 @@ import { uuidv4 } from '../src/lib/ids';
 import { isSecureBackendUrl } from '../src/lib/cloud/url';
 import type { CloudConfig } from '../src/lib/cloud/types';
 import { taxEngineLabel } from '../src/lib/currency';
-import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../src/theme/tokens';
+import { useTheme } from '../src/theme/ThemeContext';
 
 /**
  * BYO cloud setup wizard (ADR-010, FR-504/FR-505).
@@ -61,6 +62,8 @@ import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens'
 type Step = 'creds' | 'sql' | 'account' | 'store';
 
 export default function CloudSetupScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { t } = useT();
   const adapter = getCloudAdapter();
@@ -525,6 +528,8 @@ function useOutletLite() {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -533,133 +538,137 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const styles = StyleSheet.create({
-  modeRow: { flexDirection: 'row', gap: spacing.sm },
-  modeBtn: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    alignItems: 'center',
-  },
-  modeBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  modeText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.slate700 },
-  modeTextActive: { color: colors.white },
-  content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 16 },
-  steps: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.xs },
-  step: { alignItems: 'center', gap: 4, width: 72 },
-  stepDot: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: colors.slate200,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stepDotDone: { backgroundColor: colors.positive },
-  stepDotActive: { backgroundColor: colors.primary },
-  stepNum: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.slate500 },
-  stepLabel: { fontFamily: fonts.sansSemiBold, fontSize: 10, color: colors.slate400, textAlign: 'center' },
-  errorBox: {
-    flexDirection: 'row',
-    gap: 8,
-    backgroundColor: colors.dangerSoft,
-    borderRadius: radius.control,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  errorText: { flex: 1, fontFamily: fonts.sans, fontSize: typography.caption, color: colors.danger },
-  noteBox: {
-    flexDirection: 'row',
-    gap: 8,
-    backgroundColor: colors.primarySoft,
-    borderRadius: radius.control,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  noteText: { flex: 1, fontFamily: fonts.sans, fontSize: typography.caption, color: colors.primary },
-  cardTitle: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900, marginBottom: 6 },
-  hint: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500, lineHeight: 17, marginBottom: spacing.md },
-  field: { marginBottom: spacing.md },
-  fieldLabel: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700, marginBottom: 4 },
-  input: {
-    backgroundColor: colors.white,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 11,
-    fontFamily: fonts.sans,
-    fontSize: 15,
-    color: colors.slate900,
-  },
-  inputMono: {
-    backgroundColor: colors.white,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 9,
-    fontFamily: fonts.mono,
-    fontSize: 12,
-    color: colors.slate900,
-  },
-  sqlBox: {
-    backgroundColor: colors.slate900,
-    borderRadius: radius.control,
-    padding: spacing.md,
-    maxHeight: 180,
-    marginBottom: spacing.md,
-  },
-  sqlScroll: { flexGrow: 0 },
-  sqlText: { fontFamily: fonts.mono, fontSize: 10, color: '#E2E8F0', lineHeight: 14 },
-  copyBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    height: 44,
-    borderRadius: radius.control,
-    backgroundColor: colors.primary,
-  },
-  copyText: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.white },
-  storeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.slate50,
-    borderRadius: radius.control,
-    padding: spacing.md,
-  },
-  storeName: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.slate900 },
-  storeSub: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
-  footer: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderTopWidth: 1,
-    borderColor: colors.slate200,
-    backgroundColor: colors.white,
-  },
-  backBtn: {
-    flex: 1,
-    height: 52,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.slate300,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate700 },
-  primaryBtn: {
-    flex: 2,
-    height: 52,
-    borderRadius: radius.control,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  primaryText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    modeRow: { flexDirection: 'row', gap: spacing.sm },
+    modeBtn: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: radius.control,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      alignItems: 'center',
+    },
+    modeBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    modeText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.slate700 },
+    modeTextActive: { color: colors.white },
+    content: { padding: spacing.lg, gap: spacing.md, paddingBottom: 16 },
+    steps: { flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: spacing.xs },
+    step: { alignItems: 'center', gap: 4, width: 72 },
+    stepDot: {
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      backgroundColor: colors.slate200,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stepDotDone: { backgroundColor: colors.positive },
+    stepDotActive: { backgroundColor: colors.primary },
+    stepNum: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.slate500 },
+    stepLabel: { fontFamily: fonts.sansSemiBold, fontSize: 10, color: colors.slate400, textAlign: 'center' },
+    errorBox: {
+      flexDirection: 'row',
+      gap: 8,
+      backgroundColor: colors.dangerSoft,
+      borderRadius: radius.control,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 2,
+    },
+    errorText: { flex: 1, fontFamily: fonts.sans, fontSize: typography.caption, color: colors.danger },
+    noteBox: {
+      flexDirection: 'row',
+      gap: 8,
+      backgroundColor: colors.primarySoft,
+      borderRadius: radius.control,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 2,
+    },
+    noteText: { flex: 1, fontFamily: fonts.sans, fontSize: typography.caption, color: colors.primary },
+    cardTitle: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900, marginBottom: 6 },
+    hint: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500, lineHeight: 17, marginBottom: spacing.md },
+    field: { marginBottom: spacing.md },
+    fieldLabel: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700, marginBottom: 4 },
+    input: {
+      backgroundColor: colors.white,
+      borderRadius: radius.control,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 11,
+      fontFamily: fonts.sans,
+      fontSize: 15,
+      color: colors.slate900,
+    },
+    inputMono: {
+      backgroundColor: colors.white,
+      borderRadius: radius.control,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      paddingHorizontal: spacing.md,
+      paddingVertical: 9,
+      fontFamily: fonts.mono,
+      fontSize: 12,
+      color: colors.slate900,
+    },
+    sqlBox: {
+      backgroundColor: colors.slate900,
+      borderRadius: radius.control,
+      padding: spacing.md,
+      maxHeight: 180,
+      marginBottom: spacing.md,
+    },
+    sqlScroll: { flexGrow: 0 },
+    sqlText: { fontFamily: fonts.mono, fontSize: 10, color: '#E2E8F0', lineHeight: 14 },
+    copyBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      height: 44,
+      borderRadius: radius.control,
+      backgroundColor: colors.primary,
+    },
+    copyText: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.white },
+    storeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.slate50,
+      borderRadius: radius.control,
+      padding: spacing.md,
+    },
+    storeName: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.slate900 },
+    storeSub: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
+    footer: {
+      flexDirection: 'row',
+      gap: spacing.md,
+      padding: spacing.lg,
+      borderTopWidth: 1,
+      borderColor: colors.slate200,
+      backgroundColor: colors.white,
+    },
+    backBtn: {
+      flex: 1,
+      height: 52,
+      borderRadius: radius.control,
+      borderWidth: 1,
+      borderColor: colors.slate300,
+      backgroundColor: colors.white,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    backText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate700 },
+    primaryBtn: {
+      flex: 2,
+      height: 52,
+      borderRadius: radius.control,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    primaryText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
+
+  });
+}

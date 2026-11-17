@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useT } from '../hooks/useT';
-import { colors, fonts, radius, spacing } from '../theme/tokens';
+import { fonts, radius, spacing, type Palette } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 /** The word the user must type (deliberately not translated: it is an action key, like a PIN). */
 export const DELETE_CONFIRM_WORD = 'DELETE';
@@ -16,6 +17,8 @@ export interface DeleteAccountDialogProps {
 
 /** Typed-confirmation dialog for in-app cloud account deletion. */
 export function DeleteAccountDialog({ role, busy, onConfirm, onCancel }: DeleteAccountDialogProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const [typed, setTyped] = useState('');
   const ok = typed.trim().toUpperCase() === DELETE_CONFIRM_WORD && !busy;
@@ -52,17 +55,21 @@ export function DeleteAccountDialog({ role, busy, onConfirm, onCancel }: DeleteA
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
-  card: { width: '100%', maxWidth: 480, backgroundColor: '#fff', borderRadius: radius.control, padding: spacing.lg, gap: spacing.sm },
-  title: { fontFamily: fonts.sansMedium, fontSize: 18, color: colors.danger },
-  body: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500, lineHeight: 20 },
-  label: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.slate500, marginTop: spacing.sm },
-  input: { borderWidth: 1, borderColor: colors.slate200, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: 10, fontFamily: fonts.mono, fontSize: 16 },
-  row: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  btn: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.control },
-  cancel: { backgroundColor: colors.slate100 },
-  cancelText: { fontFamily: fonts.sansMedium, color: colors.slate500 },
-  danger: { backgroundColor: colors.danger },
-  dangerText: { fontFamily: fonts.sansMedium, color: '#fff' },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center', padding: spacing.lg },
+    card: { width: '100%', maxWidth: 480, backgroundColor: '#fff', borderRadius: radius.control, padding: spacing.lg, gap: spacing.sm },
+    title: { fontFamily: fonts.sansMedium, fontSize: 18, color: colors.danger },
+    body: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500, lineHeight: 20 },
+    label: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.slate500, marginTop: spacing.sm },
+    input: { borderWidth: 1, borderColor: colors.slate200, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: 10, fontFamily: fonts.mono, fontSize: 16 },
+    row: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+    btn: { flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.control },
+    cancel: { backgroundColor: colors.slate100 },
+    cancelText: { fontFamily: fonts.sansMedium, color: colors.slate500 },
+    danger: { backgroundColor: colors.danger },
+    dangerText: { fontFamily: fonts.sansMedium, color: '#fff' },
+
+  });
+}

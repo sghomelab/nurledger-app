@@ -1,7 +1,7 @@
 import { useT } from '../../src/hooks/useT';
 import type { MsgKey } from '../../src/i18n';
 import { wideColumn } from '../../src/lib/layout';
-import { useCallback, useState } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,7 +25,8 @@ import { isValidPin } from '../../src/lib/pin';
 import type { AppUser } from '../../src/types';
 import type { XReport, ZReport } from '../../src/lib/shift';
 import type { UserRole } from '../../src/types';
-import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 
 function errMsg(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
@@ -55,6 +56,8 @@ const ROLE_KEY: Record<UserRole, MsgKey> = {
  * "owner's PIN protects the rest" rule (FR-500 / DEV-003).
  */
 export default function ShiftTab() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const router = useRouter();
   const { outlet } = useOutlet();
@@ -367,7 +370,7 @@ export default function ShiftTab() {
             </Text>
           </View>
           <Pressable style={styles.changeBtn} onPress={() => router.push('/settings')} hitSlop={8}>
-            <Text style={styles.changeBtnText}>{t('shift.change')}</Text>
+            <Text style={styles.changeBtnText}>{t('nav.settings')}</Text>
           </Pressable>
         </View>
       </Card>
@@ -521,6 +524,8 @@ export default function ShiftTab() {
 }
 
 function DrawerRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.drawerRow}>
       <Text style={[styles.drawerLabel, strong && { fontFamily: fonts.sansSemiBold, color: colors.slate900 }]}>{label}</Text>
@@ -530,6 +535,8 @@ function DrawerRow({ label, value, strong }: { label: string; value: string; str
 }
 
 function ActionTile({ icon, label, onPress, tone }: { icon: keyof typeof Ionicons.glyphMap; label: string; onPress: () => void; tone: 'pos' | 'warn' | 'neutral' | 'danger' }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const bg = tone === 'pos' ? colors.positiveSoft : tone === 'warn' ? colors.warningSoft : tone === 'danger' ? colors.dangerSoft : colors.slate100;
   const fg = tone === 'pos' ? colors.positive : tone === 'warn' ? '#B45309' : tone === 'danger' ? colors.danger : colors.slate700;
   return (
@@ -541,6 +548,8 @@ function ActionTile({ icon, label, onPress, tone }: { icon: keyof typeof Ionicon
 }
 
 function HistoryRow({ shift, currency, onOpen }: { shift: Shift; currency: string; onOpen: () => void }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const z = shift.zReport;
   const tone = !z ? colors.slate400 : z.varianceClass === 'exact' ? colors.positive : z.varianceClass === 'over' ? '#B45309' : colors.danger;
   return (
@@ -563,6 +572,8 @@ function HistoryRow({ shift, currency, onOpen }: { shift: Shift; currency: strin
 }
 
 function SetPinSheet({ name, onSave, onCancel }: { name: string; onSave: (pin: string) => void; onCancel: () => void }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const [pin, setPin] = useState('');
   const ok = isValidPin(pin);
@@ -608,6 +619,8 @@ function AddUserSheet({
   onSave: () => void;
   onCancel: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   return (
     <Modal visible animationType="slide" onRequestClose={onCancel}>
@@ -665,75 +678,79 @@ function AddUserSheet({
   );
 }
 
-const styles = StyleSheet.create({
-  content: { padding: spacing.lg, gap: spacing.lg, backgroundColor: colors.slate50, flexGrow: 1 },
-  userCard: { padding: spacing.md },
-  userRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.primary },
-  userTexts: { flex: 1 },
-  userName: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.slate900 },
-  userRole: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2 },
-  switchBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.slate100, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: 8 },
-  switchBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.primary },
-  addUserBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: spacing.md, paddingHorizontal: spacing.sm, paddingVertical: 4 },
-  addUserText: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
-  shiftCard: { gap: spacing.md },
-  shiftHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  openBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.positiveSoft, borderRadius: radius.chip, paddingHorizontal: spacing.sm, paddingVertical: 4 },
-  openDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.positive },
-  openBadgeText: { fontFamily: fonts.sansSemiBold, fontSize: 12, color: colors.positive },
-  shiftMeta: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
-  drawerRows: { gap: spacing.sm },
-  drawerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  drawerLabel: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
-  drawerValue: { fontFamily: fonts.mono, fontSize: typography.caption, color: colors.slate900 },
-  drawerDivider: { height: 1, backgroundColor: colors.slate200, marginVertical: spacing.xs },
-  actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  tile: { width: '47%', alignItems: 'center', gap: 4, borderRadius: radius.control, paddingVertical: spacing.md },
-  tileText: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption },
-  movesCard: { gap: spacing.sm },
-  sectionTitle: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate700 },
-  moveRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  moveReason: { flex: 1, fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate700 },
-  moveAmount: { fontFamily: fonts.mono, fontSize: typography.caption, color: colors.slate900 },
-  lockedCard: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl },
-  lockedTitle: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
-  lockedText: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500, textAlign: 'center', lineHeight: 18 },
-  openShiftBtn: { marginTop: spacing.sm, backgroundColor: colors.primary, borderRadius: radius.control, paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
-  openShiftText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
-  historyCard: { gap: spacing.sm },
-  empty: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate400 },
-  historyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.slate100 },
-  historyTitle: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate900 },
-  historyVariance: { fontFamily: fonts.mono, fontSize: typography.micro, marginTop: 2 },
-  storeCard: { padding: spacing.md },
-  storeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  storeIcon: { width: 40, height: 40, borderRadius: radius.card, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  storeTexts: { flex: 1 },
-  storeName: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.slate900 },
-  storeMeta: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500, marginTop: 2 },
-  changeBtn: { backgroundColor: colors.slate100, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: 8 },
-  changeBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.primary },
-  addForm: { gap: spacing.md, padding: spacing.lg },
-  addTitle: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
-  inlineInput: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate900, borderWidth: 1, borderColor: colors.slate300, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: spacing.md },
-  roleRow: { flexDirection: 'row', gap: spacing.sm },
-  roleChip: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate300, backgroundColor: colors.white },
-  roleChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  roleChipText: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate700 },
-  addHint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, lineHeight: 16 },
-  buttons: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
-  cancelBtn: { flex: 1, height: 48, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate300, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
-  cancelText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
-  saveBtn: { flex: 1, height: 48, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  saveText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
-  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
-  sheetBody: { width: '100%', maxWidth: 640, alignSelf: 'center', backgroundColor: colors.white, borderTopLeftRadius: radius.card + 4, borderTopRightRadius: radius.card + 4, height: '78%' },
-  sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingBottom: spacing.sm },
-  sheetTitle: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
-  sheetHint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate500, marginTop: 2 },
-  reportActions: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
-  reportActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 42, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200, backgroundColor: colors.white },
-  reportActionText: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.primary },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    content: { padding: spacing.lg, gap: spacing.lg, backgroundColor: colors.slate50, flexGrow: 1 },
+    userCard: { padding: spacing.md },
+    userRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+    avatarText: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.primary },
+    userTexts: { flex: 1 },
+    userName: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.slate900 },
+    userRole: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2 },
+    switchBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.slate100, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: 8 },
+    switchBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.primary },
+    addUserBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: spacing.md, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+    addUserText: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
+    shiftCard: { gap: spacing.md },
+    shiftHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    openBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.positiveSoft, borderRadius: radius.chip, paddingHorizontal: spacing.sm, paddingVertical: 4 },
+    openDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.positive },
+    openBadgeText: { fontFamily: fonts.sansSemiBold, fontSize: 12, color: colors.positive },
+    shiftMeta: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
+    drawerRows: { gap: spacing.sm },
+    drawerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+    drawerLabel: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
+    drawerValue: { fontFamily: fonts.mono, fontSize: typography.caption, color: colors.slate900 },
+    drawerDivider: { height: 1, backgroundColor: colors.slate200, marginVertical: spacing.xs },
+    actionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    tile: { width: '47%', alignItems: 'center', gap: 4, borderRadius: radius.control, paddingVertical: spacing.md },
+    tileText: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption },
+    movesCard: { gap: spacing.sm },
+    sectionTitle: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate700 },
+    moveRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    moveReason: { flex: 1, fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate700 },
+    moveAmount: { fontFamily: fonts.mono, fontSize: typography.caption, color: colors.slate900 },
+    lockedCard: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl },
+    lockedTitle: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
+    lockedText: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500, textAlign: 'center', lineHeight: 18 },
+    openShiftBtn: { marginTop: spacing.sm, backgroundColor: colors.primary, borderRadius: radius.control, paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
+    openShiftText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
+    historyCard: { gap: spacing.sm },
+    empty: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate400 },
+    historyRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.slate100 },
+    historyTitle: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate900 },
+    historyVariance: { fontFamily: fonts.mono, fontSize: typography.micro, marginTop: 2 },
+    storeCard: { padding: spacing.md },
+    storeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    storeIcon: { width: 40, height: 40, borderRadius: radius.card, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+    storeTexts: { flex: 1 },
+    storeName: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.slate900 },
+    storeMeta: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500, marginTop: 2 },
+    changeBtn: { backgroundColor: colors.slate100, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: 8 },
+    changeBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.primary },
+    addForm: { gap: spacing.md, padding: spacing.lg },
+    addTitle: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
+    inlineInput: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate900, borderWidth: 1, borderColor: colors.slate300, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: spacing.md },
+    roleRow: { flexDirection: 'row', gap: spacing.sm },
+    roleChip: { flex: 1, alignItems: 'center', paddingVertical: 10, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate300, backgroundColor: colors.white },
+    roleChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    roleChipText: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate700 },
+    addHint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, lineHeight: 16 },
+    buttons: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.sm },
+    cancelBtn: { flex: 1, height: 48, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate300, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+    cancelText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
+    saveBtn: { flex: 1, height: 48, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+    saveText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
+    sheetBackdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
+    sheetBody: { width: '100%', maxWidth: 640, alignSelf: 'center', backgroundColor: colors.white, borderTopLeftRadius: radius.card + 4, borderTopRightRadius: radius.card + 4, height: '78%' },
+    sheetHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: spacing.lg, paddingBottom: spacing.sm },
+    sheetTitle: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
+    sheetHint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate500, marginTop: 2 },
+    reportActions: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
+    reportActionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, minHeight: 42, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200, backgroundColor: colors.white },
+    reportActionText: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.primary },
+
+  });
+}

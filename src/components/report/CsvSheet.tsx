@@ -1,10 +1,11 @@
 import { useT } from '../../hooks/useT';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
-import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface Props {
   visible: boolean;
@@ -27,6 +28,8 @@ type ShareState =
  * standard offline path for "email this report" on a shop kiosk.
  */
 export function CsvSheet({ visible, csv, fileName, onClose }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const [state, setState] = useState<ShareState>({ status: 'idle' });
 
@@ -93,35 +96,39 @@ export function CsvSheet({ visible, csv, fileName, onClose }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: radius.card + 4,
-    borderTopRightRadius: radius.card + 4,
-    height: '72%',
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  title: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900, flex: 1 },
-  closeBtn: { padding: 4 },
-  meta: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400 },
-  preview: {
-    flex: 1,
-    backgroundColor: colors.slate50,
-    borderRadius: radius.chip,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    padding: spacing.md,
-  },
-  previewText: { fontFamily: fonts.mono, fontSize: 11, color: colors.slate700 },
-  footer: { gap: spacing.sm },
-  done: { fontFamily: fonts.sansSemiBold, fontSize: typography.micro, color: colors.positive },
-  error: { fontFamily: fonts.sansSemiBold, fontSize: typography.micro, color: colors.danger },
-  buttons: { flexDirection: 'row', gap: spacing.md },
-  cancelBtn: { flex: 1, height: 48, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate300, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
-  cancelText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
-  shareBtn: { flex: 1, height: 48, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  shareText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
+    sheet: {
+      backgroundColor: colors.white,
+      borderTopLeftRadius: radius.card + 4,
+      borderTopRightRadius: radius.card + 4,
+      height: '72%',
+      padding: spacing.lg,
+      gap: spacing.md,
+    },
+    header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    title: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900, flex: 1 },
+    closeBtn: { padding: 4 },
+    meta: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400 },
+    preview: {
+      flex: 1,
+      backgroundColor: colors.slate50,
+      borderRadius: radius.chip,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      padding: spacing.md,
+    },
+    previewText: { fontFamily: fonts.mono, fontSize: 11, color: colors.slate700 },
+    footer: { gap: spacing.sm },
+    done: { fontFamily: fonts.sansSemiBold, fontSize: typography.micro, color: colors.positive },
+    error: { fontFamily: fonts.sansSemiBold, fontSize: typography.micro, color: colors.danger },
+    buttons: { flexDirection: 'row', gap: spacing.md },
+    cancelBtn: { flex: 1, height: 48, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate300, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+    cancelText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
+    shareBtn: { flex: 1, height: 48, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+    shareText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
+
+  });
+}

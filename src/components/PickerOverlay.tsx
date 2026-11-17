@@ -1,7 +1,9 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useT } from '../hooks/useT';
-import { colors, fonts, radius, spacing } from '../theme/tokens';
+import { fonts, radius, spacing, type Palette } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
+import { useMemo } from 'react';
 
 export interface PickerRow {
   key: string;
@@ -34,6 +36,8 @@ export function PickerOverlay({
   rows: PickerRow[];
   onClose: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   return (
     <View style={styles.backdrop}>
@@ -71,49 +75,53 @@ export function PickerOverlay({
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.45)',
-  },
-  sheet: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    // Definite height so the inner ScrollView always scrolls reliably
-    // (auto-height + nested ScrollView gestures are unreliable on Android).
-    height: '72%',
-    backgroundColor: colors.white,
-    borderTopLeftRadius: radius.card + 4,
-    borderTopRightRadius: radius.card + 4,
-    paddingTop: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.sm,
-  },
-  title: { fontFamily: fonts.sansBold, fontSize: 17, color: colors.slate900, flexShrink: 1 },
-  closeBtn: { padding: 4 },
-  list: { flex: 1 },
-  listContent: { paddingBottom: spacing.sm },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 14,
-    borderRadius: radius.control,
-  },
-  rowDisabled: { opacity: 0.4 },
-  label: { fontFamily: fonts.sans, fontSize: 15, color: colors.slate900, flexShrink: 1 },
-  sub: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginLeft: spacing.sm, flexShrink: 0 },
-  closeText: { color: colors.slate500 },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    backdrop: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(15, 23, 42, 0.45)',
+    },
+    sheet: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      // Definite height so the inner ScrollView always scrolls reliably
+      // (auto-height + nested ScrollView gestures are unreliable on Android).
+      height: '72%',
+      backgroundColor: colors.white,
+      borderTopLeftRadius: radius.card + 4,
+      borderTopRightRadius: radius.card + 4,
+      paddingTop: spacing.md,
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.lg,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.sm,
+    },
+    title: { fontFamily: fonts.sansBold, fontSize: 17, color: colors.slate900, flexShrink: 1 },
+    closeBtn: { padding: 4 },
+    list: { flex: 1 },
+    listContent: { paddingBottom: spacing.sm },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 14,
+      borderRadius: radius.control,
+    },
+    rowDisabled: { opacity: 0.4 },
+    label: { fontFamily: fonts.sans, fontSize: 15, color: colors.slate900, flexShrink: 1 },
+    sub: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginLeft: spacing.sm, flexShrink: 0 },
+    closeText: { color: colors.slate500 },
+
+  });
+}

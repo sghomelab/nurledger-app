@@ -1,6 +1,6 @@
 import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,8 @@ import { buildPoText, isFullyReceived, remainingToReceive } from '../../src/lib/
 import { formatMoney } from '../../src/lib/money';
 import { NumberText } from '../../src/components/NumberText';
 import { Chip } from '../../src/components/Chip';
-import { colors, fonts, radius, spacing } from '../../src/theme/tokens';
+import { fonts, radius, spacing, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 import type { PurchaseOrder } from '../../src/types';
 
 function fmtDate(ts: number | null): string {
@@ -34,6 +35,8 @@ const PO_STATUS_TONE: Record<string, 'neutral' | 'primary' | 'positive' | 'warni
  * cost layer per line, cost layer linked to the lot for the FEFO radar).
  */
 export default function PODetailScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const { outlet } = useOutlet();
@@ -208,60 +211,64 @@ export default function PODetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.slate50 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.slate50 },
-  missing: { fontFamily: fonts.sans, fontSize: 15, color: colors.slate500 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm,
-  },
-  vendor: { fontFamily: fonts.sansBold, fontSize: 20, color: colors.slate900 },
-  meta: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2 },
-  totalCard: {
-    marginHorizontal: spacing.lg, marginTop: spacing.md, backgroundColor: colors.slate900,
-    borderRadius: radius.card, padding: spacing.lg,
-  },
-  totalLabel: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate400 },
-  totalVal: { fontFamily: fonts.mono, fontSize: 26, color: colors.white, marginTop: 4 },
-  linesCount: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate400, marginTop: 4 },
-  sectionTitle: {
-    fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500, textTransform: 'uppercase',
-    letterSpacing: 0.5, marginTop: spacing.xl, marginBottom: spacing.sm, marginLeft: spacing.lg + 2,
-  },
-  card: {
-    marginHorizontal: spacing.lg, backgroundColor: colors.white, borderRadius: radius.card,
-    borderWidth: 1, borderColor: colors.slate200, paddingHorizontal: spacing.lg,
-  },
-  lineRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  divider: { borderTopWidth: 1, borderTopColor: colors.slate100 },
-  lineName: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.slate900 },
-  lineMeta: { fontFamily: fonts.sans, fontSize: 11, color: colors.slate500, marginTop: 2 },
-  qtyCol: { alignItems: 'center', minWidth: 44 },
-  qtyLabel: { fontFamily: fonts.sans, fontSize: 10, color: colors.slate400, textTransform: 'uppercase' },
-  qtyVal: { fontFamily: fonts.mono, fontSize: 13, color: colors.slate900, marginTop: 2 },
-  remainNote: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    marginHorizontal: spacing.lg, marginTop: spacing.md,
-  },
-  remainText: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
-  footer: {
-    padding: spacing.lg, borderTopWidth: 1, borderColor: colors.slate200, backgroundColor: colors.white,
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', gap: spacing.md,
-  },
-  shareBtn: {
-    backgroundColor: colors.white, borderRadius: radius.control, paddingVertical: 14,
-    paddingHorizontal: spacing.lg, borderWidth: 1, borderColor: colors.slate200,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
-  },
-  shareText: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.primary },
-  receiveBtn: {
-    flex: 1, backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 14,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
-  },
-  receiveText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, backgroundColor: colors.slate50 },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.slate50 },
+    missing: { fontFamily: fonts.sans, fontSize: 15, color: colors.slate500 },
+    header: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+      paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm,
+    },
+    vendor: { fontFamily: fonts.sansBold, fontSize: 20, color: colors.slate900 },
+    meta: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2 },
+    totalCard: {
+      marginHorizontal: spacing.lg, marginTop: spacing.md, backgroundColor: colors.slate900,
+      borderRadius: radius.card, padding: spacing.lg,
+    },
+    totalLabel: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate400 },
+    totalVal: { fontFamily: fonts.mono, fontSize: 26, color: colors.white, marginTop: 4 },
+    linesCount: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate400, marginTop: 4 },
+    sectionTitle: {
+      fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500, textTransform: 'uppercase',
+      letterSpacing: 0.5, marginTop: spacing.xl, marginBottom: spacing.sm, marginLeft: spacing.lg + 2,
+    },
+    card: {
+      marginHorizontal: spacing.lg, backgroundColor: colors.white, borderRadius: radius.card,
+      borderWidth: 1, borderColor: colors.slate200, paddingHorizontal: spacing.lg,
+    },
+    lineRow: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+      paddingVertical: spacing.md,
+    },
+    divider: { borderTopWidth: 1, borderTopColor: colors.slate100 },
+    lineName: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.slate900 },
+    lineMeta: { fontFamily: fonts.sans, fontSize: 11, color: colors.slate500, marginTop: 2 },
+    qtyCol: { alignItems: 'center', minWidth: 44 },
+    qtyLabel: { fontFamily: fonts.sans, fontSize: 10, color: colors.slate400, textTransform: 'uppercase' },
+    qtyVal: { fontFamily: fonts.mono, fontSize: 13, color: colors.slate900, marginTop: 2 },
+    remainNote: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+      marginHorizontal: spacing.lg, marginTop: spacing.md,
+    },
+    remainText: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
+    footer: {
+      padding: spacing.lg, borderTopWidth: 1, borderColor: colors.slate200, backgroundColor: colors.white,
+      position: 'absolute', bottom: 0, left: 0, right: 0,
+      flexDirection: 'row', gap: spacing.md,
+    },
+    shareBtn: {
+      backgroundColor: colors.white, borderRadius: radius.control, paddingVertical: 14,
+      paddingHorizontal: spacing.lg, borderWidth: 1, borderColor: colors.slate200,
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    },
+    shareText: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.primary },
+    receiveBtn: {
+      flex: 1, backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 14,
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+    },
+    receiveText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
+
+  });
+}

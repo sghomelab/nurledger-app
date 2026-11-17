@@ -1,6 +1,6 @@
 import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
-import { useCallback, useState } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { View, Text, StyleSheet, ScrollView, Pressable, Alert, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -16,19 +16,22 @@ import { StatusChip } from '../../src/components/Chip';
 import { NumberText } from '../../src/components/NumberText';
 import { AdjustStockDialog } from '../../src/components/AdjustStockDialog';
 import { PinPrompt } from '../../src/components/PinPrompt';
-import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 import type { BatchWithQty, ExpiryUrgency, ProductWithStock, StockLedgerRow, Supplier } from '../../src/types';
 
 function fmtDate(ts: number): string {
   return new Date(ts).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-const URGENCY_COLOR: Record<ExpiryUrgency, string> = {
-  expired: colors.danger,
-  critical: colors.danger,
-  soon: colors.warning,
-  ok: colors.positive,
-};
+function urgencyColor(c: Palette): Record<ExpiryUrgency, string> {
+  return {
+    expired: c.danger,
+    critical: c.danger,
+    soon: c.warning,
+    ok: c.positive,
+  };
+}
 
 /**
  * Product detail (M3, prototype §4): the full column set — name, SKU, barcode,
@@ -38,6 +41,8 @@ const URGENCY_COLOR: Record<ExpiryUrgency, string> = {
  * desktop 17-column table; no new top-level nav is invented.)
  */
 export default function ProductDetailScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const router = useRouter();
@@ -231,7 +236,7 @@ export default function ProductDetailScreen() {
                     {b.expiryDate ? t('invDetail.expOn', { date: b.expiryDate }) : t('invDetail.noExpiry')}
                   </Text>
                 </View>
-                <Text style={[styles.batchDays, { color: URGENCY_COLOR[urgency] }]}>
+                <Text style={[styles.batchDays, { color: urgencyColor(colors)[urgency] }]}>
                   {Number.isFinite(daysLeft) ? `${daysLeft}d` : '—'}
                 </Text>
                 <NumberText style={styles.batchQty}>{b.qtyRemaining}</NumberText>
@@ -304,6 +309,8 @@ export default function ProductDetailScreen() {
 }
 
 function Metric({ label, value, accent }: { label: string; value: string; accent?: string }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.metric}>
       <Text style={styles.metricLabel}>{label}</Text>
@@ -313,10 +320,14 @@ function Metric({ label, value, accent }: { label: string; value: string; accent
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return <Text style={styles.sectionTitle}>{children}</Text>;
 }
 
 function Row({ label, value, mono, sub }: { label: string; value: string; mono?: boolean; sub?: string }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.row}>
       <Text style={styles.rowLabel}>{label}</Text>
@@ -329,15 +340,19 @@ function Row({ label, value, mono, sub }: { label: string; value: string; mono?:
 }
 
 type ActionTone = 'primary' | 'warning' | 'neutral' | 'danger';
-const ACTION_TONE: Record<ActionTone, { bg: string; fg: string }> = {
-  primary: { bg: colors.primarySoft, fg: colors.primary },
-  warning: { bg: colors.warningSoft, fg: '#B45309' },
-  neutral: { bg: colors.slate100, fg: colors.slate700 },
-  danger: { bg: colors.dangerSoft, fg: colors.danger },
-};
+function actionTone(c: Palette): Record<ActionTone, { bg: string; fg: string }> {
+  return {
+    primary: { bg: c.primarySoft, fg: c.primary },
+    warning: { bg: c.warningSoft, fg: '#B45309' },
+    neutral: { bg: c.slate100, fg: c.slate700 },
+    danger: { bg: c.dangerSoft, fg: c.danger },
+  };
+}
 
 function ActionButton({ icon, label, tone, onPress }: { icon: keyof typeof Ionicons.glyphMap; label: string; tone: ActionTone; onPress: () => void }) {
-  const t = ACTION_TONE[tone];
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const t = actionTone(colors)[tone];
   return (
     <Pressable style={[styles.actionBtn, { backgroundColor: t.bg }]} onPress={onPress}>
       <Ionicons name={icon} size={20} color={t.fg} />
@@ -346,64 +361,68 @@ function ActionButton({ icon, label, tone, onPress }: { icon: keyof typeof Ionic
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.slate50 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.slate50 },
-  missing: { fontFamily: fonts.sans, fontSize: 15, color: colors.slate500 },
-  header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm },
-  name: { fontFamily: fonts.sansBold, fontSize: 22, color: colors.slate900, marginBottom: spacing.sm },
-  metrics: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
-  metric: {
-    flex: 1, backgroundColor: colors.white, borderRadius: radius.card, borderWidth: 1, borderColor: colors.slate200,
-    paddingHorizontal: spacing.sm, paddingVertical: spacing.md, alignItems: 'center',
-  },
-  metricLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.slate500, marginBottom: 4 },
-  metricValue: { fontFamily: fonts.mono, fontSize: 15, color: colors.slate900 },
-  reorderCard: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.md,
-    backgroundColor: colors.warningSoft, borderRadius: radius.card, borderWidth: 1, borderColor: colors.warning, padding: spacing.md,
-  },
-  reorderTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: '#92400E' },
-  reorderSub: { fontFamily: fonts.sans, fontSize: 12, color: '#B45309', marginTop: 2 },
-  marginCard: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.md,
-    backgroundColor: colors.warningSoft, borderRadius: radius.card, borderWidth: 1, borderColor: colors.warning, padding: spacing.md,
-  },
-  marginTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: '#92400E' },
-  marginSub: { fontFamily: fonts.sans, fontSize: 12, color: '#B45309', marginTop: 2 },
-  marginSuggest: { fontFamily: fonts.sans, fontSize: 12, color: '#92400E', marginTop: 4 },
-  marginBtn: {
-    backgroundColor: colors.warning, borderRadius: radius.control, paddingVertical: 8, paddingHorizontal: spacing.lg,
-  },
-  marginBtnText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.white },
-  sectionTitle: {
-    fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500, textTransform: 'uppercase', letterSpacing: 0.5,
-    marginTop: spacing.xl, marginBottom: spacing.sm, marginLeft: spacing.lg + 2,
-  },
-  card: {
-    marginHorizontal: spacing.lg, backgroundColor: colors.white, borderRadius: radius.card,
-    borderWidth: 1, borderColor: colors.slate200, paddingHorizontal: spacing.lg,
-  },
-  row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, gap: spacing.md },
-  rowLabel: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500 },
-  rowValWrap: { alignItems: 'flex-end', flexShrink: 1 },
-  rowVal: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.slate900, textAlign: 'right' },
-  rowSub: { fontFamily: fonts.sans, fontSize: 11, color: colors.slate400, marginTop: 2 },
-  batchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-  batchDivider: { borderTopWidth: 1, borderTopColor: colors.slate100 },
-  batchCode: { fontFamily: fonts.mono, fontSize: 13, color: colors.slate900 },
-  batchMeta: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2 },
-  batchDays: { fontFamily: fonts.monoSemiBold, fontSize: 13 },
-  batchQty: { fontFamily: fonts.mono, fontSize: 15, color: colors.slate900, minWidth: 36, textAlign: 'right' },
-  ledgerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
-  ledgerType: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate900, textTransform: 'capitalize' },
-  ledgerMeta: { fontFamily: fonts.sans, fontSize: 11, color: colors.slate500, marginTop: 2 },
-  ledgerQty: { fontFamily: fonts.mono, fontSize: 15 },
-  emptyText: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate400, paddingVertical: spacing.md },
-  actions: { flexDirection: 'row', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.lg },
-  actionBtn: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
-    paddingVertical: 13, borderRadius: radius.control,
-  },
-  actionText: { fontFamily: fonts.sansSemiBold, fontSize: 14 },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, backgroundColor: colors.slate50 },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.slate50 },
+    missing: { fontFamily: fonts.sans, fontSize: 15, color: colors.slate500 },
+    header: { paddingHorizontal: spacing.lg, paddingTop: spacing.lg, paddingBottom: spacing.sm },
+    name: { fontFamily: fonts.sansBold, fontSize: 22, color: colors.slate900, marginBottom: spacing.sm },
+    metrics: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg },
+    metric: {
+      flex: 1, backgroundColor: colors.white, borderRadius: radius.card, borderWidth: 1, borderColor: colors.slate200,
+      paddingHorizontal: spacing.sm, paddingVertical: spacing.md, alignItems: 'center',
+    },
+    metricLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.slate500, marginBottom: 4 },
+    metricValue: { fontFamily: fonts.mono, fontSize: 15, color: colors.slate900 },
+    reorderCard: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.md,
+      backgroundColor: colors.warningSoft, borderRadius: radius.card, borderWidth: 1, borderColor: colors.warning, padding: spacing.md,
+    },
+    reorderTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: '#92400E' },
+    reorderSub: { fontFamily: fonts.sans, fontSize: 12, color: '#B45309', marginTop: 2 },
+    marginCard: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.md,
+      backgroundColor: colors.warningSoft, borderRadius: radius.card, borderWidth: 1, borderColor: colors.warning, padding: spacing.md,
+    },
+    marginTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: '#92400E' },
+    marginSub: { fontFamily: fonts.sans, fontSize: 12, color: '#B45309', marginTop: 2 },
+    marginSuggest: { fontFamily: fonts.sans, fontSize: 12, color: '#92400E', marginTop: 4 },
+    marginBtn: {
+      backgroundColor: colors.warning, borderRadius: radius.control, paddingVertical: 8, paddingHorizontal: spacing.lg,
+    },
+    marginBtnText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.white },
+    sectionTitle: {
+      fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500, textTransform: 'uppercase', letterSpacing: 0.5,
+      marginTop: spacing.xl, marginBottom: spacing.sm, marginLeft: spacing.lg + 2,
+    },
+    card: {
+      marginHorizontal: spacing.lg, backgroundColor: colors.white, borderRadius: radius.card,
+      borderWidth: 1, borderColor: colors.slate200, paddingHorizontal: spacing.lg,
+    },
+    row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, gap: spacing.md },
+    rowLabel: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500 },
+    rowValWrap: { alignItems: 'flex-end', flexShrink: 1 },
+    rowVal: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.slate900, textAlign: 'right' },
+    rowSub: { fontFamily: fonts.sans, fontSize: 11, color: colors.slate400, marginTop: 2 },
+    batchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+    batchDivider: { borderTopWidth: 1, borderTopColor: colors.slate100 },
+    batchCode: { fontFamily: fonts.mono, fontSize: 13, color: colors.slate900 },
+    batchMeta: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2 },
+    batchDays: { fontFamily: fonts.monoSemiBold, fontSize: 13 },
+    batchQty: { fontFamily: fonts.mono, fontSize: 15, color: colors.slate900, minWidth: 36, textAlign: 'right' },
+    ledgerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+    ledgerType: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate900, textTransform: 'capitalize' },
+    ledgerMeta: { fontFamily: fonts.sans, fontSize: 11, color: colors.slate500, marginTop: 2 },
+    ledgerQty: { fontFamily: fonts.mono, fontSize: 15 },
+    emptyText: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate400, paddingVertical: spacing.md },
+    actions: { flexDirection: 'row', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.lg },
+    actionBtn: {
+      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+      paddingVertical: 13, borderRadius: radius.control,
+    },
+    actionText: { fontFamily: fonts.sansSemiBold, fontSize: 14 },
+
+  });
+}

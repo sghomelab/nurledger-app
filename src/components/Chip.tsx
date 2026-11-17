@@ -1,21 +1,27 @@
 import { Text, StyleSheet, View } from 'react-native';
-import { colors, fonts, radius, spacing } from '../theme/tokens';
+import { fonts, radius, spacing, type Palette } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
+import { useMemo } from 'react';
 import { useT } from '../hooks/useT';
 import type { StockStatus } from '../lib/stock';
 import type { MsgKey } from '../i18n';
 
 type Tone = 'neutral' | 'primary' | 'positive' | 'warning' | 'danger';
 
-const toneMap: Record<Tone, { bg: string; fg: string }> = {
-  neutral: { bg: colors.slate100, fg: colors.slate700 },
-  primary: { bg: colors.primarySoft, fg: colors.primary },
-  positive: { bg: colors.positiveSoft, fg: colors.positive },
-  warning: { bg: colors.warningSoft, fg: '#B45309' },
-  danger: { bg: colors.dangerSoft, fg: colors.danger },
-};
+function toneMap(c: Palette): Record<Tone, { bg: string; fg: string }> {
+  return {
+    neutral: { bg: c.slate100, fg: c.slate700 },
+    primary: { bg: c.primarySoft, fg: c.primary },
+    positive: { bg: c.positiveSoft, fg: c.positive },
+    warning: { bg: c.warningSoft, fg: '#B45309' },
+    danger: { bg: c.dangerSoft, fg: c.danger },
+  };
+}
 
 export function Chip({ label, tone = 'neutral' }: { label: string; tone?: Tone }) {
-  const t = toneMap[tone];
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const t = toneMap(colors)[tone];
   return (
     <View style={[styles.chip, { backgroundColor: t.bg }]}>
       <Text style={[styles.chipText, { color: t.fg }]}>{label}</Text>
@@ -45,16 +51,20 @@ export function StatusChip({ status }: { status: StockStatus }) {
   return <Chip label={t(STATUS_KEYS[status])} tone={meta.tone} />;
 }
 
-const styles = StyleSheet.create({
-  chip: {
-    alignSelf: 'flex-start',
-    borderRadius: radius.chip,
-    paddingHorizontal: spacing.sm + 2,
-    paddingVertical: 3,
-  },
-  chipText: {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    chip: {
+      alignSelf: 'flex-start',
+      borderRadius: radius.chip,
+      paddingHorizontal: spacing.sm + 2,
+      paddingVertical: 3,
+    },
+    chipText: {
+      fontFamily: fonts.sans,
+      fontSize: 12,
+      fontWeight: '600',
+    },
+
+  });
+}

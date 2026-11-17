@@ -1,5 +1,5 @@
 import { centeredColumn } from '../src/lib/layout';
-import { useEffect, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, Pressable, Alert, KeyboardAvoidingView, Platform, Switch,
 } from 'react-native';
@@ -44,7 +44,7 @@ import { PickerOverlay } from '../src/components/PickerOverlay';
 import { PinPrompt } from '../src/components/PinPrompt';
 import { DeleteAccountDialog } from '../src/components/DeleteAccountDialog';
 import { roleCanAct } from '../src/lib/roles';
-import { colors, fonts, radius, spacing } from '../src/theme/tokens';
+import { fonts, radius, spacing, type Palette } from '../src/theme/tokens';
 
 /**
  * Store Settings — outlet identity + currency + tax locale (FR-600, FR-602).
@@ -58,6 +58,8 @@ import { colors, fonts, radius, spacing } from '../src/theme/tokens';
  * an owner/manager PIN unlocks the save, single-action.
  */
 export default function SettingsScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { active, users } = useUsers();
   const [gateVisible, setGateVisible] = useState(false);
@@ -672,10 +674,14 @@ export default function SettingsScreen() {
 }
 
 function SectionTitle({ children, style }: { children: React.ReactNode; style?: object }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return <Text style={[styles.sectionTitle, style]}>{children}</Text>;
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -685,6 +691,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Segmented({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.segmented}>
       {options.map((o) => (
@@ -696,66 +704,70 @@ function Segmented({ options, value, onChange }: { options: string[]; value: str
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.lg, paddingBottom: 24, gap: spacing.lg },
-  sectionTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.slate900, marginBottom: spacing.md },
-  dangerTitle: { color: colors.danger },
-  field: { marginBottom: spacing.md },
-  label: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700, marginBottom: spacing.xs + 2 },
-  input: {
-    backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
-    paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.sans, fontSize: 15, color: colors.slate900,
-  },
-  inputMono: {
-    backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
-    paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.mono, fontSize: 15, color: colors.slate900,
-  },
-  selectBox: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
-    paddingHorizontal: spacing.md, paddingVertical: 11,
-  },
-  selectText: { fontFamily: fonts.sans, fontSize: 15, color: colors.slate900, flex: 1 },
-  chevron: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate400, marginLeft: spacing.sm },
-  note: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, lineHeight: 17 },
-  emailAskRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
-  emailAskLabel: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.slate900 },
-  emailAskDesc: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2, lineHeight: 16 },
-  row: { flexDirection: 'row', gap: spacing.md },
-  colHalf: { flex: 1 },
-  segmented: { flexDirection: 'row', backgroundColor: colors.slate100, borderRadius: radius.control, padding: 3 },
-  seg: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.control - 3 },
-  segActive: { backgroundColor: colors.primary },
-  segText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500 },
-  segTextActive: { color: colors.white },
-  footer: {
-    padding: spacing.lg, borderTopWidth: 1, borderColor: colors.slate200, backgroundColor: colors.white,
-  },
-  saveBtn: {
-    backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 14, alignItems: 'center',
-  },
-  saveText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
-  cloudRow: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.slate50, borderRadius: radius.control, padding: spacing.md, marginBottom: spacing.sm,
-  },
-  cloudInfo: { flex: 1, gap: 2 },
-  cloudUrl: { fontFamily: fonts.mono, fontSize: 13, color: colors.slate900 },
-  cloudSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
-  cloudMeta: { gap: 4, marginBottom: spacing.md },
-  cloudMetaText: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500 },
-  cloudError: { fontFamily: fonts.sans, fontSize: 12, color: colors.danger, lineHeight: 16 },
-  rejectedBox: {
-    backgroundColor: colors.dangerSoft, borderRadius: radius.control, padding: spacing.md,
-    gap: 6, marginBottom: spacing.md,
-  },
-  rejectedTitle: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.danger },
-  deleteAcctLink: { alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.sm },
-  deleteAcctText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.danger, textDecorationLine: 'underline' },
-  cloudBtns: { flexDirection: 'row', gap: spacing.sm },
-  cloudBtn: {
-    backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 12, alignItems: 'center',
-  },
-  cloudBtnText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.white },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    flex: { flex: 1, backgroundColor: colors.slate50 },
+    content: { padding: spacing.lg, paddingBottom: 24, gap: spacing.lg },
+    sectionTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.slate900, marginBottom: spacing.md },
+    dangerTitle: { color: colors.danger },
+    field: { marginBottom: spacing.md },
+    label: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700, marginBottom: spacing.xs + 2 },
+    input: {
+      backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
+      paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.sans, fontSize: 15, color: colors.slate900,
+    },
+    inputMono: {
+      backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
+      paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.mono, fontSize: 15, color: colors.slate900,
+    },
+    selectBox: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
+      paddingHorizontal: spacing.md, paddingVertical: 11,
+    },
+    selectText: { fontFamily: fonts.sans, fontSize: 15, color: colors.slate900, flex: 1 },
+    chevron: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate400, marginLeft: spacing.sm },
+    note: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, lineHeight: 17 },
+    emailAskRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
+    emailAskLabel: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.slate900 },
+    emailAskDesc: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2, lineHeight: 16 },
+    row: { flexDirection: 'row', gap: spacing.md },
+    colHalf: { flex: 1 },
+    segmented: { flexDirection: 'row', backgroundColor: colors.slate100, borderRadius: radius.control, padding: 3 },
+    seg: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.control - 3 },
+    segActive: { backgroundColor: colors.primary },
+    segText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500 },
+    segTextActive: { color: colors.white },
+    footer: {
+      padding: spacing.lg, borderTopWidth: 1, borderColor: colors.slate200, backgroundColor: colors.white,
+    },
+    saveBtn: {
+      backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 14, alignItems: 'center',
+    },
+    saveText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
+    cloudRow: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+      backgroundColor: colors.slate50, borderRadius: radius.control, padding: spacing.md, marginBottom: spacing.sm,
+    },
+    cloudInfo: { flex: 1, gap: 2 },
+    cloudUrl: { fontFamily: fonts.mono, fontSize: 13, color: colors.slate900 },
+    cloudSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
+    cloudMeta: { gap: 4, marginBottom: spacing.md },
+    cloudMetaText: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500 },
+    cloudError: { fontFamily: fonts.sans, fontSize: 12, color: colors.danger, lineHeight: 16 },
+    rejectedBox: {
+      backgroundColor: colors.dangerSoft, borderRadius: radius.control, padding: spacing.md,
+      gap: 6, marginBottom: spacing.md,
+    },
+    rejectedTitle: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.danger },
+    deleteAcctLink: { alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.sm },
+    deleteAcctText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.danger, textDecorationLine: 'underline' },
+    cloudBtns: { flexDirection: 'row', gap: spacing.sm },
+    cloudBtn: {
+      backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 12, alignItems: 'center',
+    },
+    cloudBtnText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.white },
+
+  });
+}

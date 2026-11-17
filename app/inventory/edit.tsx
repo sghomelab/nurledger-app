@@ -1,6 +1,6 @@
 import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
-import { useEffect, useState } from 'react';
+import { useMemo, useEffect, useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, Pressable, Alert, KeyboardAvoidingView, Platform,
@@ -11,7 +11,8 @@ import { BarcodeScanner } from '../../src/components/BarcodeScanner';
 import { useCategories, useOutlet, useProducts } from '../../src/hooks/useAppData';
 import { createProduct, getProduct, updateProduct, type ProductInput } from '../../src/repositories/productRepository';
 import { listSuppliers } from '../../src/repositories/supplierRepository';
-import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 import type { SupplierWithCounts, UnitType, VelocityClass } from '../../src/types';
 
 /**
@@ -20,6 +21,8 @@ import type { SupplierWithCounts, UnitType, VelocityClass } from '../../src/type
  * `/inventory/new` (no id) or `/inventory/edit?id=<id>` (edit).
  */
 export default function ProductFormScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   // Route params arrive via useLocalSearchParams (routes are untyped — no prop injection).
   const { id } = useLocalSearchParams<{ id?: string }>();
@@ -252,6 +255,8 @@ export default function ProductFormScreen() {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -261,6 +266,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Segmented({ options, value, onChange }: { options: string[]; value: string; onChange: (v: string) => void }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.segmented}>
       {options.map((o) => (
@@ -272,44 +279,48 @@ function Segmented({ options, value, onChange }: { options: string[]; value: str
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.lg, paddingBottom: 24 },
-  field: { marginBottom: spacing.lg },
-  label: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700, marginBottom: spacing.xs + 2 },
-  input: {
-    backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
-    paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.sans, fontSize: 15, color: colors.slate900,
-  },
-  inputMono: {
-    backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
-    paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.mono, fontSize: 15, color: colors.slate900,
-  },
-  multiline: { minHeight: 72, textAlignVertical: 'top' },
-  scanField: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  scanFieldBtn: {
-    width: 42, height: 42, borderRadius: radius.control, borderWidth: 1, borderColor: colors.primary,
-    backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center',
-  },
-  row: { flexDirection: 'row', gap: spacing.md },
-  colHalf: { flex: 1 },
-  colThird: { flex: 1 },
-  selectBox: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
-    paddingHorizontal: spacing.md, paddingVertical: 11,
-  },
-  selectText: { fontFamily: fonts.sans, fontSize: 15, color: colors.slate900 },
-  segmented: { flexDirection: 'row', backgroundColor: colors.slate100, borderRadius: radius.control, padding: 3 },
-  seg: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.control - 3 },
-  segActive: { backgroundColor: colors.primary },
-  segText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500, textTransform: 'capitalize' },
-  segTextActive: { color: colors.white },
-  footer: {
-    padding: spacing.lg, borderTopWidth: 1, borderColor: colors.slate200, backgroundColor: colors.white,
-  },
-  saveBtn: {
-    backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 14, alignItems: 'center',
-  },
-  saveText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    flex: { flex: 1, backgroundColor: colors.slate50 },
+    content: { padding: spacing.lg, paddingBottom: 24 },
+    field: { marginBottom: spacing.lg },
+    label: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700, marginBottom: spacing.xs + 2 },
+    input: {
+      backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
+      paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.sans, fontSize: 15, color: colors.slate900,
+    },
+    inputMono: {
+      backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
+      paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.mono, fontSize: 15, color: colors.slate900,
+    },
+    multiline: { minHeight: 72, textAlignVertical: 'top' },
+    scanField: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    scanFieldBtn: {
+      width: 42, height: 42, borderRadius: radius.control, borderWidth: 1, borderColor: colors.primary,
+      backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center',
+    },
+    row: { flexDirection: 'row', gap: spacing.md },
+    colHalf: { flex: 1 },
+    colThird: { flex: 1 },
+    selectBox: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
+      paddingHorizontal: spacing.md, paddingVertical: 11,
+    },
+    selectText: { fontFamily: fonts.sans, fontSize: 15, color: colors.slate900 },
+    segmented: { flexDirection: 'row', backgroundColor: colors.slate100, borderRadius: radius.control, padding: 3 },
+    seg: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: radius.control - 3 },
+    segActive: { backgroundColor: colors.primary },
+    segText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500, textTransform: 'capitalize' },
+    segTextActive: { color: colors.white },
+    footer: {
+      padding: spacing.lg, borderTopWidth: 1, borderColor: colors.slate200, backgroundColor: colors.white,
+    },
+    saveBtn: {
+      backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 14, alignItems: 'center',
+    },
+    saveText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
+
+  });
+}

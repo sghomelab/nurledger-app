@@ -1,7 +1,9 @@
 import { Tabs, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet } from 'react-native';
-import { colors, fonts, spacing, touchTarget } from '../../src/theme/tokens';
+import { fonts, spacing, touchTarget, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
+import { useMemo } from 'react';
 import { useProducts } from '../../src/hooks/useAppData';
 import { useT } from '../../src/hooks/useT';
 
@@ -10,6 +12,8 @@ import { useT } from '../../src/hooks/useT';
  * Sell · Inventory · Expiry · Insights · Shift.
  */
 export default function TabLayout() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { lowStock } = useProducts();
   const { t } = useT();
   const router = useRouter();
@@ -85,6 +89,10 @@ export default function TabLayout() {
   );
 }
 
-const styles = StyleSheet.create({
-  headerBtn: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    headerBtn: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
+
+  });
+}

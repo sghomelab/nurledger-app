@@ -1,7 +1,9 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useT } from '../../hooks/useT';
-import { colors, fonts, radius, spacing } from '../../theme/tokens';
+import { fonts, radius, spacing, type Palette } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
+import { useMemo } from 'react';
 import type { ProductWithStock } from '../../types';
 
 /** Tappable product quick-chips (FR-101 manual/quick path). Out-of-stock is disabled. */
@@ -15,6 +17,8 @@ export function QuickChips({
   /** Tablet two-pane: wrap the chips into a scrollable catalogue grid that fills the pane. */
   grid?: boolean;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   if (products.length === 0) {
     return (
@@ -51,43 +55,47 @@ export function QuickChips({
   );
 }
 
-const styles = StyleSheet.create({
-  gridScroll: { flex: 1 },
-  gridRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  row: {
-    flexGrow: 1,
-    alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-  },
-  chip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    borderRadius: radius.chip,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    height: 40,
-    maxWidth: 200,
-  },
-  chipDisabled: { opacity: 0.55 },
-  chipText: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 13,
-    color: colors.slate700,
-    maxWidth: 150,
-  },
-  empty: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
-  emptyText: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate400 },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    gridScroll: { flex: 1 },
+    gridRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+    },
+    row: {
+      flexGrow: 1,
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.sm + 2,
+    },
+    chip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.white,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      borderRadius: radius.chip,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      height: 40,
+      maxWidth: 200,
+    },
+    chipDisabled: { opacity: 0.55 },
+    chipText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 13,
+      color: colors.slate700,
+      maxWidth: 150,
+    },
+    empty: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+    emptyText: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate400 },
+
+  });
+}

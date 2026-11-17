@@ -11,7 +11,8 @@ import {
   type QRPrep,
 } from '../../lib/payment';
 import { useT } from '../../hooks/useT';
-import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 import type { PaymentAllocation, PaymentMethodId } from '../../types';
 
 type Method = PaymentMethodId | 'split';
@@ -45,6 +46,8 @@ interface Props {
  * ADR-006).
  */
 export function PaymentSheet({ totalMinor, currency, locale, onClose, onComplete }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const [method, setMethod] = useState<Method>('cash');
   const [tender, setTender] = useState('');
@@ -229,101 +232,105 @@ export function PaymentSheet({ totalMinor, currency, locale, onClose, onComplete
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.slate50, padding: spacing.lg, gap: spacing.md },
-  header: { alignItems: 'center', gap: 2, paddingVertical: spacing.sm },
-  headerLabel: { fontFamily: fonts.sansMedium, fontSize: typography.caption, color: colors.slate500, letterSpacing: 1 },
-  headerValue: { fontFamily: fonts.monoSemiBold, fontSize: 30, color: colors.slate900 },
-  scroll: { gap: spacing.md },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  gridBtn: {
-    flexBasis: '30%',
-    flexGrow: 1,
-    height: 72,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingHorizontal: 4,
-  },
-  gridBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  gridLabel: { fontFamily: fonts.sansMedium, fontSize: typography.caption, color: colors.slate700 },
-  panel: {
-    backgroundColor: colors.white,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  quickBtn: {
-    flexBasis: '46%',
-    flexGrow: 1,
-    height: 44,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    backgroundColor: colors.slate50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickText: { fontSize: typography.body, color: colors.slate700 },
-  tenderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  tenderLabel: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate500 },
-  tenderInput: {
-    flex: 1,
-    fontFamily: fonts.monoSemiBold,
-    fontSize: 22,
-    color: colors.slate900,
-    textAlign: 'right',
-    borderWidth: 1,
-    borderColor: colors.slate300,
-    borderRadius: radius.control,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  changeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  changeLabel: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate500 },
-  changeValue: { fontFamily: fonts.monoSemiBold, fontSize: 22, color: colors.slate900 },
-  splitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  splitLabel: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate700 },
-  splitValue: { fontSize: typography.body },
-  stubTitle: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900, textAlign: 'center' },
-  hint: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500, textAlign: 'center', lineHeight: 17 },
-  qrPrepareBtn: {
-    height: 48,
-    borderRadius: radius.control,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  qrPrepareText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
-  qrRefLabel: { fontFamily: fonts.sansMedium, fontSize: typography.caption, color: colors.slate500, letterSpacing: 1, textAlign: 'center' },
-  qrRef: { fontFamily: fonts.monoSemiBold, fontSize: 26, color: colors.slate900, textAlign: 'center', letterSpacing: 1 },
-  qrAmount: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.slate700, textAlign: 'center' },
-  actions: { flexDirection: 'row', gap: spacing.md },
-  cancelBtn: {
-    flex: 1,
-    height: 54,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.slate300,
-    backgroundColor: colors.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
-  completeBtn: {
-    flex: 2,
-    height: 54,
-    borderRadius: radius.control,
-    backgroundColor: colors.positive,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  completeText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, backgroundColor: colors.slate50, padding: spacing.lg, gap: spacing.md },
+    header: { alignItems: 'center', gap: 2, paddingVertical: spacing.sm },
+    headerLabel: { fontFamily: fonts.sansMedium, fontSize: typography.caption, color: colors.slate500, letterSpacing: 1 },
+    headerValue: { fontFamily: fonts.monoSemiBold, fontSize: 30, color: colors.slate900 },
+    scroll: { gap: spacing.md },
+    grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    gridBtn: {
+      flexBasis: '30%',
+      flexGrow: 1,
+      height: 72,
+      borderRadius: radius.card,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      backgroundColor: colors.white,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      paddingHorizontal: 4,
+    },
+    gridBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    gridLabel: { fontFamily: fonts.sansMedium, fontSize: typography.caption, color: colors.slate700 },
+    panel: {
+      backgroundColor: colors.white,
+      borderRadius: radius.card,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      padding: spacing.lg,
+      gap: spacing.md,
+    },
+    quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    quickBtn: {
+      flexBasis: '46%',
+      flexGrow: 1,
+      height: 44,
+      borderRadius: radius.control,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      backgroundColor: colors.slate50,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    quickText: { fontSize: typography.body, color: colors.slate700 },
+    tenderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+    tenderLabel: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate500 },
+    tenderInput: {
+      flex: 1,
+      fontFamily: fonts.monoSemiBold,
+      fontSize: 22,
+      color: colors.slate900,
+      textAlign: 'right',
+      borderWidth: 1,
+      borderColor: colors.slate300,
+      borderRadius: radius.control,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    changeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    changeLabel: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate500 },
+    changeValue: { fontFamily: fonts.monoSemiBold, fontSize: 22, color: colors.slate900 },
+    splitRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    splitLabel: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate700 },
+    splitValue: { fontSize: typography.body },
+    stubTitle: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900, textAlign: 'center' },
+    hint: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500, textAlign: 'center', lineHeight: 17 },
+    qrPrepareBtn: {
+      height: 48,
+      borderRadius: radius.control,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    qrPrepareText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
+    qrRefLabel: { fontFamily: fonts.sansMedium, fontSize: typography.caption, color: colors.slate500, letterSpacing: 1, textAlign: 'center' },
+    qrRef: { fontFamily: fonts.monoSemiBold, fontSize: 26, color: colors.slate900, textAlign: 'center', letterSpacing: 1 },
+    qrAmount: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.slate700, textAlign: 'center' },
+    actions: { flexDirection: 'row', gap: spacing.md },
+    cancelBtn: {
+      flex: 1,
+      height: 54,
+      borderRadius: radius.control,
+      borderWidth: 1,
+      borderColor: colors.slate300,
+      backgroundColor: colors.white,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cancelText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
+    completeBtn: {
+      flex: 2,
+      height: 54,
+      borderRadius: radius.control,
+      backgroundColor: colors.positive,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    completeText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
+
+  });
+}

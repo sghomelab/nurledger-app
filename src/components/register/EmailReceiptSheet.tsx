@@ -6,7 +6,8 @@ import { BarcodeScanner } from '../BarcodeScanner';
 import { useT } from '../../hooks/useT';
 import { layoutReceipt, receiptDataFrom, renderReceiptText, WIDTH_COLS } from '../../lib/receipt';
 import type { SaleReceipt } from '../../repositories/saleRepository';
-import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -28,6 +29,8 @@ interface Props {
  * template engine), so emailed and printed receipts never drift.
  */
 export function EmailReceiptSheet({ receipt, currency, outletName, onClose }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const [email, setEmail] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -118,54 +121,58 @@ export function EmailReceiptSheet({ receipt, currency, outletName, onClose }: Pr
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
-  sheet: {
-    width: '100%',
-    maxWidth: 560,
-    alignSelf: 'center',
-    backgroundColor: colors.white,
-    borderTopLeftRadius: radius.card + 4,
-    borderTopRightRadius: radius.card + 4,
-    padding: spacing.lg,
-    gap: spacing.md,
-  },
-  header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  title: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
-  sub: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate500, marginTop: 2 },
-  row: { flexDirection: 'row', gap: spacing.sm },
-  input: {
-    flex: 1,
-    height: 48,
-    borderRadius: radius.control,
-    borderWidth: 1.5,
-    borderColor: colors.slate200,
-    paddingHorizontal: spacing.md,
-    fontFamily: fonts.sans,
-    fontSize: typography.body,
-    color: colors.slate900,
-  },
-  scanBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    height: 48,
-    borderRadius: radius.control,
-    borderWidth: 1.5,
-    borderColor: colors.primary,
-    paddingHorizontal: spacing.md,
-  },
-  scanBtnText: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.primary },
-  error: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.danger },
-  sendBtn: {
-    height: 54,
-    borderRadius: radius.control,
-    backgroundColor: colors.primary,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  sendText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
-  hint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, textAlign: 'center' },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', justifyContent: 'flex-end' },
+    sheet: {
+      width: '100%',
+      maxWidth: 560,
+      alignSelf: 'center',
+      backgroundColor: colors.white,
+      borderTopLeftRadius: radius.card + 4,
+      borderTopRightRadius: radius.card + 4,
+      padding: spacing.lg,
+      gap: spacing.md,
+    },
+    header: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    title: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
+    sub: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate500, marginTop: 2 },
+    row: { flexDirection: 'row', gap: spacing.sm },
+    input: {
+      flex: 1,
+      height: 48,
+      borderRadius: radius.control,
+      borderWidth: 1.5,
+      borderColor: colors.slate200,
+      paddingHorizontal: spacing.md,
+      fontFamily: fonts.sans,
+      fontSize: typography.body,
+      color: colors.slate900,
+    },
+    scanBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      height: 48,
+      borderRadius: radius.control,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      paddingHorizontal: spacing.md,
+    },
+    scanBtnText: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.primary },
+    error: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.danger },
+    sendBtn: {
+      height: 54,
+      borderRadius: radius.control,
+      backgroundColor: colors.primary,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    sendText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
+    hint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, textAlign: 'center' },
+
+  });
+}

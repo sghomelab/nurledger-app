@@ -1,6 +1,6 @@
 import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, Pressable, Alert, KeyboardAvoidingView, Platform,
@@ -13,7 +13,8 @@ import { cartonsToBase } from '../../src/lib/po';
 import { formatMoney } from '../../src/lib/money';
 import { NumberText } from '../../src/components/NumberText';
 import { PickerOverlay } from '../../src/components/PickerOverlay';
-import { colors, fonts, radius, spacing } from '../../src/theme/tokens';
+import { fonts, radius, spacing, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 import type { POLineInput, ProductWithStock } from '../../src/types';
 
 /**
@@ -23,6 +24,8 @@ import type { POLineInput, ProductWithStock } from '../../src/types';
  * cartons for carton products and are stored as base units (FR-318).
  */
 export default function NewPOScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const router = useRouter();
   const { product: prefilledId, qty: prefilledQty } = useLocalSearchParams<{
@@ -324,6 +327,8 @@ export default function NewPOScreen() {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -332,58 +337,62 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.lg, paddingBottom: 24 },
-  field: { marginBottom: spacing.lg },
-  label: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700, marginBottom: 6 },
-  input: {
-    backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
-    paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.sans, fontSize: 15, color: colors.slate900,
-  },
-  inputMono: {
-    backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
-    paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.mono, fontSize: 15, color: colors.slate900,
-  },
-  termsNote: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate400, marginTop: -spacing.sm, marginBottom: spacing.lg },
-  pickSupplierBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
-    marginTop: 6, paddingVertical: 4, paddingHorizontal: 6, borderRadius: radius.chip,
-  },
-  pickSupplierText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.primary },
-  linesTitle: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.sm },
-  addLineBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
-    borderWidth: 1, borderStyle: 'dashed', borderColor: colors.slate300, borderRadius: radius.control,
-    paddingVertical: 14, marginVertical: spacing.sm,
-  },
-  addLineText: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.primary },
-  lineCard: {
-    backgroundColor: colors.white, borderRadius: radius.card, borderWidth: 1, borderColor: colors.slate200,
-    padding: spacing.md, marginBottom: spacing.md,
-  },
-  lineHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  lineName: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate900, flex: 1 },
-  lineGrid: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
-  lineCol: { flex: 1 },
-  lineLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.slate500, marginBottom: 4 },
-  lineTotalRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.slate100,
-  },
-  lineTotalLabel: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
-  lineTotalVal: { fontFamily: fonts.mono, fontSize: 14, color: colors.slate900 },
-  totalRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginTop: spacing.lg, padding: spacing.md, backgroundColor: colors.slate900, borderRadius: radius.card,
-  },
-  totalLabel: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.white },
-  totalVal: { fontFamily: fonts.mono, fontSize: 18, color: colors.white },
-  footer: {
-    padding: spacing.lg, borderTopWidth: 1, borderColor: colors.slate200, backgroundColor: colors.white,
-  },
-  saveBtn: {
-    backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 14, alignItems: 'center',
-  },
-  saveText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    flex: { flex: 1, backgroundColor: colors.slate50 },
+    content: { padding: spacing.lg, paddingBottom: 24 },
+    field: { marginBottom: spacing.lg },
+    label: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700, marginBottom: 6 },
+    input: {
+      backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
+      paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.sans, fontSize: 15, color: colors.slate900,
+    },
+    inputMono: {
+      backgroundColor: colors.white, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
+      paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.mono, fontSize: 15, color: colors.slate900,
+    },
+    termsNote: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate400, marginTop: -spacing.sm, marginBottom: spacing.lg },
+    pickSupplierBtn: {
+      flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start',
+      marginTop: 6, paddingVertical: 4, paddingHorizontal: 6, borderRadius: radius.chip,
+    },
+    pickSupplierText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.primary },
+    linesTitle: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: spacing.sm },
+    addLineBtn: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm,
+      borderWidth: 1, borderStyle: 'dashed', borderColor: colors.slate300, borderRadius: radius.control,
+      paddingVertical: 14, marginVertical: spacing.sm,
+    },
+    addLineText: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.primary },
+    lineCard: {
+      backgroundColor: colors.white, borderRadius: radius.card, borderWidth: 1, borderColor: colors.slate200,
+      padding: spacing.md, marginBottom: spacing.md,
+    },
+    lineHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+    lineName: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate900, flex: 1 },
+    lineGrid: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
+    lineCol: { flex: 1 },
+    lineLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.slate500, marginBottom: 4 },
+    lineTotalRow: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      marginTop: spacing.md, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.slate100,
+    },
+    lineTotalLabel: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
+    lineTotalVal: { fontFamily: fonts.mono, fontSize: 14, color: colors.slate900 },
+    totalRow: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      marginTop: spacing.lg, padding: spacing.md, backgroundColor: colors.slate900, borderRadius: radius.card,
+    },
+    totalLabel: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.white },
+    totalVal: { fontFamily: fonts.mono, fontSize: 18, color: colors.white },
+    footer: {
+      padding: spacing.lg, borderTopWidth: 1, borderColor: colors.slate200, backgroundColor: colors.white,
+    },
+    saveBtn: {
+      backgroundColor: colors.primary, borderRadius: radius.control, paddingVertical: 14, alignItems: 'center',
+    },
+    saveText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.white },
+
+  });
+}

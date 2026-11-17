@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useMemo, useCallback, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -8,7 +8,8 @@ import {
   type BarcodeType,
 } from 'expo-camera';
 import { useT } from '../hooks/useT';
-import { colors, fonts, radius, spacing, typography } from '../theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 
 /** 1-D + 2-D formats used on grocery product barcodes. */
 const PRODUCT_TYPES: BarcodeType[] = ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39', 'itf14'];
@@ -35,6 +36,8 @@ interface Props {
  * be re-triggered after denial on iOS). Torch toggle for dim shops.
  */
 export function BarcodeScanner({ onClose, onScanned, mode = 'barcode' }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const [permission, requestPermission] = useCameraPermissions();
   const [torch, setTorch] = useState(false);
@@ -119,27 +122,31 @@ export function BarcodeScanner({ onClose, onScanned, mode = 'barcode' }: Props) 
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: '#000' },
-  deniedWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.sm },
-  deniedTitle: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.white, marginTop: spacing.md },
-  deniedText: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate400, textAlign: 'center' },
-  overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: spacing.xl + 8 },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 60,
-  },
-  topTitle: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
-  roundBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center' },
-  bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 40, flexDirection: 'row', paddingHorizontal: spacing.lg },
-  torchBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center' },
-  btnPrimary: { minHeight: 50, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, marginTop: spacing.sm },
-  btnPrimaryText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.white },
-  cornerTL: { position: 'absolute', top: 0, left: 0, width: 36, height: 36, borderTopWidth: 3, borderLeftWidth: 3, borderColor: colors.white, borderTopLeftRadius: 10 },
-  cornerTR: { position: 'absolute', top: 0, right: 0, width: 36, height: 36, borderTopWidth: 3, borderRightWidth: 3, borderColor: colors.white, borderTopRightRadius: 10 },
-  cornerBL: { position: 'absolute', bottom: 0, left: 0, width: 36, height: 36, borderBottomWidth: 3, borderLeftWidth: 3, borderColor: colors.white, borderBottomLeftRadius: 10 },
-  cornerBR: { position: 'absolute', bottom: 0, right: 0, width: 36, height: 36, borderBottomWidth: 3, borderRightWidth: 3, borderColor: colors.white, borderBottomRightRadius: 10 },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, backgroundColor: '#000' },
+    deniedWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.sm },
+    deniedTitle: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.white, marginTop: spacing.md },
+    deniedText: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate400, textAlign: 'center' },
+    overlay: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, padding: spacing.xl + 8 },
+    topBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      paddingTop: 60,
+    },
+    topTitle: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
+    roundBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center' },
+    bottomBar: { position: 'absolute', left: 0, right: 0, bottom: 40, flexDirection: 'row', paddingHorizontal: spacing.lg },
+    torchBtn: { width: 48, height: 48, borderRadius: 24, backgroundColor: 'rgba(15,23,42,0.55)', alignItems: 'center', justifyContent: 'center' },
+    btnPrimary: { minHeight: 50, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xl, marginTop: spacing.sm },
+    btnPrimaryText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.white },
+    cornerTL: { position: 'absolute', top: 0, left: 0, width: 36, height: 36, borderTopWidth: 3, borderLeftWidth: 3, borderColor: colors.white, borderTopLeftRadius: 10 },
+    cornerTR: { position: 'absolute', top: 0, right: 0, width: 36, height: 36, borderTopWidth: 3, borderRightWidth: 3, borderColor: colors.white, borderTopRightRadius: 10 },
+    cornerBL: { position: 'absolute', bottom: 0, left: 0, width: 36, height: 36, borderBottomWidth: 3, borderLeftWidth: 3, borderColor: colors.white, borderBottomLeftRadius: 10 },
+    cornerBR: { position: 'absolute', bottom: 0, right: 0, width: 36, height: 36, borderBottomWidth: 3, borderRightWidth: 3, borderColor: colors.white, borderBottomRightRadius: 10 },
+
+  });
+}

@@ -1,7 +1,7 @@
 import { useT } from '../../src/hooks/useT';
 import { useLayout } from '../../src/hooks/useLayout';
 import { GridCell } from '../../src/components/GridCell';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { FlatList, Pressable, Text, StyleSheet, RefreshControl, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -9,7 +9,8 @@ import { useOutlet, usePurchaseOrders } from '../../src/hooks/useAppData';
 import { formatMoney } from '../../src/lib/money';
 import { NumberText } from '../../src/components/NumberText';
 import { Chip } from '../../src/components/Chip';
-import { colors, fonts, radius, spacing } from '../../src/theme/tokens';
+import { fonts, radius, spacing, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 import type { POSummary } from '../../src/repositories/poRepository';
 
 function fmtDate(ts: number | null): string {
@@ -30,6 +31,8 @@ const STATUS_TONE: Record<string, 'neutral' | 'primary' | 'positive' | 'warning'
  * Tapping a row opens the detail + Receive screen.
  */
 export default function POListScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const layout = useLayout();
   const router = useRouter();
@@ -100,26 +103,30 @@ export default function POListScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.slate50 },
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.md,
-    backgroundColor: colors.white, borderRadius: radius.card, borderWidth: 1, borderColor: colors.slate200,
-    padding: spacing.md, marginBottom: spacing.md,
-  },
-  rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  supplier: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate900, flex: 1 },
-  rowMeta: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 3 },
-  rowRight: { alignItems: 'flex-end' },
-  rowTotal: { fontFamily: fonts.mono, fontSize: 14, color: colors.slate900 },
-  rowQty: { fontFamily: fonts.mono, fontSize: 11, color: colors.slate500, marginTop: 3 },
-  empty: { flexGrow: 1 },
-  emptyBox: { alignItems: 'center', paddingTop: 120 },
-  emptyTitle: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.slate700, marginTop: spacing.md },
-  emptySub: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500, marginTop: 4 },
-  fab: {
-    position: 'absolute', right: 24, bottom: 28, width: 58, height: 58, borderRadius: 29,
-    backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
-    elevation: 4, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6, shadowOffset: { width: 0, height: 3 },
-  },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, backgroundColor: colors.slate50 },
+    row: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.md,
+      backgroundColor: colors.white, borderRadius: radius.card, borderWidth: 1, borderColor: colors.slate200,
+      padding: spacing.md, marginBottom: spacing.md,
+    },
+    rowTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+    supplier: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate900, flex: 1 },
+    rowMeta: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 3 },
+    rowRight: { alignItems: 'flex-end' },
+    rowTotal: { fontFamily: fonts.mono, fontSize: 14, color: colors.slate900 },
+    rowQty: { fontFamily: fonts.mono, fontSize: 11, color: colors.slate500, marginTop: 3 },
+    empty: { flexGrow: 1 },
+    emptyBox: { alignItems: 'center', paddingTop: 120 },
+    emptyTitle: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.slate700, marginTop: spacing.md },
+    emptySub: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500, marginTop: 4 },
+    fab: {
+      position: 'absolute', right: 24, bottom: 28, width: 58, height: 58, borderRadius: 29,
+      backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center',
+      elevation: 4, shadowColor: '#000', shadowOpacity: 0.18, shadowRadius: 6, shadowOffset: { width: 0, height: 3 },
+    },
+
+  });
+}

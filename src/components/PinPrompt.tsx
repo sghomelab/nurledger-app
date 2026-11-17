@@ -5,7 +5,8 @@ import { canUnlock, roleRank, type GateAction } from '../lib/roles';
 import { pinEntryOutcome, PIN_MAX_LENGTH, PIN_MIN_LENGTH, verifyPin } from '../lib/pin';
 import { useT } from '../hooks/useT';
 import type { MsgKey } from '../i18n';
-import { colors, fonts, radius, spacing, typography } from '../theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
 import type { AppUser } from '../types';
 
 interface Props {
@@ -45,6 +46,8 @@ const GATE_KEYS: Record<GateAction, MsgKey> = {
  * the kiosk pattern (no IME to fight, no autocorrect surprises).
  */
 export function PinPrompt({ visible, action, users, minRank = 0, onSuccess, onCancel }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -143,41 +146,45 @@ export function PinPrompt({ visible, action, users, minRank = 0, onSuccess, onCa
 const KEY = 72;
 const KEY_GAP = spacing.md;
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  card: {
-    width: '100%',
-    maxWidth: 380,
-    backgroundColor: colors.white,
-    borderRadius: radius.card,
-    padding: spacing.xl,
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  title: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900, textAlign: 'center' },
-  hint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, textAlign: 'center' },
-  dots: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.sm },
-  dot: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.slate200 },
-  dotFilled: { backgroundColor: colors.primary },
-  error: { fontFamily: fonts.sansSemiBold, fontSize: typography.micro, color: colors.danger, minHeight: 16 },
-  errorSpacer: { minHeight: 16 },
-  keypad: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: KEY_GAP,
-    width: KEY * 3 + KEY_GAP * 2,
-  },
-  key: {
-    width: KEY,
-    height: KEY,
-    borderRadius: radius.control,
-    backgroundColor: colors.slate100,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  keyDisabled: { backgroundColor: 'transparent' },
-  keyText: { fontFamily: fonts.sansBold, fontSize: 24, color: colors.slate900 },
-  cancelBtn: { alignSelf: 'stretch', height: 48, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate300, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
-  cancelText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+    card: {
+      width: '100%',
+      maxWidth: 380,
+      backgroundColor: colors.white,
+      borderRadius: radius.card,
+      padding: spacing.xl,
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    title: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900, textAlign: 'center' },
+    hint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, textAlign: 'center' },
+    dots: { flexDirection: 'row', gap: spacing.sm, paddingVertical: spacing.sm },
+    dot: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.slate200 },
+    dotFilled: { backgroundColor: colors.primary },
+    error: { fontFamily: fonts.sansSemiBold, fontSize: typography.micro, color: colors.danger, minHeight: 16 },
+    errorSpacer: { minHeight: 16 },
+    keypad: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'center',
+      gap: KEY_GAP,
+      width: KEY * 3 + KEY_GAP * 2,
+    },
+    key: {
+      width: KEY,
+      height: KEY,
+      borderRadius: radius.control,
+      backgroundColor: colors.slate100,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    keyDisabled: { backgroundColor: 'transparent' },
+    keyText: { fontFamily: fonts.sansBold, fontSize: 24, color: colors.slate900 },
+    cancelBtn: { alignSelf: 'stretch', height: 48, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate300, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+    cancelText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
+
+  });
+}

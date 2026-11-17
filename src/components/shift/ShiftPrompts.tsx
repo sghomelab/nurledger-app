@@ -1,9 +1,10 @@
 import { useT } from '../../hooks/useT';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { formatMoney, parseMoneyToMinor } from '../../lib/money';
 import type { CashMoveType } from '../../lib/shift';
-import { colors, fonts, radius, spacing, typography } from '../../theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../theme/tokens';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface Props {
   visible: boolean;
@@ -18,6 +19,8 @@ interface Props {
  * Amount + free-text reason in one modal (kiosk pattern — one tap, one confirm).
  */
 export function CashMovePrompt({ visible, type, currency, onSave, onCancel }: Props) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const [text, setText] = useState('');
   const [reason, setReason] = useState('');
@@ -85,6 +88,8 @@ interface CloseProps {
 
 /** FR-202: close-shift counted cash + notes. Expected is shown read-only. */
 export function CountedCashPrompt({ visible, currency, expectedMinor, onSave, onCancel }: CloseProps) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const [text, setText] = useState('');
   const [notes, setNotes] = useState('');
@@ -142,26 +147,30 @@ export function CountedCashPrompt({ visible, currency, expectedMinor, onSave, on
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
-  card: { width: '100%', backgroundColor: colors.white, borderRadius: radius.card, padding: spacing.xl, gap: spacing.md },
-  title: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
-  input: {
-    fontFamily: fonts.monoSemiBold, fontSize: 28, color: colors.slate900, borderWidth: 1,
-    borderColor: colors.slate300, borderRadius: radius.control, paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md, textAlign: 'right',
-  },
-  hint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400 },
-  reason: {
-    fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate900, borderWidth: 1,
-    borderColor: colors.slate300, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: spacing.md,
-  },
-  buttons: { flexDirection: 'row', gap: spacing.md },
-  cancelBtn: { flex: 1, height: 48, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate300, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
-  cancelText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
-  saveBtn: { flex: 1, height: 48, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
-  saveText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
-  expectedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.slate50, borderRadius: radius.chip, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  expectedLabel: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
-  expectedValue: { fontFamily: fonts.monoSemiBold, fontSize: typography.body, color: colors.slate900 },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    backdrop: { flex: 1, backgroundColor: 'rgba(15,23,42,0.45)', alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+    card: { width: '100%', backgroundColor: colors.white, borderRadius: radius.card, padding: spacing.xl, gap: spacing.md },
+    title: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
+    input: {
+      fontFamily: fonts.monoSemiBold, fontSize: 28, color: colors.slate900, borderWidth: 1,
+      borderColor: colors.slate300, borderRadius: radius.control, paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md, textAlign: 'right',
+    },
+    hint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400 },
+    reason: {
+      fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate900, borderWidth: 1,
+      borderColor: colors.slate300, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: spacing.md,
+    },
+    buttons: { flexDirection: 'row', gap: spacing.md },
+    cancelBtn: { flex: 1, height: 48, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate300, backgroundColor: colors.white, alignItems: 'center', justifyContent: 'center' },
+    cancelText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
+    saveBtn: { flex: 1, height: 48, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+    saveText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
+    expectedRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: colors.slate50, borderRadius: radius.chip, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+    expectedLabel: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
+    expectedValue: { fontFamily: fonts.monoSemiBold, fontSize: typography.body, color: colors.slate900 },
+
+  });
+}

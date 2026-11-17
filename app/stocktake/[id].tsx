@@ -25,7 +25,8 @@ import { NumberText } from '../../src/components/NumberText';
 import { Chip } from '../../src/components/Chip';
 import { PinPrompt } from '../../src/components/PinPrompt';
 import { getActiveUser, listActiveUsers } from '../../src/repositories/userRepository';
-import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 import type { AppUser } from '../../src/types';
 
 /**
@@ -43,6 +44,8 @@ import type { AppUser } from '../../src/types';
  * marked applied and the screen becomes read-only.
  */
 export default function StocktakeDetailScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const topInset = useTopInset();
   const router = useRouter();
@@ -322,143 +325,147 @@ export default function StocktakeDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.slate50 },
-  center: {
-    flex: 1,
-    backgroundColor: colors.slate50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.xl,
-    gap: spacing.md,
-  },
-  missing: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate500, textAlign: 'center' },
-  backBtn: {
-    alignSelf: 'flex-start',
-    marginTop: spacing.lg,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.sm,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.slate300,
-    marginLeft: spacing.lg,
-  },
-  backText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  title: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900 },
-  meta: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginTop: 2 },
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
 
-  sectionTitle: {
-    fontFamily: fonts.sansBold,
-    fontSize: typography.heading,
-    color: colors.slate700,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    marginBottom: spacing.sm,
-  },
-  tableHead: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    paddingVertical: spacing.xs,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.slate200,
-  },
-  tableRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: spacing.lg,
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.slate100,
-  },
-  tableCol: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate700 },
-  tableNum: { width: 64, textAlign: 'right', fontFamily: fonts.mono, color: colors.slate700 },
-  unitTag: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400 },
+    wrap: { flex: 1, backgroundColor: colors.slate50 },
+    center: {
+      flex: 1,
+      backgroundColor: colors.slate50,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: spacing.xl,
+      gap: spacing.md,
+    },
+    missing: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate500, textAlign: 'center' },
+    backBtn: {
+      alignSelf: 'flex-start',
+      marginTop: spacing.lg,
+      paddingHorizontal: spacing.xl,
+      paddingVertical: spacing.sm,
+      borderRadius: radius.control,
+      borderWidth: 1,
+      borderColor: colors.slate300,
+      marginLeft: spacing.lg,
+    },
+    backText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate700 },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    title: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900 },
+    meta: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginTop: 2 },
 
-  summaryRow: {
-    flexDirection: 'row',
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    backgroundColor: colors.white,
-    borderRadius: radius.card,
-    paddingVertical: spacing.md,
-  },
-  summaryCell: { flex: 1, alignItems: 'center', gap: 2 },
-  summaryLabel: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400 },
-  summaryValue: { fontFamily: fonts.monoSemiBold, fontSize: typography.body, color: colors.slate900 },
-  hint: {
-    fontFamily: fonts.sans,
-    fontSize: typography.micro,
-    color: colors.slate400,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
-  },
+    sectionTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: typography.heading,
+      color: colors.slate700,
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.lg,
+      marginBottom: spacing.sm,
+    },
+    tableHead: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: spacing.lg,
+      paddingVertical: spacing.xs,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.slate200,
+    },
+    tableRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: spacing.lg,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.slate100,
+    },
+    tableCol: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate700 },
+    tableNum: { width: 64, textAlign: 'right', fontFamily: fonts.mono, color: colors.slate700 },
+    unitTag: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400 },
 
-  countRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.xs,
-    backgroundColor: colors.white,
-    borderRadius: radius.card,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  countName: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate900 },
-  countMeta: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginTop: 2 },
-  countInput: {
-    width: 96,
-    height: 40,
-    borderWidth: 1,
-    borderColor: colors.slate300,
-    borderRadius: radius.control,
-    paddingHorizontal: spacing.sm,
-    textAlign: 'right',
-    fontFamily: fonts.mono,
-    fontSize: typography.body,
-    color: colors.slate900,
-    backgroundColor: colors.white,
-  },
+    summaryRow: {
+      flexDirection: 'row',
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.md,
+      backgroundColor: colors.white,
+      borderRadius: radius.card,
+      paddingVertical: spacing.md,
+    },
+    summaryCell: { flex: 1, alignItems: 'center', gap: 2 },
+    summaryLabel: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400 },
+    summaryValue: { fontFamily: fonts.monoSemiBold, fontSize: typography.body, color: colors.slate900 },
+    hint: {
+      fontFamily: fonts.sans,
+      fontSize: typography.micro,
+      color: colors.slate400,
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.sm,
+    },
 
-  appliedBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
-    backgroundColor: colors.positiveSoft,
-    borderRadius: radius.card,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-  },
-  appliedText: { flex: 1, fontFamily: fonts.sans, fontSize: typography.caption, color: colors.positive },
+    countRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      marginHorizontal: spacing.lg,
+      marginVertical: spacing.xs,
+      backgroundColor: colors.white,
+      borderRadius: radius.card,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+    },
+    countName: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate900 },
+    countMeta: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginTop: 2 },
+    countInput: {
+      width: 96,
+      height: 40,
+      borderWidth: 1,
+      borderColor: colors.slate300,
+      borderRadius: radius.control,
+      paddingHorizontal: spacing.sm,
+      textAlign: 'right',
+      fontFamily: fonts.mono,
+      fontSize: typography.body,
+      color: colors.slate900,
+      backgroundColor: colors.white,
+    },
 
-  footer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
-    backgroundColor: colors.white,
-    borderTopWidth: 1,
-    borderTopColor: colors.slate200,
-  },
-  applyBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.control,
-    alignItems: 'center',
-    paddingVertical: 14,
-  },
-  applyText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.white },
-});
+    appliedBox: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.lg,
+      backgroundColor: colors.positiveSoft,
+      borderRadius: radius.card,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+    },
+    appliedText: { flex: 1, fontFamily: fonts.sans, fontSize: typography.caption, color: colors.positive },
+
+    footer: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.lg,
+      backgroundColor: colors.white,
+      borderTopWidth: 1,
+      borderTopColor: colors.slate200,
+    },
+    applyBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: radius.control,
+      alignItems: 'center',
+      paddingVertical: 14,
+    },
+    applyText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.white },
+
+  });
+}

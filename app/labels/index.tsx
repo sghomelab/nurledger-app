@@ -10,7 +10,8 @@ import * as Sharing from 'expo-sharing';
 import { useCategories, useOutlet, useProducts } from '../../src/hooks/useAppData';
 import { buildLabelHtml, symbologyFor, type LabelItem, type LabelLayout } from '../../src/lib/label';
 import { formatMoney } from '../../src/lib/money';
-import { colors, fonts, radius, spacing } from '../../src/theme/tokens';
+import { fonts, radius, spacing, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 import type { ProductWithStock } from '../../src/types';
 
 type Scope =
@@ -35,6 +36,8 @@ const DEFAULT_COPIES = 5;
  * the offline kiosk print path (open in any browser → print, or email).
  */
 export default function LabelsScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const topInset = useTopInset();
   const router = useRouter();
@@ -218,6 +221,8 @@ function ScopeChip({ label, count, selected, onPress }: {
   selected: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Pressable style={[styles.scopeChip, selected && styles.scopeChipSelected]} onPress={onPress}>
       <Ionicons
@@ -236,6 +241,8 @@ function LayoutChip({ label, selected, onPress }: {
   selected: boolean;
   onPress: () => void;
 }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <Pressable style={[styles.layoutChip, selected && styles.layoutChipSelected]} onPress={onPress}>
       <Text style={[styles.layoutText, selected && styles.layoutTextSelected]}>{label}</Text>
@@ -243,81 +250,85 @@ function LayoutChip({ label, selected, onPress }: {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.slate50 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.lg,
-    backgroundColor: colors.white,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.slate200,
-  },
-  backBtn: { paddingRight: spacing.md },
-  title: { fontFamily: fonts.sansBold, fontSize: 22, color: colors.slate900 },
-  subtitle: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500 },
-  sectionTitle: {
-    fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500,
-    textTransform: 'uppercase', letterSpacing: 0.5,
-  },
-  muted: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500 },
-  scopeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.white,
-    borderRadius: radius.chip,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-  },
-  scopeChipSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  scopeLabel: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate700, flex: 1 },
-  scopeLabelSelected: { color: colors.slate900, fontWeight: '700' },
-  scopeCount: { fontFamily: fonts.mono, fontSize: 12, color: colors.slate400 },
-  stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: colors.white,
-    borderRadius: radius.control,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-  },
-  stepBtn: { padding: spacing.md + 2 },
-  stepValue: { fontFamily: fonts.sansBold, fontSize: 17, color: colors.slate900, minWidth: 44, textAlign: 'center' },
-  toggleRow: { flexDirection: 'row', gap: spacing.sm },
-  layoutChip: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.chip,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    backgroundColor: colors.white,
-  },
-  layoutChipSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  layoutText: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500 },
-  layoutTextSelected: { color: colors.primary, fontWeight: '700' },
-  summary: {
-    backgroundColor: colors.white,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    padding: spacing.md,
-  },
-  summaryText: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate700 },
-  warning: { fontFamily: fonts.sans, fontSize: 12, color: '#B45309', marginTop: 4 },
-  cta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.primary,
-    borderRadius: radius.control,
-    paddingVertical: spacing.md + 2,
-  },
-  ctaText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.white },
-  done: { fontFamily: fonts.sans, fontSize: 13, color: colors.positive },
-  error: { fontFamily: fonts.sans, fontSize: 14, color: colors.danger },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    container: { flex: 1, backgroundColor: colors.slate50 },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.lg,
+      backgroundColor: colors.white,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.slate200,
+    },
+    backBtn: { paddingRight: spacing.md },
+    title: { fontFamily: fonts.sansBold, fontSize: 22, color: colors.slate900 },
+    subtitle: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500 },
+    sectionTitle: {
+      fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate500,
+      textTransform: 'uppercase', letterSpacing: 0.5,
+    },
+    muted: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500 },
+    scopeChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.white,
+      borderRadius: radius.chip,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 2,
+    },
+    scopeChipSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+    scopeLabel: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate700, flex: 1 },
+    scopeLabelSelected: { color: colors.slate900, fontWeight: '700' },
+    scopeCount: { fontFamily: fonts.mono, fontSize: 12, color: colors.slate400 },
+    stepper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      backgroundColor: colors.white,
+      borderRadius: radius.control,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+    },
+    stepBtn: { padding: spacing.md + 2 },
+    stepValue: { fontFamily: fonts.sansBold, fontSize: 17, color: colors.slate900, minWidth: 44, textAlign: 'center' },
+    toggleRow: { flexDirection: 'row', gap: spacing.sm },
+    layoutChip: {
+      paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      borderRadius: radius.chip,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      backgroundColor: colors.white,
+    },
+    layoutChipSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+    layoutText: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500 },
+    layoutTextSelected: { color: colors.primary, fontWeight: '700' },
+    summary: {
+      backgroundColor: colors.white,
+      borderRadius: radius.card,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      padding: spacing.md,
+    },
+    summaryText: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate700 },
+    warning: { fontFamily: fonts.sans, fontSize: 12, color: '#B45309', marginTop: 4 },
+    cta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+      backgroundColor: colors.primary,
+      borderRadius: radius.control,
+      paddingVertical: spacing.md + 2,
+    },
+    ctaText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.white },
+    done: { fontFamily: fonts.sans, fontSize: 13, color: colors.positive },
+    error: { fontFamily: fonts.sans, fontSize: 14, color: colors.danger },
+
+  });
+}

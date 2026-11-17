@@ -1,7 +1,7 @@
 import { useT } from '../../src/hooks/useT';
 import { useTopInset } from '../../src/hooks/useTopInset';
 import { centeredColumn } from '../../src/lib/layout';
-import { useCallback, useState } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import {
   View, Text, TextInput, StyleSheet, ScrollView, Pressable, Modal, Alert, KeyboardAvoidingView, Platform,
@@ -10,7 +10,8 @@ import { Ionicons } from '@expo/vector-icons';
 import {
   listSuppliers, createSupplier, updateSupplier, deleteSupplier,
 } from '../../src/repositories/supplierRepository';
-import { colors, fonts, radius, spacing } from '../../src/theme/tokens';
+import { fonts, radius, spacing, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 import type { Supplier } from '../../src/types';
 
 /**
@@ -19,6 +20,8 @@ import type { Supplier } from '../../src/types';
  * the vendor name, so historical documents survive renames/deletes.
  */
 export default function SuppliersScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
   const router = useRouter();
   const topInset = useTopInset();
@@ -201,6 +204,8 @@ export default function SuppliersScreen() {
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.field}>
       <Text style={styles.label}>{label}</Text>
@@ -209,66 +214,70 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: colors.slate50 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.lg,
-    backgroundColor: colors.white,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.slate200,
-  },
-  backBtn: { paddingRight: spacing.md },
-  title: { fontFamily: fonts.sansBold, fontSize: 22, color: colors.slate900 },
-  subtitle: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500 },
-  newBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
-    backgroundColor: colors.primary, borderRadius: radius.control,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
-  },
-  newText: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.white },
-  empty: { alignItems: 'center', gap: spacing.sm, paddingVertical: 60 },
-  emptyText: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500, textAlign: 'center', maxWidth: 300 },
-  row: {
-    flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
-    backgroundColor: colors.white, borderRadius: radius.card,
-    borderWidth: 1, borderColor: colors.slate200,
-    paddingHorizontal: spacing.md, paddingVertical: spacing.md,
-  },
-  rowName: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate900 },
-  rowMeta: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2 },
-  deleteBtn: { padding: 4 },
-  backdrop: {
-    flex: 1, backgroundColor: 'rgba(15,23,42,0.45)',
-    alignItems: 'center', justifyContent: 'center', padding: spacing.xl,
-  },
-  formCard: {
-    width: '100%', maxWidth: 440, maxHeight: '88%',
-    backgroundColor: colors.white, borderRadius: radius.card + 4,
-    padding: spacing.lg, gap: spacing.md,
-  },
-  formScroll: { flexShrink: 1 },
-  formTitle: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate900, marginBottom: spacing.xs },
-  field: { gap: 6 },
-  label: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700 },
-  input: {
-    backgroundColor: colors.slate50, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
-    paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.sans, fontSize: 15, color: colors.slate900,
-  },
-  inputMono: {
-    backgroundColor: colors.slate50, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
-    paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.mono, fontSize: 15, color: colors.slate900,
-  },
-  multiline: { minHeight: 74, textAlignVertical: 'top' },
-  formButtons: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  cancelBtn: {
-    flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.control,
-    borderWidth: 1, borderColor: colors.slate200,
-  },
-  cancelText: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.slate700 },
-  saveBtn: {
-    flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.control, backgroundColor: colors.primary,
-  },
-  saveText: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.white },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    flex: { flex: 1, backgroundColor: colors.slate50 },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.lg,
+      backgroundColor: colors.white,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.slate200,
+    },
+    backBtn: { paddingRight: spacing.md },
+    title: { fontFamily: fonts.sansBold, fontSize: 22, color: colors.slate900 },
+    subtitle: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500 },
+    newBtn: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+      backgroundColor: colors.primary, borderRadius: radius.control,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.sm + 2,
+    },
+    newText: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.white },
+    empty: { alignItems: 'center', gap: spacing.sm, paddingVertical: 60 },
+    emptyText: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500, textAlign: 'center', maxWidth: 300 },
+    row: {
+      flexDirection: 'row', alignItems: 'center', gap: spacing.sm,
+      backgroundColor: colors.white, borderRadius: radius.card,
+      borderWidth: 1, borderColor: colors.slate200,
+      paddingHorizontal: spacing.md, paddingVertical: spacing.md,
+    },
+    rowName: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate900 },
+    rowMeta: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2 },
+    deleteBtn: { padding: 4 },
+    backdrop: {
+      flex: 1, backgroundColor: 'rgba(15,23,42,0.45)',
+      alignItems: 'center', justifyContent: 'center', padding: spacing.xl,
+    },
+    formCard: {
+      width: '100%', maxWidth: 440, maxHeight: '88%',
+      backgroundColor: colors.white, borderRadius: radius.card + 4,
+      padding: spacing.lg, gap: spacing.md,
+    },
+    formScroll: { flexShrink: 1 },
+    formTitle: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate900, marginBottom: spacing.xs },
+    field: { gap: 6 },
+    label: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.slate700 },
+    input: {
+      backgroundColor: colors.slate50, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
+      paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.sans, fontSize: 15, color: colors.slate900,
+    },
+    inputMono: {
+      backgroundColor: colors.slate50, borderRadius: radius.control, borderWidth: 1, borderColor: colors.slate200,
+      paddingHorizontal: spacing.md, paddingVertical: 11, fontFamily: fonts.mono, fontSize: 15, color: colors.slate900,
+    },
+    multiline: { minHeight: 74, textAlignVertical: 'top' },
+    formButtons: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+    cancelBtn: {
+      flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.control,
+      borderWidth: 1, borderColor: colors.slate200,
+    },
+    cancelText: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.slate700 },
+    saveBtn: {
+      flex: 1, alignItems: 'center', paddingVertical: 12, borderRadius: radius.control, backgroundColor: colors.primary,
+    },
+    saveText: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.white },
+
+  });
+}
