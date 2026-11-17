@@ -279,16 +279,78 @@ export default function RefundScreen() {
             return (
               <View key={l.saleLineId} style={[styles.lineRow, i > 0 && styles.divider]}>
                 <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }}>
-                    <Text style={styles.lineName} numberOfLines={1}>{l.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm }}>
+                    <View style={{ flex: 1 }}>
+                      {/* Wraps (issue #17): long names no longer truncate the product away. */}
+                      <Text style={styles.lineName}>{l.name}</Text>
+                      <Text style={styles.lineMeta}>
+                        {l.sku} · {formatMoney(l.unitPriceMinor, currency)}
+                        {l.isWeighed ? '/kg' : ''} · {t('refund.soldQty', { qty: l.isWeighed ? `${l.qtyG} g` : `${l.qty}` })}
+                        {(l.refundedQty > 0 || (l.refundedQtyG ?? 0) > 0) &&
+                          ` · ${t('refund.refundedQty', { qty: l.isWeighed ? `${l.refundedQtyG} g` : `${l.refundedQty}` })}`}
+                      </Text>
+                    </View>
                     {l.isWeighed && <Chip label={t('refund.weighed')} tone="warning" />}
                   </View>
-                  <Text style={styles.lineMeta} numberOfLines={1}>
-                    {l.sku} · {formatMoney(l.unitPriceMinor, currency)}
-                    {l.isWeighed ? '/kg' : ''} · {t('refund.soldQty', { qty: l.isWeighed ? `${l.qtyG} g` : `${l.qty}` })}
-                    {(l.refundedQty > 0 || (l.refundedQtyG ?? 0) > 0) &&
-                      ` · ${t('refund.refundedQty', { qty: l.isWeighed ? `${l.refundedQtyG} g` : `${l.refundedQty}` })}`}
-                  </Text>
+                  {/* Per-line controls inline with the product (issue #17: they used to render
+                      as a detached block below the card, so the stepper/checkbox could not be
+                      matched to its product). */}
+                  {l.isWeighed ? (
+                    <View style={[styles.lineCtl, { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }]}>
+                      <TextInput
+                        style={[styles.gramsInput, overGrams && { borderColor: colors.danger }]}
+                        value={st ? st.grams : ''}
+                        onChangeText={(v) => setLineGrams(l, v)}
+                        placeholder={`0 – ${remaining} g`}
+                        placeholderTextColor={colors.slate400}
+                        keyboardType="number-pad"
+                      />
+                      <Pressable style={styles.maxBtn} onPress={() => setLineGrams(l, String(remaining))}>
+                        <Text style={styles.maxText}>{t('invDetail.max')}</Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <View style={[styles.lineCtl, { flexDirection: 'row', alignItems: 'center', gap: spacing.md }]}>
+                      <Pressable
+                        style={[styles.stepBtn, (st?.qty ?? 0) === 0 && styles.stepBtnDisabled]}
+                        onPress={() => setLineQty(l, (st?.qty ?? 0) - 1)}
+                        disabled={(st?.qty ?? 0) === 0}
+                        accessibilityLabel={t('refund.decrease', { name: l.name })}
+                      >
+                        <Ionicons name="remove" size={18} color={(st?.qty ?? 0) === 0 ? colors.slate300 : colors.slate700} />
+                      </Pressable>
+                      <NumberText style={styles.stepVal}>{st?.qty ?? 0}</NumberText>
+                      <Pressable
+                        style={[styles.stepBtn, (st?.qty ?? 0) >= remaining && styles.stepBtnDisabled]}
+                        onPress={() => setLineQty(l, (st?.qty ?? 0) + 1)}
+                        disabled={(st?.qty ?? 0) >= remaining}
+                        accessibilityLabel={t('refund.increase', { name: l.name })}
+                      >
+                        <Ionicons name="add" size={18} color={(st?.qty ?? 0) >= remaining ? colors.slate300 : colors.slate700} />
+                      </Pressable>
+                      <Text style={styles.remaining}>{t('refund.ofLeft', { n: remaining })}</Text>
+                    </View>
+                  )}
+                  <Pressable
+                    style={styles.lineRestock}
+                    onPress={() =>
+                      setLines((s) => {
+                        const next: Record<string, LineState> = { ...s };
+                        const cur = s[l.saleLineId] ?? { qty: 0, grams: '', restock: true };
+                        next[l.saleLineId] = { ...cur, restock: !cur.restock };
+                        return next;
+                      })
+                    }
+                  >
+                    <Ionicons
+                      name={st?.restock ? 'checkmark-circle' : 'ellipse-outline'}
+                      size={16}
+                      color={st?.restock ? colors.positive : colors.slate400}
+                    />
+                    <Text style={[styles.lineRestockText, !st?.restock && { color: colors.slate400 }]}>
+                      {t('refund.restockThisLine')}
+                    </Text>
+                  </Pressable>
                 </View>
                 {requested > 0 && (
                   <NumberText style={[styles.lineAmount, overGrams && { color: colors.danger }]}>
@@ -299,77 +361,6 @@ export default function RefundScreen() {
             );
           })}
         </View>
-
-        {/* Per-line controls */}
-        {ctx.lines.map((l) => {
-          const st = lines[l.saleLineId];
-          if (!st) return null;
-          const remaining = l.isWeighed ? (l.qtyG ?? 0) - (l.refundedQtyG ?? 0) : l.qty - l.refundedQty;
-          const requested = l.isWeighed ? (st.grams === '' ? 0 : parseInt(st.grams, 10) || 0) : st.qty;
-          const overGrams = l.isWeighed && requested > remaining;
-          return (
-            <View key={`ctl-${l.saleLineId}`} style={styles.ctlRow}>
-              <View style={{ flex: 1, gap: spacing.sm }}>
-                {l.isWeighed ? (
-                  <View style={{ flexDirection: 'row', gap: spacing.sm, alignItems: 'center' }}>
-                    <TextInput
-                      style={[styles.gramsInput, overGrams && { borderColor: colors.danger }]}
-                      value={st.grams}
-                      onChangeText={(v) => setLineGrams(l, v)}
-                      placeholder={`0 – ${remaining} g`}
-                      placeholderTextColor={colors.slate400}
-                      keyboardType="number-pad"
-                    />
-                    <Pressable style={styles.maxBtn} onPress={() => setLineGrams(l, String(remaining))}>
-                      <Text style={styles.maxText}>{t('invDetail.max')}</Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
-                    <Pressable
-                      style={[styles.stepBtn, st.qty === 0 && styles.stepBtnDisabled]}
-                      onPress={() => setLineQty(l, st.qty - 1)}
-                      disabled={st.qty === 0}
-                      accessibilityLabel={t('refund.decrease', { name: l.name })}
-                    >
-                      <Ionicons name="remove" size={18} color={st.qty === 0 ? colors.slate300 : colors.slate700} />
-                    </Pressable>
-                    <NumberText style={styles.stepVal}>{st.qty}</NumberText>
-                    <Pressable
-                      style={[styles.stepBtn, st.qty >= remaining && styles.stepBtnDisabled]}
-                      onPress={() => setLineQty(l, st.qty + 1)}
-                      disabled={st.qty >= remaining}
-                      accessibilityLabel={t('refund.increase', { name: l.name })}
-                    >
-                      <Ionicons name="add" size={18} color={st.qty >= remaining ? colors.slate300 : colors.slate700} />
-                    </Pressable>
-                    <Text style={styles.remaining}>{t('refund.ofLeft', { n: remaining })}</Text>
-                  </View>
-                )}
-                <Pressable
-                  style={styles.lineRestock}
-                  onPress={() =>
-                    setLines((s) => {
-                      const next: Record<string, LineState> = { ...s };
-                      const cur = s[l.saleLineId] ?? { qty: 0, grams: '', restock: true };
-                      next[l.saleLineId] = { ...cur, restock: !cur.restock };
-                      return next;
-                    })
-                  }
-                >
-                  <Ionicons
-                    name={st.restock ? 'checkmark-circle' : 'ellipse-outline'}
-                    size={16}
-                    color={st.restock ? colors.positive : colors.slate400}
-                  />
-                  <Text style={[styles.lineRestockText, !st.restock && { color: colors.slate400 }]}>
-                    {t('refund.restockThisLine')}
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-          );
-        })}
 
         {/* Total + CTA */}
         <View style={[styles.totalCard, { marginTop: spacing.lg }]}>
@@ -486,7 +477,7 @@ const styles = StyleSheet.create({
   lineName: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate900 },
   lineMeta: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginTop: 2 },
   lineAmount: { fontFamily: fonts.monoSemiBold, fontSize: typography.body, color: colors.slate900 },
-  ctlRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md },
+  lineCtl: { marginTop: spacing.sm },
   gramsInput: {
     flex: 1,
     height: 44,
