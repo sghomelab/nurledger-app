@@ -8,3 +8,6 @@ expo-env.d.ts
 secrets/
 android/
 ios/
+
+# Apple review video (hosted at nurledger-review-video.nurlogicstudio.workers.dev)
+assets/*.mp4
