@@ -33,3 +33,26 @@ export async function setUiLanguage(lang: Lang): Promise<void> {
     lang,
   ]);
 }
+
+// ── Theme (issue #22) ────────────────────────────────────────────────────────
+
+export type UiTheme = 'system' | 'light' | 'dark';
+const UI_THEME_KEY = 'ui.theme';
+
+/** The stored theme choice; unknown/absent → 'light' (the app's default look). */
+export async function getUiTheme(): Promise<UiTheme> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM settings WHERE key = '${UI_THEME_KEY}'`,
+  );
+  const v = row?.value;
+  return v === 'dark' || v === 'system' ? v : 'light';
+}
+
+export async function setUiTheme(theme: UiTheme): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [
+    UI_THEME_KEY,
+    theme,
+  ]);
+}

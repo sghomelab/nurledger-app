@@ -2,7 +2,7 @@ import { useT } from '../src/hooks/useT';
 import { centeredColumn } from '../src/lib/layout';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Stack, useRouter } from 'expo-router';
-import { headerOptions } from './_layout';
+import { useHeaderOptions } from '../src/theme/useHeaderOptions';
 import { getPickedFile } from '../src/lib/pickedFile';
 import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,7 +12,8 @@ import { importProducts, type ProductImportReport } from '../src/repositories/pr
 import { parseProductsCsv, type ParseResult } from '../src/lib/productCsv';
 import { formatMoney } from '../src/lib/money';
 import { NumberText } from '../src/components/NumberText';
-import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../src/theme/tokens';
+import { useTheme } from '../src/theme/ThemeContext';
 
 /**
  * FR-314 (M6) — CSV import preview + report. Reads the picked file, parses
@@ -28,6 +29,9 @@ type State =
   | { phase: 'error'; message: string };
 
 export default function ImportCsvScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const headerOptions = useHeaderOptions();
   const { t } = useT();
   const router = useRouter();
   const { outlet } = useOutlet();
@@ -202,6 +206,8 @@ export default function ImportCsvScreen() {
 }
 
 function Chip({ label, tone }: { label: string; tone: 'positive' | 'danger' | 'muted' }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   const bg = tone === 'positive' ? colors.positiveSoft : tone === 'danger' ? colors.dangerSoft : colors.slate100;
   const fg = tone === 'positive' ? colors.positive : tone === 'danger' ? colors.danger : colors.slate500;
   return (
@@ -211,60 +217,64 @@ function Chip({ label, tone }: { label: string; tone: 'positive' | 'danger' | 'm
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.slate50 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.sm },
-  centerText: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500, textAlign: 'center' },
-  errorText: { fontFamily: fonts.sans, fontSize: 15, color: colors.danger, textAlign: 'center' },
-  doneTitle: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900 },
-  fileName: { fontFamily: fonts.mono, fontSize: 12.5, color: colors.slate500, marginBottom: spacing.md },
-  summaryRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
-  chip: { borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: 4 },
-  chipText: { fontFamily: fonts.sansSemiBold, fontSize: 13 },
-  errorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.dangerSoft,
-    borderRadius: radius.control,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-  },
-  errorCardText: { flex: 1, fontFamily: fonts.sans, fontSize: 13.5, color: colors.danger },
-  rowCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.white,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    marginBottom: spacing.sm,
-  },
-  rowMain: { flex: 1 },
-  rowSku: { fontFamily: fonts.mono, fontSize: 12, color: colors.slate500 },
-  rowName: { fontFamily: fonts.sansSemiBold, fontSize: 14.5, color: colors.slate900, marginTop: 1 },
-  rowPrice: { fontSize: 14, fontWeight: '500' },
-  rowIssues: { fontFamily: fonts.sans, fontSize: 12, color: colors.danger, marginTop: 3 },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: spacing.lg,
-    backgroundColor: colors.slate50,
-    borderTopWidth: 1,
-    borderTopColor: colors.slate200,
-  },
-  primaryBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.control,
-    paddingVertical: 15,
-    alignItems: 'center',
-  },
-  primaryBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: colors.white },
-  ghostBtn: { paddingVertical: 10, paddingHorizontal: spacing.lg },
-  ghostBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate500 },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, backgroundColor: colors.slate50 },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.sm },
+    centerText: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500, textAlign: 'center' },
+    errorText: { fontFamily: fonts.sans, fontSize: 15, color: colors.danger, textAlign: 'center' },
+    doneTitle: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900 },
+    fileName: { fontFamily: fonts.mono, fontSize: 12.5, color: colors.slate500, marginBottom: spacing.md },
+    summaryRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
+    chip: { borderRadius: 999, paddingHorizontal: spacing.md, paddingVertical: 4 },
+    chipText: { fontFamily: fonts.sansSemiBold, fontSize: 13 },
+    errorCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.dangerSoft,
+      borderRadius: radius.control,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+    },
+    errorCardText: { flex: 1, fontFamily: fonts.sans, fontSize: 13.5, color: colors.danger },
+    rowCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.white,
+      borderRadius: radius.card,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm + 2,
+      marginBottom: spacing.sm,
+    },
+    rowMain: { flex: 1 },
+    rowSku: { fontFamily: fonts.mono, fontSize: 12, color: colors.slate500 },
+    rowName: { fontFamily: fonts.sansSemiBold, fontSize: 14.5, color: colors.slate900, marginTop: 1 },
+    rowPrice: { fontSize: 14, fontWeight: '500' },
+    rowIssues: { fontFamily: fonts.sans, fontSize: 12, color: colors.danger, marginTop: 3 },
+    footer: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      padding: spacing.lg,
+      backgroundColor: colors.slate50,
+      borderTopWidth: 1,
+      borderTopColor: colors.slate200,
+    },
+    primaryBtn: {
+      backgroundColor: colors.primary,
+      borderRadius: radius.control,
+      paddingVertical: 15,
+      alignItems: 'center',
+    },
+    primaryBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 16, color: colors.white },
+    ghostBtn: { paddingVertical: 10, paddingHorizontal: spacing.lg },
+    ghostBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate500 },
+
+  });
+}

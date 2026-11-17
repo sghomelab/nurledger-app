@@ -9,6 +9,7 @@ import { useOutlet } from '../src/hooks/useAppData';
 import { useUsers } from '../src/hooks/useShift';
 import { getCloudAdapter, useSync } from '../src/hooks/useSync';
 import { useT } from '../src/hooks/useT';
+import { useTheme } from '../src/theme/ThemeContext';
 import { getDb } from '../src/db/database';
 import { resetAllData } from '../src/db/firstRun';
 import { updateOutlet } from '../src/repositories/outletRepository';
@@ -62,6 +63,7 @@ export default function SettingsScreen() {
   const [gateVisible, setGateVisible] = useState(false);
   const { outlet, reload } = useOutlet();
   const { t, lang, setLanguage } = useT();
+  const { theme, setTheme } = useTheme();
 
   const [name, setName] = useState('');
   const [currency, setCurrency] = useState('SGD');
@@ -401,6 +403,17 @@ export default function SettingsScreen() {
             />
           </Field>
           <Text style={styles.note}>{t('settings.languageNote')}</Text>
+        </Card>
+
+        {/* App theme (issue #22) — system / light / dark, device-local */}
+        <Card>
+          <SectionTitle>{t('settings.theme')}</SectionTitle>
+          <Segmented
+            options={[t('settings.themeSystem'), t('settings.themeLight'), t('settings.themeDark')]}
+            value={theme === 'system' ? t('settings.themeSystem') : theme === 'dark' ? t('settings.themeDark') : t('settings.themeLight')}
+            onChange={(v) => setTheme(v === t('settings.themeDark') ? 'dark' : v === t('settings.themeSystem') ? 'system' : 'light')}
+          />
+          <Text style={styles.note}>{t('settings.themeNote')}</Text>
         </Card>
 
         <Card>

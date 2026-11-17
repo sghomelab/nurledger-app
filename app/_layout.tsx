@@ -9,6 +9,8 @@ import { getDb } from '../src/db/database';
 import { isFirstRunPending, onFirstRunStateChange } from '../src/db/firstRun';
 import { FirstRunScreen } from '../src/components/FirstRunScreen';
 import { useT } from '../src/hooks/useT';
+import { ThemeProvider, useTheme } from '../src/theme/ThemeContext';
+import { useHeaderOptions } from '../src/theme/useHeaderOptions';
 import { colors, fonts } from '../src/theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -62,6 +64,7 @@ export default function RootLayout() {
   }, [attempt]);
 
   if (bootFailed) {
+    // Pre-provider screen — always the light palette (issue #22).
     return (
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: colors.slate50 }}>
         <Text style={{ fontFamily: fonts.sansBold, fontSize: 16, color: colors.slate900, textAlign: 'center' }}>
@@ -82,9 +85,23 @@ export default function RootLayout() {
   if (firstRunPending === null) return null; // splash still covering
   if (firstRunPending) return <FirstRunScreen />;
 
+  // The provider mounts only after the DB is ready: the theme choice lives in
+  // the `settings` table (issue #22), and this app is offline-first.
+  return (
+    <ThemeProvider>
+      <MainStack />
+    </ThemeProvider>
+  );
+}
+
+function MainStack() {
+  const { t } = useT();
+  const { isDark, colors } = useTheme();
+  const headerOptions = useHeaderOptions();
+
   return (
     <>
-      <StatusBar style="dark" />
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <AppFrame>
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.slate50 } }}>
         {/* Non-tab screens live outside the (tabs) group — header + back button. */}
@@ -96,21 +113,9 @@ export default function RootLayout() {
         <Stack.Screen name="po/[id]" options={{ ...headerOptions, title: t('nav.po') }} />
         <Stack.Screen name="settings" options={{ ...headerOptions, title: t('settings.title') }} />
         <Stack.Screen name="cloud-setup" options={{ ...headerOptions, title: t('cloudsetup.title') }} />
+        <Stack.Screen name="sale/[id]" options={{ ...headerOptions, title: t('nav.sale') }} />
       </Stack>
       </AppFrame>
     </>
   );
 }
-
-/** Shared header style for stack screens outside the tab group. */
-export const headerOptions = {
-  headerShown: true,
-  headerStyle: { backgroundColor: colors.slate50 },
-  headerTitleStyle: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate900 },
-  headerTintColor: colors.slate900,
-  // Without this, screens pushed from a tab show the previous route's NAME as
-  // the back-button label — and the tab root lives in the "(tabs)" group folder,
-  // so users saw a literal "(tabs)" next to the chevron (issue #7).
-  // Empty = chevron-only back button.
-  headerBackTitle: '',
-} as const;

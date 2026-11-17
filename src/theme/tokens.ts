@@ -23,6 +23,35 @@ export const colors = {
   white: '#FFFFFF', // cards on slate-50
 } as const;
 
+/** A palette: same keys as `colors`, values widened to plain strings so a
+ *  second (dark) palette can satisfy the same shape. */
+export type Palette = { [K in keyof typeof colors]: string };
+
+/**
+ * Dark palette (issue #22) — same keys as `colors`, dark values, so a screen
+ * only ever references palette names and the theme swaps the values.
+ * Neutrals are slate-600…950; accents are the 400 shades (legible on dark).
+ */
+export const colorsDark: Palette = {
+  primary: '#818CF8', // indigo-400
+  primarySoft: '#1E1B4B', // indigo-950
+  positive: '#34D399', // emerald-400
+  positiveSoft: '#064E3B',
+  warning: '#FBBF24', // amber-400
+  warningSoft: '#78350F',
+  danger: '#FB7185', // rose-400
+  dangerSoft: '#881337',
+  slate50: '#0F172A', // app background (slate-900)
+  slate100: '#1E293B', // slate-800
+  slate200: '#334155', // borders (slate-700)
+  slate300: '#475569', // slate-600
+  slate400: '#64748B', // slate-500
+  slate500: '#94A3B8', // secondary text (slate-400)
+  slate700: '#CBD5E1', // body text (slate-300)
+  slate900: '#F1F5F9', // headings (slate-100)
+  white: '#1E293B', // cards (slate-800)
+};
+
 export type ColorName = keyof typeof colors;
 
 /** Font families (registered in app/_layout.tsx via expo-font, one family per weight). */

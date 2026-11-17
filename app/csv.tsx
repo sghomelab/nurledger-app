@@ -1,8 +1,8 @@
 import { useT } from '../src/hooks/useT';
 import { centeredColumn } from '../src/lib/layout';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter, Stack } from 'expo-router';
-import { headerOptions } from './_layout';
+import { useHeaderOptions } from '../src/theme/useHeaderOptions';
 import { View, Text, Pressable, StyleSheet, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Sharing from 'expo-sharing';
@@ -11,7 +11,8 @@ import { listProducts, listCategories } from '../src/repositories/productReposit
 import { setPickedFile } from '../src/lib/pickedFile';
 import { useOutlet } from '../src/hooks/useAppData';
 import { serializeProductsToCsv } from '../src/lib/productCsv';
-import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../src/theme/tokens';
+import { useTheme } from '../src/theme/ThemeContext';
 
 /**
  * FR-314 (M6) — product data import/export hub, reached from the Inventory
@@ -19,6 +20,9 @@ import { colors, fonts, radius, spacing, typography } from '../src/theme/tokens'
  * Import: pick a .csv → /import-csv preview + report screen.
  */
 export default function ProductDataScreen() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const headerOptions = useHeaderOptions();
   const { t } = useT();
   const router = useRouter();
   const { outlet } = useOutlet();
@@ -120,38 +124,42 @@ export default function ProductDataScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.slate50 },
-  intro: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500, lineHeight: 20, marginBottom: spacing.lg },
-  actionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    backgroundColor: colors.white,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: colors.slate200,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-  },
-  actionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primarySoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionTitle: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate900 },
-  actionSub: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.slate500, marginTop: 2 },
-  noteCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    backgroundColor: colors.positiveSoft,
-    borderRadius: radius.control,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  noteText: { flex: 1, fontFamily: fonts.sans, fontSize: 13, color: colors.slate700 },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, backgroundColor: colors.slate50 },
+    intro: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate500, lineHeight: 20, marginBottom: spacing.lg },
+    actionCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      backgroundColor: colors.white,
+      borderRadius: radius.card,
+      borderWidth: 1,
+      borderColor: colors.slate200,
+      padding: spacing.lg,
+      marginBottom: spacing.md,
+    },
+    actionIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primarySoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    actionTitle: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.slate900 },
+    actionSub: { fontFamily: fonts.sans, fontSize: 12.5, color: colors.slate500, marginTop: 2 },
+    noteCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.positiveSoft,
+      borderRadius: radius.control,
+      padding: spacing.md,
+      marginTop: spacing.sm,
+    },
+    noteText: { flex: 1, fontFamily: fonts.sans, fontSize: 13, color: colors.slate700 },
+
+  });
+}

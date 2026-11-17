@@ -1,8 +1,8 @@
 import { useT } from '../../src/hooks/useT';
 import { centeredColumn } from '../../src/lib/layout';
-import { useCallback, useEffect, useState } from 'react';
+import { useMemo, useCallback, useEffect, useState } from 'react';
 import { Stack, useRouter, useLocalSearchParams } from 'expo-router';
-import { headerOptions } from '../_layout';
+import { useHeaderOptions } from '../../src/theme/useHeaderOptions';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../../src/components/Screen';
@@ -11,7 +11,8 @@ import { ReportView } from '../../src/components/report/ReportView';
 import { useOutlet } from '../../src/hooks/useAppData';
 import { getShift, getShiftDrawerSnapshot, type DrawerSnapshot, type Shift } from '../../src/repositories/shiftRepository';
 import { formatMoney } from '../../src/lib/money';
-import { colors, fonts, radius, spacing, typography } from '../../src/theme/tokens';
+import { fonts, radius, spacing, typography, type Palette } from '../../src/theme/tokens';
+import { useTheme } from '../../src/theme/ThemeContext';
 
 function timeStr(ms: number): string {
   return new Date(ms).toLocaleString([], { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -22,6 +23,9 @@ function timeStr(ms: number): string {
  * The Z-report is the stored z_report_json — the source of truth (FR-202).
  */
 export default function ShiftDetail() {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const headerOptions = useHeaderOptions();
   const { t } = useT();
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -98,6 +102,8 @@ export default function ShiftDetail() {
 }
 
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.row}>
       <Text style={[styles.rowLabel, strong && { fontFamily: fonts.sansSemiBold, color: colors.slate900 }]}>{label}</Text>
@@ -106,22 +112,26 @@ function Row({ label, value, strong }: { label: string; value: string; strong?: 
   );
 }
 
-const styles = StyleSheet.create({
-  wrap: { flex: 1, backgroundColor: colors.slate50 },
-  content: { padding: spacing.lg, gap: spacing.md, flexGrow: 1 },
-  metaCard: { gap: spacing.xs },
-  metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  metaTitle: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
-  metaLine: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
-  section: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate700, marginTop: spacing.sm },
-  drawerCard: { gap: spacing.sm },
-  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
-  rowLabel: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
-  rowValue: { fontFamily: fonts.mono, fontSize: typography.caption, color: colors.slate900 },
-  divider: { height: 1, backgroundColor: colors.slate200, marginVertical: spacing.xs },
-  hint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  notFound: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate500 },
-  backBtn: { backgroundColor: colors.primary, borderRadius: radius.control, paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
-  backText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
-});
+function makeStyles(colors: Palette) {
+  return StyleSheet.create({
+
+    wrap: { flex: 1, backgroundColor: colors.slate50 },
+    content: { padding: spacing.lg, gap: spacing.md, flexGrow: 1 },
+    metaCard: { gap: spacing.xs },
+    metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    metaTitle: { fontFamily: fonts.sansBold, fontSize: typography.heading, color: colors.slate900 },
+    metaLine: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
+    section: { fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate700, marginTop: spacing.sm },
+    drawerCard: { gap: spacing.sm },
+    row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+    rowLabel: { fontFamily: fonts.sans, fontSize: typography.caption, color: colors.slate500 },
+    rowValue: { fontFamily: fonts.mono, fontSize: typography.caption, color: colors.slate900 },
+    divider: { height: 1, backgroundColor: colors.slate200, marginVertical: spacing.xs },
+    hint: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400 },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+    notFound: { fontFamily: fonts.sans, fontSize: typography.body, color: colors.slate500 },
+    backBtn: { backgroundColor: colors.primary, borderRadius: radius.control, paddingHorizontal: spacing.xl, paddingVertical: spacing.md },
+    backText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
+
+  });
+}
