@@ -6,6 +6,80 @@ FR → file/test mapping lives in `FR-COVERAGE.md`.
 
 ---
 
+## 1.1.0 — tester enhancement batch (2026-11-17)
+
+> Status (2026-11-17): **both platforms built from the SAME commit `8106800`**
+> (Mas's explicit GO, "Go BUILD on both platforms"). iOS 1.1.0 = **build 9**
+> (EAS auto-bumped the configured 8 → 9; verified from the IPA
+> `Info.plist`, not the CLI) — binary in App Store Connect (TestFlight once
+> Apple's processing clears; the EAS submit job auto-creates the v1.1.0 entry
+> and files it for review). Android 1.1.0 = **vc5** — EAS `preview`
+> (internal) build, APK artifact sent to testers. Gates at queue time: tsc 0;
+> jest 510/510; expo SDK 58.0.22; `prebuild --clean` OK.
+>
+> EAS builds: Android `0588fc4b-6809-40f2-a5a1-b184be7dc488` (preview),
+> iOS `5f6cf0dc-0bc9-44ba-a7fb-010ababbff14` (production). The known
+> non-interactive trap fired again — the iOS store build showed FINISHED but
+> was NOT uploaded to ASC — recovered with zero credits: pull the IPA
+> artifact → verify `Info.plist` → `eas submit --platform ios --path
+> <ipa> --non-interactive` (ASC build 9 confirmed via the ASC API).
+>
+> All 21 tester issues (GitHub #2–#24) got replies on their threads; the
+> issues stay open until testers verify on 1.1.0, then they are closed in
+> one pass.
+
+**What's in 1.1.0** — the full tester-feedback round, all device-verified:
+
+- **Camera barcode scanning** (#5/#10/#11/#12) — built-in camera scanner
+  (expo-camera + BarcodeScanner, torch support) on the **Sell tab** (camera
+  icon beside the scan field — one tap, item added) and on **Add/edit
+  product** (product barcode AND carton barcode). Keyboard-wedge and typed
+  entry unchanged. Camera is now the app's only permission, requested only
+  when the scanner opens.
+- **Gear icon = global Settings entry** (#6/#15/#21) — ⚙ at the top right
+  of the Sell tab header; replaces the buried Shift-tab "Change" path.
+  Leaked "(tabs)" route-group labels on pushed screens are gone (#7/#9/#15).
+- **Insights is tabbed** (#23/#16) — **Overview** (KPIs, Payment Mix,
+  extended KPIs) · **Financials** (Profit & Loss, inventory asset position,
+  operating expenses) · **Products** (top sellers/ABC, stockout forecast) ·
+  **History** (searchable sales + CSV export) — the period selector applies
+  to all tabs. This is now the standard refund path (History → tap a sale →
+  Refund).
+- **X/Z report print + share** (#13/#14/#2) — every report sheet has
+  **Print** (system print dialog) and **Save / share PDF** via a pure
+  `buildReportHtml` renderer; **Settings → Print & export** is the one-stop
+  hub for labels, CSV, POs and reports.
+- **Report naming + full localization** (#18) — tiles "Shift snapshot" /
+  "Shift Close"; reports titled **"Shift Snapshot — X-Report"** /
+  **"Shift Close — Z-Report"** (en; ms "Snapshot shift — Laporan X" /
+  "Penutupan shift — Laporan Z"; fil equivalents); the printed HTML's row
+  labels and the close-sheet hint follow the app language
+  (`reportHtml` labels option, en fallback unit-tested).
+- **Email receipt** (#19) — Settings → Receipt → "Ask to email the receipt";
+  after each payment the register offers to email the receipt (typed address
+  or scanned email QR).
+- **App themes** (#22) — Settings → Theme: Light / Dark / System
+  (per-device; follows the platform dark mode).
+- **Refund restock placement** (#17) — the restock toggle moved up beside
+  the product description with a compact label (no more scrolled-away
+  control; product text wraps).
+- **Sync button spacing** (#24) — the Cloud-card "Sync now" row had 0 pt
+  vertical gap to the row above and read as an overlap in its disabled
+  state; +8 pt `marginTop`.
+- **Back buttons on iOS** (#1/#4/#8) — pushed screens navigate back
+  correctly (1.0.1 carry-over fixes confirmed in this build).
+- **i18n** — 651 keys × 3 languages, compiler-enforced parity; no
+  hardcoded user-facing strings remain in the report surfaces.
+
+**Docs** — `docs/USER-GUIDE.md` rewritten against the 1.1.0 UI (camera
+scanning, tabbed Insights, report names, gear entry, print hub, themes,
+email receipts) and the **Supabase onboarding** section reworked from real
+tester Q&A (401 = wrong `anon public` key after the 1.0.1 ping fix, key
+location, service_role warning, free-project sleep, schema-upgrade messages,
+owner-only invite codes, confirm-email guidance).
+
+---
+
 ## 1.0.0 — submitted (2026-11-09): first release
 
 > Status (2026-11-09): **iOS 1.0.0 (build 3) is `WAITING_FOR_REVIEW`

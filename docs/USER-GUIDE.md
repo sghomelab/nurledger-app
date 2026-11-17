@@ -56,10 +56,12 @@ stock, shifts and reports — all on one device.
   (e.g. GST 9% inclusive, SST 10% inclusive, VAT — or any custom rate) and the payment
   methods are settings you choose for your store. The same app works in Singapore,
   Malaysia, the EU, or anywhere else.
-- **No special permissions.** NurLedger asks for nothing unusual — no camera, no
-  Bluetooth. Barcodes are scanned with a USB/Bluetooth *keyboard-wedge* scanner or typed
-  in, and printing (receipts, labels, purchase orders) works by generating a file you
-  can print on any device, any printer.
+- **Almost no permissions.** NurLedger asks for nothing unusual — no Bluetooth,
+  no location. The only permission it can request is the **camera**, and only when
+  you actively open the built-in barcode scanner; use a physical scanner or type
+  the code and you never grant it. Printing (receipts, labels, purchase orders)
+  works by generating a file you can print on any device, any printer — or email
+  to the customer.
 
 ---
 
@@ -67,11 +69,11 @@ stock, shifts and reports — all on one device.
 
 | Tab | What it's for |
 |---|---|
-| **Sell** | The register: scan or type items, take payment, print/show the receipt. |
+| **Sell** | The register: scan (camera, physical scanner, or typed) or search items, take payment, on-screen receipt with optional email. Gear icon at the top right opens Settings. |
 | **Inventory** | Products, stock levels, stocktakes, label printing, suppliers, purchase orders, CSV import/export. |
 | **Expiry** | Your perishables, ranked by nearest expiry (FEFO). |
-| **Insights** | KPIs, top sellers, sales history, CSV exports. |
-| **Shift** | Open/close the register with a cash float, cash in/out, X and Z reports. |
+| **Insights** | Tabbed analytics: **Overview**, **Financials**, **Products**, **History** — KPIs, P&L, top sellers, searchable sales history (where refunds start), CSV exports. |
+| **Shift** | Open/close the register with a cash float, cash in/out, Shift snapshot (X-report) and Shift Close (Z-report), both printable. |
 
 A **shift must be open before selling.** When no shift is open the register is
 locked — tap the banner to open one (the Shift tab).
@@ -80,10 +82,13 @@ locked — tap the banner to open one (the Shift tab).
 
 ## Selling (the register)
 
-1. **Add items** three ways:
-   - **Scan** — point a USB/Bluetooth keyboard-wedge scanner at the barcode
-     (or the carton's barcode — a carton adds all the units it contains), or
-     type the barcode into the scan field and press Enter.
+1. **Add items** four ways:
+   - **Camera** — tap the **camera icon** next to the scan field and point the
+     phone at the barcode (or the carton's barcode — a carton adds all the units
+     it contains). The item is added to the order right away.
+   - **Physical scanner or type** — point a USB/Bluetooth *keyboard-wedge*
+     scanner at the barcode, or type the code into the scan field and press
+     Enter.
    - **Weighed items** (vegetables, meat) — scan the **scale's barcode** and
      the app reads the weight: "Weighed — Russet Apples · 1.25 kg" with an
      editable weight → **Add to order**. The price is weight × your per-kg rate.
@@ -99,7 +104,10 @@ locked — tap the banner to open one (the Shift tab).
      confirm it was paid.
    - *Card* records a card payment (use your terminal for the actual charge).
 5. **Done** — the on-screen receipt appears. Stock goes down **immediately,
-   even offline**, and the sale is saved on the device.
+   even offline**, and the sale is saved on the device. If you turned on
+   **Ask to email the receipt** (Settings → Receipt), NurLedger now offers to
+   email the receipt to the customer — type their address or scan their email
+   QR code.
 
 **Staff permissions:** cashiers can sell, but **discounts and price overrides**
 ask for the manager/owner PIN. The PIN is device-only and never leaves the
@@ -109,7 +117,7 @@ device.
 
 ## Refunds
 
-Give a refund from **Insights → Sales history**:
+Give a refund from **Insights → History tab → Sales history**:
 
 1. Find the sale (search by product, cashier or sale ID) and tap it.
 2. Tap **Refund** on the line you want back. You can refund:
@@ -230,17 +238,23 @@ from the top of this list and your shrinkage drops.
 
 ## Insights (reports)
 
-- **KPI cards** — revenue (net), COGS, gross profit, operating net margin,
-  discounted items, units, transactions, average basket, UPT — for **Today**,
-  the **current period** or **all time**.
-- **Payment Mix** — how the money came in: sales by payment method (cash,
-  card, QR…) for the selected period, with each method's share of the total.
-  Switch periods and it updates with them.
-- **Extended KPIs** — mark-up %, inventory turnover, days on hand, sell-through,
-  GMROI, shrinkage, stockout rate, expiry waste, fill rate.
-- **Top sellers** — by revenue share, with velocity/ABC class.
-- **Sales history** — every sale, searchable by product / cashier / sale ID.
-  This is also where **refunds** start (tap a sale). Export the history to CSV.
+A **period selector** (Today · Current period · All time) sits on top and
+applies to every tab below it. The tab is split into four sections:
+
+- **Overview** — KPI cards (revenue net, gross profit, operating net margin,
+  discounted items, units, transactions, average basket, UPT), **Payment Mix**
+  (how the money came in: cash, card, QR… with each method's share of the
+  total), and **Extended KPIs** (mark-up %, inventory turnover, days on hand,
+  sell-through, shrinkage, stockout rate, expiry waste, fill rate).
+- **Financials** — a **Profit & Loss** statement (gross sales → COGS → gross
+  margin → your operating expenses: payroll, maintenance, other → operating net
+  margin), an **Inventory asset position** (value at cost, at retail, unrealised
+  margin) and an **Operating expenses** list you can add to.
+- **Products** — **Top sellers** by revenue share with velocity/ABC class, and
+  a **Stockout forecast** (what runs out when, based on recent sales).
+- **History** — every sale in the period, searchable by product / cashier /
+  sale ID, with CSV export. This is also where **refunds** start: tap a sale,
+  then **Refund** on the line you want back.
 
 ---
 
@@ -249,14 +263,19 @@ from the top of this list and your shrinkage drops.
 1. **Open a shift** — enter the **float** (the cash you start with). The
    register unlocks.
 2. During the shift: **cash in / cash out** with a reason (e.g. personal
-   purchase, petty cash), and an **X-report** anytime — a non-destructive
-   snapshot of sales by method and cash expected in the drawer.
+   purchase, petty cash), and a **Shift snapshot** (the X-report) anytime — a
+   non-destructive snapshot of sales by method and the cash expected in the
+   drawer.
 3. **Close the shift** — enter the **counted cash**. The app compares it with
    the expected cash (float + cash sales − cash out + refunds given in cash)
    and shows **exact / over / short**.
-4. The **Z-report** is generated and saved with the shift: sales by payment
-   method, cash movements, **refunds**, and the variance. The register locks
-   again.
+4. The **Shift Close report** (the Z-report) is generated and saved with the
+   shift: sales by payment method, cash movements, **refunds**, and the
+   variance. The register locks again.
+
+Every report sheet has two export actions: **Print** (the system print
+dialog — AirPrint on iOS) and **Save / share PDF** — the file matches the
+on-screen numbers, in your app language.
 
 Shifts work **fully offline** — close the day's shift with no internet and it
 all syncs later.
@@ -265,12 +284,20 @@ all syncs later.
 
 ## Settings
 
+Open it from the **gear icon (⚙) at the top right of the Sell tab**.
+
 - **Store** — the shop's name (shown on receipts and reports).
+- **Print & export** — one place for everything printable/exportable:
+  **Price labels** (58 mm roll or A4 sheet), **Product data (CSV)** (import or
+  export the product list), **Purchase orders** (share or print PO documents)
+  and **X & Z reports** (jumps to the Shift tab).
 - **Language** — the app's interface language: **English**, **Bahasa Melayu**
   or **Filipino**. Until you choose one, the app follows your phone's language
   (and uses English if your language is not supported). This is a **per-device** choice (each staff member's
   tablet can be in a different language) and it does **not** change the shop's
   currency or tax.
+- **Theme** — **Light**, **Dark** or **System** (follows the phone). Also
+  per-device; your data is unchanged.
 - **Currency** — what you sell in. Pick a preset or any ISO currency code.
   ⚠️ Changing the currency reinterprets existing amounts in the new currency —
   re-price as needed. (Some currencies like JPY show no decimals.)
@@ -278,11 +305,15 @@ all syncs later.
   inclusive, EU VAT 21% exclusive) or a **custom rate** (0–40%, inclusive or
   exclusive). Nothing is hardcoded to a country — the same app works
   anywhere.
-- **Receipt width** — 58 mm or 80 mm.
+- **Receipt** — **Printer width** (58 mm or 80 mm) and **Ask to email the
+  receipt** — when on, after every payment NurLedger offers to email the
+  receipt to the customer (type their address or scan an email QR code).
+- **Cloud sync** — see below.
 - **Staff** — managed on the **Shift** tab (see *Adding cashiers and managing
   PINs* below), not in Settings. PIN-gated actions (discounts, price overrides,
   refunds, stocktakes, closing shifts, settings) ask for the manager/owner PIN.
-- **Cloud sync** — see below.
+- **Danger zone** — **Reset all data** wipes everything on this device
+  (PIN-gated, type-to-confirm). If cloud sync is on, sync first.
 
 ---
 
@@ -320,47 +351,72 @@ the shop then connects using the same details.
 ### Step 3 — Copy your project's details
 1. Open your new project.
 2. In the left menu, go to **Project settings** (the gear icon) → **API**.
-3. You'll see two things. Copy **both**:
+3. Copy **both** of these:
    - **Project URL** — looks like `https://abcdefg.supabase.co`
-   - **anon / public key** — a long key labelled `anon public` (this is safe to share with the app)
+   - the **key labelled `anon public`** — a very long key that starts with
+     `eyJ`. This is the one to paste into NurLedger; it is safe to put in the
+     app (the real protection is the database rules the setup script installs,
+     not the key itself).
 
-> A self-hosted Supabase must be reachable over HTTPS; release builds block plain
-> http (only local-development addresses are accepted in debug builds).
+   If you see more than one key, take the one labelled **`anon public`** and
+   nothing else.
 
-> **Never paste the `service_role` key into NurLedger.** It is a master password for
-> your database and the app does not need it (older versions asked for it — if you
-> ever pasted it, go to Project settings → API and **rotate/regenerate it**; current
-> versions delete the stored copy from the phone automatically).
+> **Never paste the `service_role` key into NurLedger.** It is a master key for
+> your database and the app does not need it (older versions asked for it — if
+> you ever pasted it, go to Project settings → API and **regenerate** the
+> service role key; current versions delete any stored copy from the phone
+> automatically).
+
+> A self-hosted Supabase must be reachable over HTTPS; release builds block
+> plain http (only local-development addresses are accepted in debug builds).
+
+> **Heads-up: free projects sleep.** A free Supabase project that sits unused
+> for about a week goes to sleep. That's not an error — open the project once
+> in the dashboard to wake it (takes a few minutes), and NurLedger's
+> connection resumes on its own.
 
 ### Step 4 — Connect it in NurLedger
 1. Open **NurLedger** on your first device.
-2. Go to **Settings** (the gear / Store card).
-3. Find **Cloud sync** — it will say **Off**.
-4. Tap **Connect your store**.
-5. Choose **New store** (this is your first device) and paste the two details (Project URL, anon key), then tap **Continue**.
-   NurLedger checks that it can reach your project.
+2. Open **Settings** (the gear icon at the top right of the Sell tab).
+3. Find the **Cloud sync** card — it will say **Off**.
+4. Tap **Connect your backend**.
+5. Choose **New store** (this is your first device) and paste the two details (Project URL, `anon public` key), then tap **Check connection**.
+
+   What the check can say:
+   - **"Backend reachable and the NurLedger schema is deployed."** — you're
+     done with this step.
+   - **"Backend reachable — but the schema is not deployed yet."** — continue
+     to the SQL step below.
+   - **"Backend reachable — it runs schema vN, but this app needs vM."** — your
+     project was set up by an older app version; run the *updated* script
+     shown (safe to re-run — it never touches existing data).
+   - **"Backend unreachable: …"** — something's off; see *Common setup
+     problems* at the end of this section.
 
    **One manual step (about 1 minute):** Supabase does not let apps create tables in a
    project on your behalf, so you run a short setup script in the project yourself:
-   1. NurLedger shows the script on screen — tap **Copy** (it is long, do not type it).
+   1. NurLedger shows the script on screen — tap **Copy SQL** (it is long, do not type it).
       It ends with a one-time claim line made just for this setup: only this phone can
       finish creating your store, nobody else who finds your project URL.
    2. Back in the Supabase dashboard, open **SQL Editor** (left menu) → **New query**.
    3. Paste the script into the editor box and tap **Run**.
    4. You should see a short success message (a few tables created).
-   5. Go back to NurLedger and tap **Check that the setup ran**. When it is right you
+   5. Go back to NurLedger and tap **I've run it — check setup**. When it is right you
       will see a **Connected** confirmation.
 
    This script is safe to re-run any time — it creates the tables and rules for your
    products, categories, sales and stock, and never touches existing data.
-   If you connected with an **older app version**, the app shows the *updated*
-   script instead (labelled "upgrade") — same steps, and it is just as safe.
 
 ### Step 5 — Create your owner login
 1. Still in **Cloud sync**, tap **Create owner account** (if prompted).
 2. Enter your **email** and choose a **password**. This is *your* login for the shop —
    it's stored in your own Supabase account from Step 1.
-3. If Supabase asks you to confirm the email, open your inbox and tap the link.
+3. Confirm the email: open your inbox and tap the link Supabase sent — the
+   app then shows the **Sign in** button. Keep Supabase's **Confirm email**
+   setting **ON** (Authentication → Providers → Email in the dashboard): it's
+   safe, it's on by default, and it verifies the account is really yours.
+   If the email already has an account, the app says so and offers **Sign in**
+   instead.
 
 That's it — **your shop is now connected**.
 
@@ -373,6 +429,17 @@ That's it — **your shop is now connected**.
 You can flip this switch **On/Off anytime**. Turning it **Off** stops syncing but **never
 deletes anything** — your sales keep being saved on the device, and they upload the next
 time you turn it back on.
+
+### Common setup problems
+
+| What you see | What it means / what to do |
+|---|---|
+| **"Backend unreachable: HTTP 401"** at Check connection | The **`anon public` key is wrong or missing**. Hosted Supabase requires an API key on every request, so a 401 almost always means the key pasted isn't the right one. Go back to Project settings → API, re-copy the key labelled **`anon public`** (it starts with `eyJ`), and try again. (Very old app builds had a bug that showed this even with the right key — it was fixed in 1.0.1.) |
+| **"Backend unreachable" (a network message)** | The phone can't reach the URL. Check the device has internet, and re-check the **Project URL** character by character — it must start with `https://`. Also: free projects sleep after ~1 week idle — open the project once in the Supabase dashboard to wake it, then retry. |
+| **"Schema still not detected"** | The SQL didn't finish in the SQL Editor. Re-run the bundle, make sure it reports success (no red errors), then tap **I've run it — check setup** again. |
+| **"Still on schema vN — the script below adds vM"** | Your project was set up by an older app version. Run the updated script shown (safe to re-run — it never touches existing data), then check again. |
+| **"This email already has an account — sign in instead"** | The owner account for this email exists already (maybe on another device). Tap **Sign in** and use that email + password. |
+| Claim step fails after running the SQL | The script wasn't run for *this* attempt — each attempt gets its own one-time claim line. Tap **Check connection** again, copy the fresh script, run it in the SQL Editor, then finish. |
 
 ### Reading the sync banner (Sell tab)
 - **"Syncing…"** — working right now.
@@ -387,9 +454,12 @@ time you turn it back on.
 Each device signs in with its **own** account and **joins** the owner's store with an
 invite code — so one person logging out never signs anyone else out.
 
-1. **Owner:** on the first device, go to **Settings → Cloud sync → Invite a device**.
-   NurLedger shows an invite code — it is valid for 24 hours and works once.
-2. **Second device:** install NurLedger, then **Settings → Cloud sync → Connect your store**.
+1. **Owner:** on the first device, open **Settings → Cloud sync → Invite a
+   device** (PIN-gated). NurLedger shows an invite code — it is **valid for 24
+   hours and works once**. Only the **store owner** can create invite codes —
+   a device that joined as a member can't.
+2. **Second device:** install NurLedger, then **Settings → Cloud sync →
+   Connect your backend**.
 3. Paste the **same two** project details (Project URL + anon key) from Step 3.
 4. Choose **Join with invite code** and enter the code the owner shared.
 5. Create a login with **your own email + password** (each device has its own account).
@@ -415,7 +485,7 @@ Staff **don't need a Supabase account.** You (the owner) manage them on the **Sh
 
 The PIN is a **local safeguard against mistakes and casual misuse**, not a vault: someone with the unlocked phone and technical skills can get around it. Keep the phone itself secure.
 
-There is no "deactivate user" action in version 1.0. To stop someone using the register, ask them to hand back the device and change the PIN of any manager/owner account they know.
+There is no "deactivate user" action yet. To stop someone using the register, ask them to hand back the device and change the PIN of any manager/owner account they know.
 
 ---
 
@@ -433,8 +503,9 @@ There is no "deactivate user" action in version 1.0. To stop someone using the r
     and can delete their own account the same way).
   - The data **on your phone is kept** — this just disconnects it. To wipe the phone too, use
     **Reset all data** afterwards.
-  - Needs the latest cloud setup script (schema v8): if you see "cloud setup is out of date",
-    Disconnect → Connect, run the updated script in the Supabase SQL Editor, then try again.
+  - Needs the latest cloud setup script (currently schema v8): if the app says
+    your project "runs schema vN, but this app needs vM", Disconnect → Connect,
+    run the updated script in the Supabase SQL Editor, then try again.
 - **Delete everything yourself:** you can also delete the whole Supabase project from the
   Supabase dashboard. NurLedger (the app) never has a copy of your data.
 
@@ -459,15 +530,18 @@ Need help? See the [NurLedger support page](https://nurlogic.ai/support) or emai
 ## Troubleshooting
 | Problem | What to do |
 |---|---|
-| "Connection failed" when connecting | Re-check the **Project URL** (must end in `.supabase.co`) and that you pasted the **anon** key, not a truncated one. Make sure the project is still running (free projects pause after a week of no use — opening the project in the dashboard wakes it). |
+| "Backend unreachable: HTTP 401" when connecting | The **`anon public` key is wrong or missing** — hosted Supabase requires a key on every request. Re-copy the key labelled `anon public` (starts with `eyJ`) from Project settings → API and try again. |
+| "Backend unreachable" (network message) when connecting | Re-check the **Project URL** (must start with `https://` and look like `https://abcdefg.supabase.co`) and that the phone has internet. Free projects **sleep after ~1 week idle** — open the project once in the dashboard to wake it, then retry. |
 | Nothing is syncing after turning it On | Wait a moment, then pull to refresh / reopen Settings. Check the device has internet. The "N ops queued" line shows what's waiting. |
-| "Sync error: …" mentions a missing table | A newer app version needs the updated setup script: in Settings → Cloud sync, tap **Disconnect** (your data on the device is untouched), then **Connect your store** again — the app detects the older setup and shows the updated script. Run it in Supabase's SQL Editor (safe to re-run — it never touches existing data) and finish the reconnection. |
+| "Sync error: …" mentions a missing table | A newer app version needs the updated setup script: in Settings → Cloud sync, tap **Disconnect** (your data on the device is untouched), then **Connect your backend** again — the app detects the older setup and shows the updated script. Run it in Supabase's SQL Editor (safe to re-run — it never touches existing data) and finish the reconnection. |
 | I pasted the wrong anon key | Disconnect, then Connect again with the correct details. (The setup is repeatable — it won't duplicate your data.) |
-| "Invalid claim code" at the last step | The setup script wasn't run for THIS attempt. Tap Continue again — the app shows the script once more — paste and run it in the SQL Editor, then finish. |
+| "Invalid claim code" at the last step | The setup script wasn't run for THIS attempt. Tap **Check connection** again — the app shows the script once more — paste and run it in the SQL Editor, then finish. |
 | Adding a second phone | On the first phone: Settings → Cloud sync → **Invite a device** (PIN-gated). It shows a one-time code, valid 24 hours. On the second phone: Connect → **Join with invite code**, paste the URL + anon key, enter the code, and create that phone's OWN account. The owner's password is never shared. |
 | I was signed out of cloud sync after an update | The sign-in session now lives in the phone's secure keystore. If the keystore is wiped (phone restore, reinstall) the session is gone: go to Settings → Cloud sync and sign in again (Connect → "sign in instead"). Your data on the phone is untouched. |
 | A red banner says "N record(s) rejected by your server" | Your cloud server refused those records (usually after an app update that needs the newer setup script, or a mismatch in the server data). Nothing is lost: the records are still on the phone and everything behind them keeps syncing. Open Settings → Cloud sync → **Rejected uploads** to see the reason. Fix the cause (for example Disconnect → Connect to re-run the latest setup script), then tap **Retry rejected**. **Discard…** stops trying for good — those records then never reach your other phones or the cloud (they stay on this phone). |
 | Free project paused (after ~1 week idle) | Open your project in the Supabase dashboard once; it wakes up and sync resumes. |
+| Camera scanner says camera access is needed | The phone hasn't granted camera permission. Allow it in the phone's Settings → Apps → NurLedger → Camera, then open the scanner again. You can keep denying it — physical scanners and typed barcodes still work. |
+| "Schema still not detected" / "Still on schema vN" after running the SQL | Make sure the SQL Editor query **finished without errors** (a red error means it stopped early), then check again in the app. |
 | A weighed item shows the wrong weight | Re-check the scale's barcode format matches your locale's scale (Settings → the store's locale drives the barcode parser). You can always edit the weight before adding it to the order. |
 | Printed labels don't scan | Make sure you printed at 100% scale (no "fit to page"). Regenerate and print again; the barcodes are standard UPC-A/Code 39 and scan with any scanner. |
 
@@ -483,19 +557,22 @@ NurLedger combines them correctly when both sync: **no sale is counted twice**, 
 stays accurate.
 
 ### Can I use a barcode scanner?
-Yes. Any USB or Bluetooth *keyboard-wedge* scanner works — it types into the scan field
-like a keyboard. You can also type barcodes by hand. (Scanning with the camera is on the
-roadmap.)
+Yes — three ways. Any USB or Bluetooth *keyboard-wedge* scanner works (it types
+into the scan field like a keyboard). Or tap the **camera icon** on the Sell tab
+(or on the product barcode / carton barcode fields when adding a product) and
+scan with the phone's camera. Or type the code by hand.
 
 ### Do I need a receipt printer?
 No. The receipt appears on screen, and receipts, labels and purchase orders can be
-generated as files you can print on any device, any printer. (Connecting a physical
-printer directly is on the roadmap.)
+generated as files you can print on any device, any printer. X/Z reports can be
+printed or saved as PDF. You can also **email the receipt to the customer**
+(Settings → Receipt → Ask to email the receipt). (Connecting a physical printer
+directly is on the roadmap.)
 
 ### How do refunds work?
-Open a sale and tap **Refund** to refund the whole sale or individual lines. Returned
-items are restocked, you record a reason, and cashiers are asked for the manager/owner
-PIN.
+Open **Insights → History**, tap the sale, and tap **Refund** to refund the whole
+sale or individual lines. Returned items are restocked (per line), you record a
+reason, and cashiers are asked for the manager/owner PIN.
 
 ### Who needs a PIN?
 You (the owner) and any managers — a 4–8 digit PIN each; cashiers don't have one. When a
@@ -517,10 +594,19 @@ accountant or tax authority.
 updates immediately. It is a per-device choice, so each staff tablet can be in a
 different language.
 
+### Does it have a dark mode?
+Yes. **Settings → Theme**: **Light**, **Dark** or **System** (follows the phone).
+Per-device, and it never changes your data.
+
 ### What if my tablet breaks, is lost, or I need a new one?
 If cloud sync is on, your data is backed up in your own Supabase project. On the new
 device, join the store again with an invite code and it downloads your latest products,
 stock and sales.
+
+### My free Supabase project stopped syncing — is it broken?
+Probably not. Free Supabase projects **sleep after about a week of inactivity** —
+open the project once in the Supabase dashboard to wake it (a few minutes) and sync
+resumes. Nothing is deleted while it sleeps.
 
 ### How do I back up my data?
 Cloud sync keeps a backup in your own Supabase project (see *Setting up cloud sync*

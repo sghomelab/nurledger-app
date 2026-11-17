@@ -33,7 +33,7 @@ No FR was silently dropped — each deferral is logged in
 |---|---|---|
 | Register & checkout | FR-101, 102, 103, 104, 105, 107, 108, 109 | ✅ (FR-109 = on-screen receipt + label print; **physical ESC/POS print + re-print → v2**) |
 | Held / parked orders | FR-106 | 🔜 **v2 — decision taken 2026-11-09** (schema exists, no UI, never built; one active order at a time is the shipped behaviour) |
-| Camera scan | FR-100 | 🔜 **v2** (no camera permission in the release build by design; keyboard-wedge + typed barcodes + scale barcodes cover scanning) |
+| Camera scan | FR-100 | ✅ **shipped in 1.1.0** (`expo-camera` + BarcodeScanner, torch) — Sell tab (beside the scan field) + product/carton barcode fields on Add/edit product; camera is now the app's only permission, requested only when the scanner opens |
 | Refunds | FR-110, 111 | ✅ line-level, per-line restock, PIN-gated, exact full-refund invariant, cross-device synced |
 | Languages | FR-115 | ✅ **EN + Bahasa Melayu + Filipino** (device-local toggle, persisted, compiler-enforced parity) |
 | Shifts | FR-200…204 | ✅ open/close + float, cash in/out, X/Z-reports, fully offline |

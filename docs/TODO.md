@@ -58,9 +58,9 @@ beyond the first testers:
 
 ## v2 (explicitly out of 1.0.0)
 
-- **FR-100 — camera scan** (MLKit / `expo-camera`). The release
-  build ships no camera permission by design; keyboard-wedge + typed
-  barcodes + scale barcodes cover scanning.
+- **FR-100 — camera scan** — ✅ **done in 1.1.0** (2026-11-17;
+  `expo-camera` + BarcodeScanner on Sell + Add/edit product, torch).
+  Keyboard-wedge + typed barcodes + scale barcodes still work as before.
 - **FR-109 / FR-604 tail — physical ESC/POS printing + re-print from
   history.** On-screen receipts (58/80mm) + printable label/PO
   files cover printing without hardware.

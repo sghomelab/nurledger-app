@@ -35,12 +35,15 @@ auto-versioning. All build profiles set `credentialsSource: "remote"`
 
 - **Icon:** `assets/icon.png` (1024) + Android adaptive (foreground/background/monochrome) + iOS `icon` from the same `icon.png` — present.
 - **Splash:** `assets/splash-icon.png` on `#4F46E5` (indigo-600), `contain` — present.
-- **Permissions:** **none special.** No camera (FR-100 deferred — scanner wedge /
-  manual entry only), no Bluetooth (FR-109 physical printer deferred — on-screen
-  receipt + share-to-file), no location, no storage (share sheet via the system
-  `FileProvider`/`UIActivityViewController` — verified working on-device in
-  C1/L1/P1). Play Data Safety + App Store privacy labels can therefore claim
-  **no data collected by the app itself** (see §5 for the BYO-cloud nuance).
+- **Permissions:** **one on-demand, since 1.1.0.** Camera — only when the
+  built-in barcode scanner opens (FR-100 shipped in 1.1.0; `expo-camera`
+  permission requested at that point, nothing before). No Bluetooth (FR-109
+  physical printer deferred — on-screen receipt + share-to-file), no location,
+  no storage (share sheet via the system `FileProvider`/`UIActivityViewController`
+  — verified working on-device in C1/L1/P1). Play Data Safety + App Store
+  privacy labels can therefore claim **no data collected by the app itself**
+  (see §5 for the BYO-cloud nuance). Pre-1.1.0 builds asked for no permissions
+  at all (wedge + typed barcodes only).
 - **Encryption:** `ITSAppUsesNonExemptEncryption: false` already declared
   (HTTPS-only, no custom crypto).
 - **Localization:** UI ships English + Bahasa Melayu + Filipino (Tagalog) (FR-115,
@@ -127,7 +130,8 @@ auto-versioning. All build profiles set `credentialsSource: "remote"`
 
 ## 6. Deferred by design (no store blockers)
 
-- FR-100 camera scanning — scanner-wedge + manual barcode entry cover it.
+- ~~FR-100 camera scanning~~ — ✅ **shipped in 1.1.0** (camera scanner on the
+  Sell tab + product/carton barcode fields; on-demand camera permission).
 - FR-109 BT/WiFi printing — on-screen receipt (width-setting aware) +
   shareable label/PO files cover it.
 - Loyalty (NFR-9 consent flow) — out of launch scope; nothing collects
