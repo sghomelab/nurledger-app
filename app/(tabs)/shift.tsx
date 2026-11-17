@@ -19,7 +19,7 @@ import { useShift, useUsers } from '../../src/hooks/useShift';
 import { getDeviceId, type Shift } from '../../src/repositories/shiftRepository';
 import { taxEngineLabel } from '../../src/lib/currency';
 import { formatMoney } from '../../src/lib/money';
-import { buildReportHtml } from '../../src/lib/reportHtml';
+import { buildReportHtml, type ReportHtmlLabels } from '../../src/lib/reportHtml';
 import { addUserRankNeeded, changePinRankNeeded, roleCanAct, switchRankNeeded, type GateAction } from '../../src/lib/roles';
 import { isValidPin } from '../../src/lib/pin';
 import type { AppUser } from '../../src/types';
@@ -63,6 +63,33 @@ export default function ShiftTab() {
   const { outlet } = useOutlet();
   const { users, active, switchUser, addUser, changePin } = useUsers();
   const { open, snapshot, history, openShift, addCashMove, closeShift, xReport } = useShift();
+
+  /** Localized row labels for the printable report (issue #18 follow-up) —
+   *  the same i18n keys `ReportView` renders on-screen, so the PDF matches
+   *  the sheet in any language. */
+  const reportLabels = useMemo<ReportHtmlLabels>(
+    () => ({
+      salesByMethod: t('reportView.salesByPaymentMethod'),
+      noSales: t('reportView.noSalesThisShift'),
+      totalSales: t('reportView.totalSales'),
+      refunds: t('reportView.refunds'),
+      cashDrawer: t('reportView.cashDrawer'),
+      openingFloat: t('shift.openingFloat'),
+      cashSales: t('shiftDetail.cashSales'),
+      expectedCash: t('reportView.expectedCash'),
+      countedCash: t('reportView.countedCash'),
+      variance: t('reportView.variance'),
+      varianceExact: t('reportView.varianceExact'),
+      varianceOver: t('reportView.varianceOver'),
+      varianceShort: t('reportView.varianceShort'),
+      cashIn: t('shift.cashIn'),
+      cashOut: t('shift.cashOut'),
+      expectedCashNow: t('reportView.expectedCashNow'),
+      notes: t('reportView.shiftNotes'),
+      unknownUser: t('shift.noUser'),
+    }),
+    [t],
+  );
 
   const [userSheet, setUserSheet] = useState(false);
   const [addUserVisible, setAddUserVisible] = useState(false);
@@ -155,6 +182,7 @@ export default function ShiftTab() {
           outletName: outlet?.name ?? null,
           title: t(r.kind === 'Z' ? 'report.zTitle' : 'report.xTitle'),
           hint: t(r.kind === 'Z' ? 'report.zHint' : 'report.xHint'),
+          labels: reportLabels,
         });
         await Print.printAsync({ html });
       } catch (e) {
@@ -163,7 +191,7 @@ export default function ShiftTab() {
         setReportBusy(false);
       }
     },
-    [currency, outlet?.name, t],
+    [currency, outlet?.name, t, reportLabels],
   );
 
   const doShareReport = useCallback(
@@ -174,6 +202,7 @@ export default function ShiftTab() {
           outletName: outlet?.name ?? null,
           title: t(r.kind === 'Z' ? 'report.zTitle' : 'report.xTitle'),
           hint: t(r.kind === 'Z' ? 'report.zHint' : 'report.xHint'),
+          labels: reportLabels,
         });
         const { uri } = await Print.printToFileAsync({ html });
         if (await Sharing.isAvailableAsync()) {
@@ -189,7 +218,7 @@ export default function ShiftTab() {
         setReportBusy(false);
       }
     },
-    [currency, outlet?.name, t],
+    [currency, outlet?.name, t, reportLabels],
   );
 
   const doSwitchUser = useCallback(

@@ -16,12 +16,55 @@ export interface ReportHtmlOptions {
   title?: string | null;
   /** Localized hint line under the title (e.g. 'Does not close the shift'). */
   hint?: string | null;
+  /**
+   * Localized row labels (issue #18 follow-up). The caller builds this from
+   * the same i18n keys `ReportView` uses, so the PDF matches the screen.
+   * Any field omitted falls back to the English default.
+   */
+  labels?: Partial<ReportHtmlLabels> | null;
 }
 
-const VARIANCE_LABEL: Record<ZReport['varianceClass'], string> = {
-  exact: 'Exact',
-  over: 'Over',
-  short: 'Short',
+/** Every translatable label in the printed report. */
+export interface ReportHtmlLabels {
+  salesByMethod: string;
+  noSales: string;
+  totalSales: string;
+  refunds: string;
+  cashDrawer: string;
+  openingFloat: string;
+  cashSales: string;
+  expectedCash: string;
+  countedCash: string;
+  variance: string;
+  varianceExact: string;
+  varianceOver: string;
+  varianceShort: string;
+  cashIn: string;
+  cashOut: string;
+  expectedCashNow: string;
+  notes: string;
+  unknownUser: string;
+}
+
+const DEFAULT_LABELS: ReportHtmlLabels = {
+  salesByMethod: 'Sales by payment method',
+  noSales: 'No sales this shift',
+  totalSales: 'Total sales',
+  refunds: 'Refunds',
+  cashDrawer: 'Cash drawer',
+  openingFloat: 'Opening float',
+  cashSales: 'Cash sales',
+  expectedCash: 'Expected cash',
+  countedCash: 'Counted cash',
+  variance: 'Variance',
+  varianceExact: 'Exact',
+  varianceOver: 'Over',
+  varianceShort: 'Short',
+  cashIn: 'Cash in',
+  cashOut: 'Cash out',
+  expectedCashNow: 'Expected cash now',
+  notes: 'Notes',
+  unknownUser: 'Unknown',
 };
 
 function esc(s: string): string {
@@ -67,6 +110,10 @@ export function buildReportHtml(
   const total = Object.values(report.salesByMethod).reduce((s, v) => s + v, 0);
 
   const title = opts.title ?? (isZ ? 'Shift Close — Z-Report' : 'Shift Snapshot — X-Report');
+  const L = { ...DEFAULT_LABELS, ...(opts.labels ?? {}) };
+  const varianceLabel = isZ
+    ? { exact: L.varianceExact, over: L.varianceOver, short: L.varianceShort }[report.varianceClass]
+    : '';
   const endAt = isZ ? report.closedAt : report.generatedAt;
   const range = isZ ? `${fmtStamp(report.openedAt)} → ${fmtStamp(endAt)}` : fmtStamp(report.openedAt);
 
@@ -80,18 +127,18 @@ export function buildReportHtml(
           (m) =>
             `<tr class="indent"><td>${m.type === 'in' ? '+' : '−'} ${esc(m.reason)}</td><td class="num">${esc(money(m.amountMinor))}</td></tr>`,
         ),
-        `<tr class="strong"><td>Expected cash</td><td class="num">${esc(money(report.expectedMinor))}</td></tr>`,
-        `<tr class="strong"><td>Counted cash</td><td class="num">${esc(money(report.countedMinor))}</td></tr>`,
-        `<tr class="strong"><td>Variance (${VARIANCE_LABEL[report.varianceClass]})</td><td class="num">${esc(money(report.varianceMinor))}</td></tr>`,
+        `<tr class="strong"><td>${esc(L.expectedCash)}</td><td class="num">${esc(money(report.expectedMinor))}</td></tr>`,
+        `<tr class="strong"><td>${esc(L.countedCash)}</td><td class="num">${esc(money(report.countedMinor))}</td></tr>`,
+        `<tr class="strong"><td>${esc(L.variance)} (${esc(varianceLabel)})</td><td class="num">${esc(money(report.varianceMinor))}</td></tr>`,
       ].join('')
     : [
-        ...(report.cashInMinor > 0 ? [`<tr><td>Cash in</td><td class="num">${esc(money(report.cashInMinor))}</td></tr>`] : []),
-        ...(report.cashOutMinor > 0 ? [`<tr><td>Cash out</td><td class="num">${esc(money(report.cashOutMinor))}</td></tr>`] : []),
-        `<tr class="strong"><td>Expected cash now</td><td class="num">${esc(money(report.expectedCashMinor))}</td></tr>`,
+        ...(report.cashInMinor > 0 ? [`<tr><td>${esc(L.cashIn)}</td><td class="num">${esc(money(report.cashInMinor))}</td></tr>`] : []),
+        ...(report.cashOutMinor > 0 ? [`<tr><td>${esc(L.cashOut)}</td><td class="num">${esc(money(report.cashOutMinor))}</td></tr>`] : []),
+        `<tr class="strong"><td>${esc(L.expectedCashNow)}</td><td class="num">${esc(money(report.expectedCashMinor))}</td></tr>`,
       ].join('');
 
-  const refundsRow = isZ ? `<tr><td>Refunds</td><td class="num">−${esc(money(report.refundsMinor))}</td></tr>` : '';
-  const notes = isZ && report.notes ? `<h2>Notes</h2><p class="notes">${esc(report.notes)}</p>` : '';
+  const refundsRow = isZ ? `<tr><td>${esc(L.refunds)}</td><td class="num">−${esc(money(report.refundsMinor))}</td></tr>` : '';
+  const notes = isZ && report.notes ? `<h2>${esc(L.notes)}</h2><p class="notes">${esc(report.notes)}</p>` : '';
 
   return `<!DOCTYPE html>
 <html>
@@ -116,17 +163,17 @@ export function buildReportHtml(
   ${opts.outletName ? `<p class="meta">${esc(opts.outletName)}</p>` : ''}
   <h1>${esc(title)}</h1>
   ${opts.hint ? `<p class="hint">${esc(opts.hint)}</p>` : ''}
-  <p class="meta">${esc(report.cashierName ?? 'Unknown')} · ${esc(range)}</p>
-  <h2>Sales by payment method</h2>
+  <p class="meta">${esc(report.cashierName ?? L.unknownUser)} · ${esc(range)}</p>
+  <h2>${esc(L.salesByMethod)}</h2>
   <table>
-    ${salesRows || '<tr><td colspan="2">No sales this shift</td></tr>'}
-    <tr class="strong"><td>Total sales</td><td class="num">${esc(money(total))}</td></tr>
+    ${salesRows || `<tr><td colspan="2">${esc(L.noSales)}</td></tr>`}
+    <tr class="strong"><td>${esc(L.totalSales)}</td><td class="num">${esc(money(total))}</td></tr>
     ${refundsRow}
   </table>
-  <h2>Cash drawer</h2>
+  <h2>${esc(L.cashDrawer)}</h2>
   <table>
-    <tr><td>Opening float</td><td class="num">${esc(money(report.floatMinor))}</td></tr>
-    <tr><td>Cash sales</td><td class="num">${esc(money(report.cashSaleMinor))}</td></tr>
+    <tr><td>${esc(L.openingFloat)}</td><td class="num">${esc(money(report.floatMinor))}</td></tr>
+    <tr><td>${esc(L.cashSales)}</td><td class="num">${esc(money(report.cashSaleMinor))}</td></tr>
     ${zRows}
   </table>
   ${notes}

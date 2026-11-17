@@ -126,7 +126,7 @@ export function CountedCashPrompt({ visible, currency, expectedMinor, onSave, on
             autoFocus
             style={styles.input}
           />
-          <Text style={styles.hint}>{currency} — the cash you actually counted</Text>
+          <Text style={styles.hint}>{t('shiftPrompts.countedCashHint', { currency })}</Text>
           <TextInput
             value={notes}
             onChangeText={setNotes}

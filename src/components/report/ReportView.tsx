@@ -31,7 +31,7 @@ export function ReportView({ report, currency }: Props) {
         <Text style={styles.header}>{t(isZ ? 'report.zTitle' : 'report.xTitle')}</Text>
       </View>
       <Text style={styles.sub}>
-        {report.cashierName ?? 'Unknown'} · {fmtRange(report.openedAt, report.kind === 'Z' ? report.closedAt : report.generatedAt, report.kind === 'Z')}
+        {report.cashierName ?? t('shift.noUser')} · {fmtRange(report.openedAt, report.kind === 'Z' ? report.closedAt : report.generatedAt, report.kind === 'Z')}
       </Text>
 
       {/* Sales by method */}
@@ -127,11 +127,12 @@ function Row({ label, value, strong, indent }: { label: string; value: string; s
 function VarianceRow({ varianceMinor, varianceClass, currency }: { varianceMinor: number; varianceClass: 'exact' | 'over' | 'short'; currency: string }) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { t } = useT();
   const color = varianceClass === 'exact' ? colors.positive : varianceClass === 'over' ? colors.warning : colors.danger;
-  const label = varianceClass === 'exact' ? 'Exact' : varianceClass === 'over' ? 'Over' : 'Short';
+  const label = varianceClass === 'exact' ? t('reportView.varianceExact') : varianceClass === 'over' ? t('reportView.varianceOver') : t('reportView.varianceShort');
   return (
     <View style={styles.row}>
-      <Text style={[styles.rowLabel, { color: colors.slate900, fontFamily: fonts.sansBold }]}>{`Variance (${label})`}</Text>
+      <Text style={[styles.rowLabel, { color: colors.slate900, fontFamily: fonts.sansBold }]}>{`${t('reportView.variance')} (${label})`}</Text>
       <Text style={[styles.rowValue, { color, fontFamily: fonts.monoSemiBold }]}>
         {formatMoney(varianceMinor, currency)}
       </Text>

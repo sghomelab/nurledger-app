@@ -109,3 +109,32 @@ describe('buildReportHtml (empty sales)', () => {
     expect(html).toContain('No sales this shift');
   });
 });
+
+describe('buildReportHtml (localized labels, issue #18 follow-up)', () => {
+  const html = buildReportHtml(zReport(), 'SGD', {
+    labels: {
+      totalSales: 'Jumlah jualan',
+      expectedCash: 'Tunai dijangka',
+      countedCash: 'Tunai dikira',
+      variance: 'Perbezaan',
+      varianceExact: 'Tepat',
+      salesByMethod: 'Jualan mengikut kaedah pembayaran',
+      unknownUser: 'Tiada pengguna',
+    },
+  });
+
+  it('uses the provided labels in place of the English defaults', () => {
+    expect(html).toContain('Jumlah jualan');
+    expect(html).toContain('Tunai dijangka');
+    expect(html).toContain('Tunai dikira');
+    expect(html).toContain('Perbezaan (Tepat)');
+    expect(html).toContain('Jualan mengikut kaedah pembayaran');
+    expect(html).not.toContain('>Total sales<');
+    expect(html).not.toContain('>Expected cash<');
+    expect(html).not.toContain('Variance (Exact)');
+  });
+
+  it('keeps the English default for labels not overridden', () => {
+    expect(html).toContain('>Refunds<');
+  });
+});
