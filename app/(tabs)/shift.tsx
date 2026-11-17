@@ -153,6 +153,7 @@ export default function ShiftTab() {
       try {
         const html = buildReportHtml(r, currency, {
           outletName: outlet?.name ?? null,
+          title: t(r.kind === 'Z' ? 'report.zTitle' : 'report.xTitle'),
           hint: t(r.kind === 'Z' ? 'report.zHint' : 'report.xHint'),
         });
         await Print.printAsync({ html });
@@ -171,6 +172,7 @@ export default function ShiftTab() {
       try {
         const html = buildReportHtml(r, currency, {
           outletName: outlet?.name ?? null,
+          title: t(r.kind === 'Z' ? 'report.zTitle' : 'report.xTitle'),
           hint: t(r.kind === 'Z' ? 'report.zHint' : 'report.xHint'),
         });
         const { uri } = await Print.printToFileAsync({ html });
@@ -478,7 +480,7 @@ export default function ShiftTab() {
             <Pressable style={styles.sheetBody} onPress={() => {}}>
               <View style={styles.sheetHeader}>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.sheetTitle}>{report.kind === 'Z' ? 'Z-Report' : 'X-Report'}</Text>
+                  <Text style={styles.sheetTitle}>{t(report.kind === 'Z' ? 'report.zTitle' : 'report.xTitle')}</Text>
                   {/* Plain-language explanation of the difference (issue #18) */}
                   <Text style={styles.sheetHint}>{t(report.kind === 'Z' ? 'report.zHint' : 'report.xHint')}</Text>
                 </View>

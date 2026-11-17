@@ -39,7 +39,7 @@ describe('buildReportHtml (Z)', () => {
   const html = buildReportHtml(zReport(), 'SGD', { outletName: 'Test Grocer', hint: 'Closes the shift — count the cash first' });
 
   it('has the title, hint, outlet and cashier', () => {
-    expect(html).toContain('Z-Report — Shift Close');
+    expect(html).toContain('Shift Close — Z-Report');
     expect(html).toContain('Closes the shift — count the cash first');
     expect(html).toContain('Test Grocer');
     expect(html).toContain('Jun');
@@ -65,7 +65,7 @@ describe('buildReportHtml (X)', () => {
   const html = buildReportHtml(xReport(), 'SGD');
 
   it('uses the snapshot title', () => {
-    expect(html).toContain('X-Report — Snapshot');
+    expect(html).toContain('Shift Snapshot — X-Report');
   });
 
   it('omits Z-only lines (counted cash, variance, refunds)', () => {

@@ -403,7 +403,7 @@ const en = {
   'shift.cashIn': 'Cash in',
   'shift.cashOut': 'Cash out',
   'shift.expectedInDrawer': 'Expected in drawer',
-  'shift.xReport': 'X-report',
+  'shift.xReport': 'Shift snapshot',
   'shift.whoIsAtTheRegister': 'Who is at the register?',
   'shift.name': 'Name',
   'shift.pin48DigitsOptional': 'PIN (4–8 digits, optional)',
@@ -716,12 +716,12 @@ const en = {
   'settings.emailReceiptsDesc': 'After each payment, offer to email the receipt to the customer.',
 
   // ── shift report export ───────────────────────────────────────────────
-  'report.xTitle': 'X-Report',
-  'report.zTitle': 'Z-Report',
+  'report.xTitle': 'Shift Snapshot — X-Report',
+  'report.zTitle': 'Shift Close — Z-Report',
   'report.print': 'Print',
   'report.sharePdf': 'Save / share PDF',
   'report.prepareFailed': 'Could not prepare the report',
-  'report.xHint': 'Snapshot — does not close the shift',
+  'report.xHint': 'Does not close the shift',
   'report.zHint': 'Closes the shift — count the cash first',
 } as const;
 

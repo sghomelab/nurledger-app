@@ -12,7 +12,9 @@ import type { XReport, ZReport } from './shift';
 export interface ReportHtmlOptions {
   /** Outlet name for the header (optional). */
   outletName?: string | null;
-  /** Localized hint line under the title (e.g. 'Snapshot — does not close the shift'). */
+  /** Localized report title (issue #18). Falls back to the English default. */
+  title?: string | null;
+  /** Localized hint line under the title (e.g. 'Does not close the shift'). */
   hint?: string | null;
 }
 
@@ -64,7 +66,7 @@ export function buildReportHtml(
   const money = (minor: number) => formatMoney(minor, currency);
   const total = Object.values(report.salesByMethod).reduce((s, v) => s + v, 0);
 
-  const title = isZ ? 'Z-Report — Shift Close' : 'X-Report — Snapshot';
+  const title = opts.title ?? (isZ ? 'Shift Close — Z-Report' : 'Shift Snapshot — X-Report');
   const endAt = isZ ? report.closedAt : report.generatedAt;
   const range = isZ ? `${fmtStamp(report.openedAt)} → ${fmtStamp(endAt)}` : fmtStamp(report.openedAt);
 

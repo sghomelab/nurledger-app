@@ -349,7 +349,7 @@ const fil: Record<keyof EnDict, string> = {
   'shift.cashIn': 'Cash in',
   'shift.cashOut': 'Cash out',
   'shift.expectedInDrawer': 'Inaasahan sa drawer',
-  'shift.xReport': 'X-report',
+  'shift.xReport': 'Snapshot ng shift',
   'shift.whoIsAtTheRegister': 'Sino ang nasa rehistro?',
   'shift.name': 'Pangalan',
   'shift.pin48DigitsOptional': 'PIN (4–8 digit, opsyonal)',
@@ -662,12 +662,12 @@ const fil: Record<keyof EnDict, string> = {
   'settings.emailReceiptsDesc': 'Pagkatapos ng bawat bayad, magtanong kung i-eemail ang resit sa customer.',
 
   // ── export ng ulat ng shift ───────────────────────────────────────────
-  'report.xTitle': 'X-Report',
-  'report.zTitle': 'Z-Report',
+  'report.xTitle': 'Snapshot ng shift — X-Report',
+  'report.zTitle': 'Isasarado ng shift — Z-Report',
   'report.print': 'I-print',
   'report.sharePdf': 'I-save / i-share ang PDF',
   'report.prepareFailed': 'Hindi maipanganda ang ulat',
-  'report.xHint': 'Snapshot — hindi isasara ang shift',
+  'report.xHint': 'Hindi isasara ang shift',
   'report.zHint': 'Isasarado ang shift — suriin muna ang cash',
 };
 

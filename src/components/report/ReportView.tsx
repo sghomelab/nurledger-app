@@ -28,7 +28,7 @@ export function ReportView({ report, currency }: Props) {
     <ScrollView contentContainerStyle={styles.content}>
       <View style={styles.headerRow}>
         <Ionicons name={isZ ? 'document-text' : 'pulse'} size={20} color={colors.primary} />
-        <Text style={styles.header}>{isZ ? 'Z-Report — Shift Close' : 'X-Report — Snapshot'}</Text>
+        <Text style={styles.header}>{t(isZ ? 'report.zTitle' : 'report.xTitle')}</Text>
       </View>
       <Text style={styles.sub}>
         {report.cashierName ?? 'Unknown'} · {fmtRange(report.openedAt, report.kind === 'Z' ? report.closedAt : report.generatedAt, report.kind === 'Z')}

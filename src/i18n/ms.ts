@@ -402,7 +402,7 @@ const ms: Record<keyof EnDict, string> = {
   'shift.cashIn': 'Tunai masuk',
   'shift.cashOut': 'Tunai keluar',
   'shift.expectedInDrawer': 'Dijangka dalam laci',
-  'shift.xReport': 'Laporan X',
+  'shift.xReport': 'Snapshot shift',
   'shift.whoIsAtTheRegister': 'Siapa di daftar tunai?',
   'shift.name': 'Nama',
   'shift.pin48DigitsOptional': 'PIN (4–8 digit, pilihan)',
@@ -715,12 +715,12 @@ const ms: Record<keyof EnDict, string> = {
   'settings.emailReceiptsDesc': 'Selepas setiap pembayaran, tawarkan menghantar resit e-mel kepada pelanggan.',
 
   // ── eksport laporan shift ─────────────────────────────────────────────
-  'report.xTitle': 'Laporan X',
-  'report.zTitle': 'Laporan Z',
+  'report.xTitle': 'Snapshot shift — Laporan X',
+  'report.zTitle': 'Penutupan shift — Laporan Z',
   'report.print': 'Cetak',
   'report.sharePdf': 'Simpan / kongsi PDF',
   'report.prepareFailed': 'Tidak dapat menyediakan laporan',
-  'report.xHint': 'Snapshot — tidak menutup shift',
+  'report.xHint': 'Tidak menutup shift',
   'report.zHint': 'Menutup shift — kira wang tunai dahulu',
 };
 
