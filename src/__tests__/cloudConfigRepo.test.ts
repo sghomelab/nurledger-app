@@ -12,7 +12,7 @@ let mockDB: any;
 jest.mock('../db/database', () => ({ getDb: async () => mockDB, ensureDeviceId: async () => {} }));
 import { SCHEMA_SQL } from '../db/schema';
 import { ensureOutlet, ensureDefaultUsers } from '../db/seed';
-import { getCloudConfig, saveCloudConfig, disconnectCloud, sdkStorage, deleteCloudAccount } from '../repositories/cloudConfigRepository';
+import { getCloudConfig, saveCloudConfig, disconnectCloud, sdkStorage, deleteCloudAccount, getPendingClaim, savePendingClaim, clearPendingClaim } from '../repositories/cloudConfigRepository';
 import { resetAllData } from '../db/firstRun';
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const secureMock = require('expo-secure-store');
@@ -81,6 +81,26 @@ d('cloud config never holds a service_role key', () => {
     raw.exec("INSERT INTO settings (key,value) VALUES ('cloud.url','u'),('cloud.anon_key','a'),('cloud.service_key','SUPER-SECRET')");
     await disconnectCloud();
     expect(q("select key from settings where key like 'cloud.%'")).toEqual([]);
+  });
+});
+
+d('pending claim code (wizard setup SQL stays valid across re-opens)', () => {
+  it('save → get round-trip, clear removes it', async () => {
+    expect(await getPendingClaim()).toBeNull();
+    await savePendingClaim('AB12CD34EF56AB78');
+    expect(await getPendingClaim()).toBe('AB12CD34EF56AB78');
+    // re-save overwrites (a fresh wizard run with no stored claim generates once,
+    // then every re-open must see the SAME code — the loop was caused by a new
+    // code per mount invalidating an already-run SQL)
+    expect(await getPendingClaim()).toBe('AB12CD34EF56AB78');
+    await clearPendingClaim();
+    expect(await getPendingClaim()).toBeNull();
+  });
+
+  it('disconnectCloud clears a pending claim (fresh setup = fresh code)', async () => {
+    await savePendingClaim('XYZ789');
+    await disconnectCloud();
+    expect(await getPendingClaim()).toBeNull();
   });
 });
 

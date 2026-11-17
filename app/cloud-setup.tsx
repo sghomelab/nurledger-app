@@ -16,7 +16,12 @@ import { Card, Screen } from '../src/components/Screen';
 import { getCloudAdapter } from '../src/hooks/useSync';
 import { useT } from '../src/hooks/useT';
 import { getOutlet } from '../src/repositories/outletRepository';
-import { saveCloudConfig } from '../src/repositories/cloudConfigRepository';
+import {
+  clearPendingClaim,
+  getPendingClaim,
+  saveCloudConfig,
+  savePendingClaim,
+} from '../src/repositories/cloudConfigRepository';
 import { CLOUD_SCHEMA_VERSION, schemaSqlWithClaim } from '../src/lib/cloud/schemaSql';
 import { sha256Hex } from '../src/lib/sha256';
 import { uuidv4 } from '../src/lib/ids';
@@ -73,9 +78,26 @@ export default function CloudSetupScreen() {
   /** New store (claim code baked into the SQL) or join an existing one (invite code). */
   const [mode, setMode] = useState<'create' | 'join'>('create');
   const [invite, setInvite] = useState('');
-  /** One-time claim code for THIS wizard run. Memory only — never persisted. */
-  const claim = useMemo(() => uuidv4().replace(/-/g, '').slice(0, 16).toUpperCase(), []);
-  const claimSql = useMemo(() => schemaSqlWithClaim(sha256Hex(claim)), [claim]);
+  /** One-time claim code for THIS setup attempt. Persisted (not regenerated
+   *  per mount) so a re-opened wizard / app restart does NOT invalidate an
+   *  already-run setup SQL — that was the endless "run SQL → connect → claim
+   *  mismatch → run SQL…" loop. Cleared on successful connect & disconnect. */
+  const [claim, setClaim] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      const stored = await getPendingClaim();
+      const c =
+        stored ??
+        uuidv4().replace(/-/g, '').slice(0, 16).toUpperCase();
+      if (!stored) await savePendingClaim(c);
+      if (live) setClaim(c);
+    })();
+    return () => {
+      live = false;
+    };
+  }, []);
+  const claimSql = useMemo(() => (claim ? schemaSqlWithClaim(sha256Hex(claim)) : ''), [claim]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
@@ -223,7 +245,7 @@ export default function CloudSetupScreen() {
           locale: outlet.locale,
           taxEngine: outlet.taxEngine,
         },
-        mode === 'join' ? { invite: invite.trim() } : { claim },
+        mode === 'join' ? { invite: invite.trim() } : { claim: claim ?? undefined },
       );
       await saveCloudConfig({
         url: cfg().url,
@@ -231,6 +253,8 @@ export default function CloudSetupScreen() {
         ownerEmail: email.trim(),
         outletId: tenantId,
       });
+      // Store claimed — the one-time code is consumed server-side; drop it.
+      await clearPendingClaim();
       const joined = tenantId !== outlet.id;
       Alert.alert(
         t('cloudsetup.connected'),
@@ -398,14 +422,19 @@ export default function CloudSetupScreen() {
             </Text>
             {upgrading && <Text style={styles.hint}>{t('cloudsetup.sqlUpgradeHint')}</Text>}
             <Text style={styles.hint}>{t('cloudsetup.sqlSteps')}</Text>
-            <View style={styles.sqlBox}>
-              <ScrollView nestedScrollEnabled horizontal style={styles.sqlScroll}>
-                <Text style={styles.sqlText}>{claimSql}</Text>
-              </ScrollView>
-            </View>
+            {claimSql ? (
+              <View style={styles.sqlBox}>
+                <ScrollView nestedScrollEnabled horizontal style={styles.sqlScroll}>
+                  <Text style={styles.sqlText}>{claimSql}</Text>
+                </ScrollView>
+              </View>
+            ) : (
+              <Text style={styles.hint}>Preparing setup SQL…</Text>
+            )}
             <Pressable
-              style={[styles.copyBtn, busy && { opacity: 0.6 }]}
+              style={[styles.copyBtn, (busy || !claimSql) && { opacity: 0.6 }]}
               onPress={async () => {
+                if (!claimSql) return;
                 await Clipboard.setStringAsync(claimSql);
                 Alert.alert(t('cloudsetup.copied'), t('cloudsetup.copiedMsg'));
               }}

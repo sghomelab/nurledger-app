@@ -32,6 +32,11 @@ const K = {
   lastSyncedAt: 'cloud.last_synced_at',
   lastError: 'cloud.last_error',
   lastErrorAt: 'cloud.last_error_at',
+  /** One-time wizard claim code. Persisted (not regenerated on remount) so an
+   *  already-run setup SQL stays valid if the wizard is re-opened or the app
+   *  restarts mid-setup; the old per-mount generation caused an endless
+   *  "run SQL → connect → claim mismatch → run SQL…" loop. */
+  pendingClaim: 'cloud.pending_claim',
 } as const;
 
 async function getSetting(key: string): Promise<string | null> {
@@ -104,6 +109,21 @@ export async function saveCloudConfig(cfg: {
   if (cfg.outletId) await setSetting(K.outletId, cfg.outletId.trim());
 }
 
+/** Pending wizard claim code, or null when no setup is in flight. */
+export async function getPendingClaim(): Promise<string | null> {
+  return getSetting(K.pendingClaim);
+}
+
+/** Persist the wizard's one-time claim code (created on first use). */
+export async function savePendingClaim(code: string): Promise<void> {
+  await setSetting(K.pendingClaim, code.trim());
+}
+
+/** Drop the claim once the store is provisioned (or the setup is abandoned). */
+export async function clearPendingClaim(): Promise<void> {
+  await deleteSetting(K.pendingClaim);
+}
+
 /**
  * Disconnect (FR-503): removes the connection + the SDK session from this
  * device. Device data (sales, stock, outbox) is NEVER touched — a reconnect
@@ -119,6 +139,7 @@ export async function disconnectCloud(): Promise<void> {
   await deleteSetting(K.lastSyncedAt);
   await deleteSetting(K.lastError);
   await deleteSetting(K.lastErrorAt);
+  await deleteSetting(K.pendingClaim); // a fresh setup gets a fresh claim code
   await clearStoredSession();
 }
 
