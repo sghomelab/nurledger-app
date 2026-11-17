@@ -152,22 +152,26 @@ export default function InsightsTab() {
         ))}
       </View>
 
-      {/* Section tabs (issues #23/#16) */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.tabStrip}>
-        <View style={styles.tabStripInner}>
-          {TABS.map((tb) => (
-            <Pressable
-              key={tb.id}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: tab === tb.id }}
-              style={[styles.tabPill, tab === tb.id && styles.tabPillActive]}
-              onPress={() => setTab(tb.id)}
-            >
-              <Text style={[styles.tabPillText, tab === tb.id && styles.tabPillTextActive]}>{t(tb.labelKey)}</Text>
-            </Pressable>
-          ))}
-        </View>
-      </ScrollView>
+      {/* Section tabs (issues #23/#16) — plain View wrapper: a horizontal
+          ScrollView as a direct flex child has internal flexGrow:1 and would
+          swallow all slack space on short tabs (History). */}
+      <View style={styles.tabStrip}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <View style={styles.tabStripInner}>
+            {TABS.map((tb) => (
+              <Pressable
+                key={tb.id}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: tab === tb.id }}
+                style={[styles.tabPill, tab === tb.id && styles.tabPillActive]}
+                onPress={() => setTab(tb.id)}
+              >
+                <Text style={[styles.tabPillText, tab === tb.id && styles.tabPillTextActive]}>{t(tb.labelKey)}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
 
       {/* ── Overview ──────────────────────────────────────────────────────── */}
       {tab === 'overview' &&
