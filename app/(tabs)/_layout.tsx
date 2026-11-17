@@ -24,7 +24,7 @@ export default function TabLayout() {
         headerShown: true,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.slate400,
-        tabBarStyle: { height: touchTarget + 20, paddingTop: 6 },
+        tabBarStyle: { height: touchTarget + 20, paddingTop: 6, backgroundColor: colors.white },
         tabBarLabelStyle: { fontFamily: fonts.sans, fontSize: 11, fontWeight: '600' },
         sceneStyle: { backgroundColor: colors.slate50 },
         headerStyle: { backgroundColor: colors.slate50 },

@@ -64,9 +64,13 @@ export default function RootLayout() {
   }, [attempt]);
 
   if (bootFailed) {
-    // Pre-provider screen — always the light palette (issue #22).
+    // Pre-provider screen — always the light palette (issue #22). Pin the
+    // status bar to dark-on-light for the same reason as FirstRunScreen
+    // (userInterfaceStyle is "automatic").
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: colors.slate50 }}>
+      <>
+        <StatusBar style="dark" />
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: colors.slate50 }}>
         <Text style={{ fontFamily: fonts.sansBold, fontSize: 16, color: colors.slate900, textAlign: 'center' }}>
           {t('app.bootFailed')}
         </Text>
@@ -79,7 +83,8 @@ export default function RootLayout() {
         >
           <Text style={{ fontFamily: fonts.sansBold, color: colors.white }}>{t('app.retry')}</Text>
         </Pressable>
-      </View>
+        </View>
+      </>
     );
   }
   if (firstRunPending === null) return null; // splash still covering

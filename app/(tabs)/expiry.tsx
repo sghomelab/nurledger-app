@@ -115,7 +115,7 @@ export default function ExpiryTab() {
                 color={colors.danger}
                 icon="warning-outline"
               />
-              <SummaryCard wide={layout.isTablet} label={t('expiry.expiring')} value={String(summary.expiringQty)} color="#B45309" icon="hourglass-outline" />
+              <SummaryCard wide={layout.isTablet} label={t('expiry.expiring')} value={String(summary.expiringQty)} color={colors.warningText} icon="hourglass-outline" />
               <SummaryCard wide={layout.isTablet} label={t('expiry.other')} value={String(summary.otherQty)} color={colors.slate500} icon="albums-outline" />
               <SummaryCard wide={layout.isTablet} label={t('expiry.batches')} value={String(summary.batchCount)} color={colors.primary} icon="pricetags-outline" />
             </View>
