@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Linking } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { BarcodeScanner } from '../BarcodeScanner';
@@ -104,19 +104,22 @@ export function EmailReceiptSheet({ receipt, currency, outletName, onClose }: Pr
         <Text style={styles.hint}>{t('receipt.emailHint')}</Text>
       </View>
 
-      {/* QR scan for the customer's email (issue #19) */}
-      {scanning && (
-        <BarcodeScanner
-          mode="qr"
-          onClose={() => setScanning(false)}
-          onScanned={(code) => {
-            setScanning(false);
-            const addr = code.replace(/^mailto:/i, '').trim();
-            setEmail(addr);
-            setError(null);
-          }}
-        />
-      )}
+      {/* QR scan for the customer's email (issue #19) — a Modal so the camera
+          is full-screen; in-flow it would be clipped to the half-sheet. */}
+      <Modal visible={scanning} animationType="fade" onRequestClose={() => setScanning(false)}>
+        {scanning && (
+          <BarcodeScanner
+            mode="qr"
+            onClose={() => setScanning(false)}
+            onScanned={(code) => {
+              setScanning(false);
+              const addr = code.replace(/^mailto:/i, '').trim();
+              setEmail(addr);
+              setError(null);
+            }}
+          />
+        )}
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

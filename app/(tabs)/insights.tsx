@@ -359,7 +359,7 @@ export default function InsightsTab() {
                     <NumberText
                       style={[
                         styles.stockDays,
-                        (r.daysUntilStockout ?? 99) <= 3 ? { color: colors.danger } : (r.daysUntilStockout ?? 99) <= 7 ? { color: '#B45309' } : undefined,
+                        (r.daysUntilStockout ?? 99) <= 3 ? { color: colors.danger } : (r.daysUntilStockout ?? 99) <= 7 ? { color: colors.warningText } : undefined,
                       ]}
                     >
                       {r.daysUntilStockout === null ? '—' : `${r.daysUntilStockout}d`}
@@ -489,7 +489,7 @@ function Badge({ text, tone }: { text: string; tone: 'pos' | 'warn' | 'neutral' 
   const styles = useInsightsStyles();
   const { colors } = useTheme();
   const bg = tone === 'pos' ? colors.positiveSoft : tone === 'warn' ? colors.warningSoft : colors.slate100;
-  const fg = tone === 'pos' ? colors.positive : tone === 'warn' ? '#B45309' : colors.slate500;
+  const fg = tone === 'pos' ? colors.positive : tone === 'warn' ? colors.warningText : colors.slate500;
   return (
     <View style={[styles.badge, { backgroundColor: bg }]}>
       <Text style={[styles.badgeText, { color: fg }]}>{text}</Text>

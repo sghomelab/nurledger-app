@@ -343,7 +343,7 @@ type ActionTone = 'primary' | 'warning' | 'neutral' | 'danger';
 function actionTone(c: Palette): Record<ActionTone, { bg: string; fg: string }> {
   return {
     primary: { bg: c.primarySoft, fg: c.primary },
-    warning: { bg: c.warningSoft, fg: '#B45309' },
+    warning: { bg: c.warningSoft, fg: c.warningText },
     neutral: { bg: c.slate100, fg: c.slate700 },
     danger: { bg: c.dangerSoft, fg: c.danger },
   };
@@ -380,15 +380,15 @@ function makeStyles(colors: Palette) {
       flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.md,
       backgroundColor: colors.warningSoft, borderRadius: radius.card, borderWidth: 1, borderColor: colors.warning, padding: spacing.md,
     },
-    reorderTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: '#92400E' },
-    reorderSub: { fontFamily: fonts.sans, fontSize: 12, color: '#B45309', marginTop: 2 },
+    reorderTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.warningTextStrong },
+    reorderSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.warningText, marginTop: 2 },
     marginCard: {
       flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginHorizontal: spacing.lg, marginTop: spacing.md,
       backgroundColor: colors.warningSoft, borderRadius: radius.card, borderWidth: 1, borderColor: colors.warning, padding: spacing.md,
     },
-    marginTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: '#92400E' },
-    marginSub: { fontFamily: fonts.sans, fontSize: 12, color: '#B45309', marginTop: 2 },
-    marginSuggest: { fontFamily: fonts.sans, fontSize: 12, color: '#92400E', marginTop: 4 },
+    marginTitle: { fontFamily: fonts.sansSemiBold, fontSize: 14, color: colors.warningTextStrong },
+    marginSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.warningText, marginTop: 2 },
+    marginSuggest: { fontFamily: fonts.sans, fontSize: 12, color: colors.warningTextStrong, marginTop: 4 },
     marginBtn: {
       backgroundColor: colors.warning, borderRadius: radius.control, paddingVertical: 8, paddingHorizontal: spacing.lg,
     },

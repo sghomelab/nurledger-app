@@ -83,7 +83,17 @@ export default function RootLayout() {
     );
   }
   if (firstRunPending === null) return null; // splash still covering
-  if (firstRunPending) return <FirstRunScreen />;
+  if (firstRunPending) {
+    // Pre-provider screen with the light palette — pin the status bar to
+    // dark-on-light so it stays legible when the iOS device is in dark mode
+    // (app.json userInterfaceStyle is "automatic").
+    return (
+      <>
+        <StatusBar style="dark" />
+        <FirstRunScreen />
+      </>
+    );
+  }
 
   // The provider mounts only after the DB is ready: the theme choice lives in
   // the `settings` table (issue #22), and this app is offline-first.

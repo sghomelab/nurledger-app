@@ -10,6 +10,8 @@ export const colors = {
   positiveSoft: '#ECFDF5',
   warning: '#F59E0B', // amber-500 — low stock
   warningSoft: '#FFFBEB',
+  warningText: '#B45309', // amber-700 — warning text on warningSoft
+  warningTextStrong: '#92400E', // amber-800 — warning headings on warningSoft
   danger: '#F43F5E', // rose-500 — expiry
   dangerSoft: '#FFF1F2',
   slate50: '#F8FAFC', // app background
@@ -39,6 +41,8 @@ export const colorsDark: Palette = {
   positiveSoft: '#064E3B',
   warning: '#FBBF24', // amber-400
   warningSoft: '#78350F',
+  warningText: '#FBBF24', // amber-400 on amber-900
+  warningTextStrong: '#FCD34D', // amber-300 on amber-900
   danger: '#FB7185', // rose-400
   dangerSoft: '#881337',
   slate50: '#0F172A', // app background (slate-900)

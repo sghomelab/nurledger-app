@@ -6,13 +6,14 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "nurledger",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nurlogic.nurledger",
       "buildNumber": "7",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSCameraUsageDescription": "NurLedger uses the camera to scan product barcodes and QR codes for customer emails."
       }
     },
     "android": {
@@ -35,6 +36,7 @@
       "expo-sqlite",
       "expo-system-ui",
       "expo-sharing",
+      "expo-camera",
       [
         "expo-splash-screen",
         {

@@ -109,9 +109,9 @@ export default function SellTab() {
       };
     }
     if (sync.enabled) {
-      if (sync.syncing) return { icon: 'sync-outline', color: '#B45309', bg: colors.warningSoft, text: t('sync.syncing') };
+      if (sync.syncing) return { icon: 'sync-outline', color: colors.warningText, bg: colors.warningSoft, text: t('sync.syncing') };
       if (sync.pending > 0) {
-        return { icon: 'cloud-upload-outline', color: '#B45309', bg: colors.warningSoft, text: t('sync.queuedAuto', { n: sync.pending }) };
+        return { icon: 'cloud-upload-outline', color: colors.warningText, bg: colors.warningSoft, text: t('sync.queuedAuto', { n: sync.pending }) };
       }
       if (sync.lastError) {
         return { icon: 'warning-outline', color: colors.danger, bg: colors.dangerSoft, text: t('sync.error', { err: sync.lastError }) };
@@ -121,7 +121,7 @@ export default function SellTab() {
         : { icon: 'cloud-outline', color: colors.slate500, bg: colors.slate100, text: t('sync.connected') };
     }
     if (sync.pending > 0) {
-      return { icon: 'cloud-offline-outline', color: '#B45309', bg: colors.warningSoft, text: t('sync.queuedOff', { n: sync.pending }) };
+      return { icon: 'cloud-offline-outline', color: colors.warningText, bg: colors.warningSoft, text: t('sync.queuedOff', { n: sync.pending }) };
     }
     return null;
   }, [sync.connected, sync.enabled, sync.syncing, sync.pending, sync.quarantined, sync.lastError, sync.lastSyncedAt, t]);
@@ -658,7 +658,7 @@ function makeStyles(colors: Palette) {
       paddingHorizontal: spacing.md,
       paddingVertical: 6,
     },
-    pendingText: { flex: 1, fontFamily: fonts.sansMedium, fontSize: typography.caption, color: '#B45309' },
+    pendingText: { flex: 1, fontFamily: fonts.sansMedium, fontSize: typography.caption, color: colors.warningText },
     lockBanner: {
       flexDirection: 'row',
       alignItems: 'center',

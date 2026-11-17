@@ -538,7 +538,7 @@ function ActionTile({ icon, label, onPress, tone }: { icon: keyof typeof Ionicon
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const bg = tone === 'pos' ? colors.positiveSoft : tone === 'warn' ? colors.warningSoft : tone === 'danger' ? colors.dangerSoft : colors.slate100;
-  const fg = tone === 'pos' ? colors.positive : tone === 'warn' ? '#B45309' : tone === 'danger' ? colors.danger : colors.slate700;
+  const fg = tone === 'pos' ? colors.positive : tone === 'warn' ? colors.warningText : tone === 'danger' ? colors.danger : colors.slate700;
   return (
     <Pressable style={[styles.tile, { backgroundColor: bg }]} onPress={onPress}>
       <Ionicons name={icon} size={20} color={fg} />
@@ -551,7 +551,7 @@ function HistoryRow({ shift, currency, onOpen }: { shift: Shift; currency: strin
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const z = shift.zReport;
-  const tone = !z ? colors.slate400 : z.varianceClass === 'exact' ? colors.positive : z.varianceClass === 'over' ? '#B45309' : colors.danger;
+  const tone = !z ? colors.slate400 : z.varianceClass === 'exact' ? colors.positive : z.varianceClass === 'over' ? colors.warningText : colors.danger;
   return (
     <Pressable style={styles.historyRow} onPress={onOpen}>
       <View style={{ flex: 1 }}>

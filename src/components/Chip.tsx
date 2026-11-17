@@ -13,7 +13,7 @@ function toneMap(c: Palette): Record<Tone, { bg: string; fg: string }> {
     neutral: { bg: c.slate100, fg: c.slate700 },
     primary: { bg: c.primarySoft, fg: c.primary },
     positive: { bg: c.positiveSoft, fg: c.positive },
-    warning: { bg: c.warningSoft, fg: '#B45309' },
+    warning: { bg: c.warningSoft, fg: c.warningText },
     danger: { bg: c.dangerSoft, fg: c.danger },
   };
 }

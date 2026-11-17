@@ -74,12 +74,15 @@ export function BarcodeScanner({ onClose, onScanned, mode = 'barcode' }: Props) 
           <Ionicons name="camera-outline" size={44} color={colors.slate400} />
           <Text style={styles.deniedTitle}>{t('scan.title')}</Text>
           <Text style={styles.deniedText}>{t('scan.cameraDenied')}</Text>
-          {!permission && (
+          {/* undetermined or previously allowed-then-denied: ask the system.
+              canAskAgain=false means the user chose "Don't allow" — the only
+              path left is iOS Settings, so only then show "Open Settings". */}
+          {(!permission || permission.canAskAgain) && (
             <Pressable style={styles.btnPrimary} onPress={() => void requestPermission()}>
               <Text style={styles.btnPrimaryText}>{t('scan.title')}</Text>
             </Pressable>
           )}
-          {permission && !permission.granted && (
+          {permission && !permission.canAskAgain && (
             <Pressable style={styles.btnPrimary} onPress={() => void Linking.openSettings()}>
               <Text style={styles.btnPrimaryText}>{t('scan.openSettings')}</Text>
             </Pressable>

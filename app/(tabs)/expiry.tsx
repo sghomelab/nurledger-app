@@ -16,7 +16,7 @@ function urgencyMeta(c: Palette): Record<ExpiryUrgency, { color: string; bg: str
   return {
     expired: { color: c.danger, bg: c.dangerSoft },
     critical: { color: c.danger, bg: c.dangerSoft },
-    soon: { color: '#B45309', bg: c.warningSoft },
+    soon: { color: c.warningText, bg: c.warningSoft },
     ok: { color: c.positive, bg: c.positiveSoft },
   };
 }

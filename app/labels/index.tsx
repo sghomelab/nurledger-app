@@ -316,7 +316,7 @@ function makeStyles(colors: Palette) {
       padding: spacing.md,
     },
     summaryText: { fontFamily: fonts.sans, fontSize: 14, color: colors.slate700 },
-    warning: { fontFamily: fonts.sans, fontSize: 12, color: '#B45309', marginTop: 4 },
+    warning: { fontFamily: fonts.sans, fontSize: 12, color: colors.warningText, marginTop: 4 },
     cta: {
       flexDirection: 'row',
       alignItems: 'center',
