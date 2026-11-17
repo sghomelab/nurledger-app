@@ -108,4 +108,9 @@ export const headerOptions = {
   headerStyle: { backgroundColor: colors.slate50 },
   headerTitleStyle: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.slate900 },
   headerTintColor: colors.slate900,
+  // Without this, screens pushed from a tab show the previous route's NAME as
+  // the back-button label — and the tab root lives in the "(tabs)" group folder,
+  // so users saw a literal "(tabs)" next to the chevron (issue #7).
+  // Empty = chevron-only back button.
+  headerBackTitle: '',
 } as const;
