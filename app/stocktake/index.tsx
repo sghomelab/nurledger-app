@@ -1,4 +1,5 @@
 import { useT } from '../../src/hooks/useT';
+import { useTopInset } from '../../src/hooks/useTopInset';
 import { useCallback, useState } from 'react';
 import { useRouter, useFocusEffect } from 'expo-router';
 import {
@@ -45,6 +46,7 @@ import type { Category } from '../../src/types';
 export default function StocktakeListScreen() {
   const { t } = useT();
   const router = useRouter();
+  const topInset = useTopInset();
   const { categories } = useCategories();
 
   const [items, setItems] = useState<StocktakeRow[] | null>(null);
@@ -85,7 +87,13 @@ export default function StocktakeListScreen() {
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: topInset + spacing.lg }]}>
+        {/* Safe-area inset + back button: without them the title slid under the
+            status bar and there was no way back (issue #8: "texts superimposed,
+            back arrow not working"). Same pattern as suppliers/labels. */}
+        <Pressable onPress={() => router.back()} hitSlop={12} style={styles.backBtn}>
+          <Ionicons name="chevron-back" size={24} color={colors.slate700} />
+        </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={styles.title}>{t('stList.stocktakes')}</Text>
           <Text style={styles.meta}>{t('stList.countStockBlindCountApply')}</Text>
@@ -203,9 +211,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
     marginBottom: spacing.md,
   },
+  backBtn: { paddingRight: spacing.xs },
   title: { fontFamily: fonts.sansBold, fontSize: typography.title, color: colors.slate900 },
   meta: { fontFamily: fonts.sans, fontSize: typography.micro, color: colors.slate400, marginTop: 2 },
   newBtn: {
