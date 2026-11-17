@@ -525,13 +525,15 @@ export default function SellTab() {
 
       {/* Camera barcode scanner (issues #10/#11/#12) */}
       <Modal visible={scanVisible} animationType="fade" onRequestClose={() => setScanVisible(false)}>
-        <BarcodeScanner
-          onClose={() => setScanVisible(false)}
-          onScanned={(code) => {
-            setScanVisible(false);
-            void submitBarcode(code);
-          }}
-        />
+        {scanVisible && (
+          <BarcodeScanner
+            onClose={() => setScanVisible(false)}
+            onScanned={(code) => {
+              setScanVisible(false);
+              void submitBarcode(code);
+            }}
+          />
+        )}
       </Modal>
 
       {/* M5 (FR-103): weighed-item weight prompt (scale pre-fill or manual kg) */}

@@ -3,7 +3,7 @@ import { centeredColumn } from '../../src/lib/layout';
 import { useMemo, useEffect, useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
-  View, Text, TextInput, StyleSheet, ScrollView, Pressable, Alert, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, StyleSheet, ScrollView, Pressable, Alert, KeyboardAvoidingView, Modal, Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { PickerOverlay } from '../../src/components/PickerOverlay';
@@ -238,18 +238,22 @@ export default function ProductFormScreen() {
         />
       )}
 
-      {/* Camera scanner for product + carton barcodes (issues #10/#11) */}
-      {scanTarget && (
-        <BarcodeScanner
-          onClose={() => setScanTarget(null)}
-          onScanned={(code) => {
-            const target = scanTarget;
-            setScanTarget(null);
-            if (target === 'barcode') setBarcode(code);
-            else setCartonBarcode(code);
-          }}
-        />
-      )}
+      {/* Camera scanner for product + carton barcodes (issues #10/#11).
+          Must be a Modal: rendered inline it lays out in-flow below the
+          scrollview (off-screen) — the camera would run invisibly. */}
+      <Modal visible={scanTarget !== null} animationType="fade" onRequestClose={() => setScanTarget(null)}>
+        {scanTarget && (
+          <BarcodeScanner
+            onClose={() => setScanTarget(null)}
+            onScanned={(code) => {
+              const target = scanTarget;
+              setScanTarget(null);
+              if (target === 'barcode') setBarcode(code);
+              else setCartonBarcode(code);
+            }}
+          />
+        )}
+      </Modal>
     </KeyboardAvoidingView>
   );
 }

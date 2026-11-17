@@ -395,6 +395,43 @@ export default function SettingsScreen() {
           </Field>
         </Card>
 
+        {/* Print & export hub (issue #2) — one place to find every printable surface */}
+        <Card>
+          <SectionTitle>{t('settings.printExport')}</SectionTitle>
+          <Pressable style={styles.linkRow} onPress={() => router.push('/labels')}>
+            <Ionicons name="print-outline" size={20} color={colors.primary} />
+            <View style={styles.linkInfo}>
+              <Text style={styles.linkTitle}>{t('settings.printLabels')}</Text>
+              <Text style={styles.linkSub}>{t('settings.printLabelsSub')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.slate400} />
+          </Pressable>
+          <Pressable style={styles.linkRow} onPress={() => router.push('/csv')}>
+            <Ionicons name="swap-vertical-outline" size={20} color={colors.primary} />
+            <View style={styles.linkInfo}>
+              <Text style={styles.linkTitle}>{t('nav.productDataCsv')}</Text>
+              <Text style={styles.linkSub}>{t('settings.printCsvSub')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.slate400} />
+          </Pressable>
+          <Pressable style={styles.linkRow} onPress={() => router.push('/po')}>
+            <Ionicons name="document-text-outline" size={20} color={colors.primary} />
+            <View style={styles.linkInfo}>
+              <Text style={styles.linkTitle}>{t('nav.purchaseOrders')}</Text>
+              <Text style={styles.linkSub}>{t('settings.printPoSub')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.slate400} />
+          </Pressable>
+          <Pressable style={styles.linkRow} onPress={() => router.navigate('/shift')}>
+            <Ionicons name="stats-chart-outline" size={20} color={colors.primary} />
+            <View style={styles.linkInfo}>
+              <Text style={styles.linkTitle}>{t('settings.printReports')}</Text>
+              <Text style={styles.linkSub}>{t('settings.printReportsSub')}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.slate400} />
+          </Pressable>
+        </Card>
+
         <Card>
           <SectionTitle>{t('settings.language')}</SectionTitle>
           <Field label={t('settings.appLanguage')}>
@@ -755,6 +792,10 @@ function makeStyles(colors: Palette) {
     cloudSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
     cloudMeta: { gap: 4, marginBottom: spacing.md },
     cloudMetaText: { fontFamily: fonts.sans, fontSize: 13, color: colors.slate500 },
+    linkRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
+    linkInfo: { flex: 1, gap: 2 },
+    linkTitle: { fontFamily: fonts.sansSemiBold, fontSize: 15, color: colors.slate900 },
+    linkSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },
     cloudError: { fontFamily: fonts.sans, fontSize: 12, color: colors.danger, lineHeight: 16 },
     rejectedBox: {
       backgroundColor: colors.dangerSoft, borderRadius: radius.control, padding: spacing.md,
