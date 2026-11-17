@@ -590,7 +590,7 @@ export default function SettingsScreen() {
                   <Text style={styles.cloudBtnText}>{t('settings.inviteDevice')}</Text>
                 </Pressable>
               </View>
-              <View style={styles.cloudBtns}>
+              <View style={[styles.cloudBtns, { marginTop: spacing.sm }]}>
                 <Pressable
                   style={[styles.cloudBtn, { flex: 1 }, (sync.syncing || !sync.enabled) && { opacity: 0.5 }]}
                   onPress={() =>
