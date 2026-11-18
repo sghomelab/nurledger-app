@@ -17,12 +17,14 @@ import { uuidv4 } from '../lib/ids';
 import {
   buildZReport,
   expectedCashMinor,
+  type AuditLine,
   type CashMove,
   type CashMoveType,
   type CashTotals,
   type SalesByMethod,
   type ZReport,
 } from '../lib/shift';
+import { runIntegrityCheck } from './securityRepository';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export interface Shift {
@@ -207,6 +209,8 @@ export interface CloseShiftInput {
   shiftId: string;
   countedMinor: number;
   notes: string | null;
+  /** Issue #26: who closed it (attributes the audit check + shift_end event). */
+  closedById?: string | null;
 }
 
 /**
@@ -270,6 +274,16 @@ export async function closeShift(input: CloseShiftInput): Promise<Shift> {
   const closedAt = Date.now();
   const totals: CashTotals = { floatMinor: shift.floatMinor, cashSaleMinor, cashInMinor, cashOutMinor, cashRefundMinor };
   const expected = expectedCashMinor(totals);
+  // Issue #26 design §4: verify the hash-chained audit log and surface the
+  // result on the Z-report. runIntegrityCheck also APPENDS the check itself
+  // as an event (attributed to the closer), so the log records when the last
+  // verification ran and what it found.
+  const verification = await runIntegrityCheck(input.closedById ?? null);
+  const audit: AuditLine = {
+    ok: verification.ok,
+    checked: verification.checked,
+    firstBadSeq: verification.firstBadSeq,
+  };
   const report = buildZReport({
     shiftId: shift.id,
     deviceId: shift.deviceId,
@@ -282,6 +296,7 @@ export async function closeShift(input: CloseShiftInput): Promise<Shift> {
     countedMinor: Math.round(input.countedMinor),
     notes: input.notes?.trim() ? input.notes.trim() : null,
     refundsMinor,
+    audit,
   });
 
   // ATOMIC: the UPDATE only hits a shift that is STILL open (closed_at IS

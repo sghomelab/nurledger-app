@@ -1,6 +1,7 @@
 import { AppFrame } from '../src/components/AppFrame';
+import { LockScreen } from '../src/components/security/LockScreen';
 import { Pressable, Text, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useNavigationContainerRef } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
@@ -9,6 +10,7 @@ import { getDb } from '../src/db/database';
 import { isFirstRunPending, onFirstRunStateChange } from '../src/db/firstRun';
 import { FirstRunScreen } from '../src/components/FirstRunScreen';
 import { useT } from '../src/hooks/useT';
+import { checkIdle, touch, useSecurity } from '../src/hooks/useSecurity';
 import { ThemeProvider, useTheme } from '../src/theme/ThemeContext';
 import { useHeaderOptions } from '../src/theme/useHeaderOptions';
 import { colors, fonts } from '../src/theme/tokens';
@@ -131,6 +133,41 @@ function MainStack() {
         <Stack.Screen name="sale/[id]" options={{ ...headerOptions, title: t('nav.sale') }} />
       </Stack>
       </AppFrame>
+      <SecurityGate />
     </>
+  );
+}
+
+/**
+ * Register security gate (issue #26 design §5): loads the security config
+ * once at boot, runs the idle auto-lock watchdog on a 15s tick (cheap: one
+ * subtraction), treats every navigation change as an interaction (timer
+ * reset), and mounts the full-screen LockScreen above the whole app when
+ * locked. In-screen register actions (Sell tab) call touch() directly.
+ */
+const IDLE_WATCHDOG_MS = 15_000;
+
+function SecurityGate() {
+  const { locked, lockReason, storePinSet, reload } = useSecurity();
+  const navRef = useNavigationContainerRef();
+
+  useEffect(() => {
+    void reload();
+    const id = setInterval(() => checkIdle(), IDLE_WATCHDOG_MS);
+    return () => clearInterval(id);
+  }, [reload]);
+
+  // Any screen/tab change = an interaction → reset the idle clock.
+  useEffect(() => {
+    const unsub = navRef.current?.addListener('state', () => touch());
+    return () => {
+      unsub?.();
+    };
+  }, [navRef]);
+
+  if (!locked) return null; // unmounts the instant a PIN is accepted
+
+  return (
+    <LockScreen locked={locked} lockReason={lockReason} storePinSet={storePinSet} onUnlocked={() => {}} />
   );
 }

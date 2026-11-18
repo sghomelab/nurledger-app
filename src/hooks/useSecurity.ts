@@ -18,6 +18,12 @@
  *
  * The lock is SESSION-scoped (not persisted): a fresh launch starts unlocked
  * and auto-locks after the configured idle timeout.
+ *
+ * Soft-lock guard (design §2: "No PIN set = open access"): a register with
+ * NO unlockable PIN (no user PIN AND no Store PIN) cannot be opened again
+ * once locked. Locking is therefore refused in that state — the watchdog
+ * stays disarmed and the manual lock button is a no-op until at least one
+ * PIN exists (see `anyUnlockable`, refreshed by reloadSecurity()).
  */
 
 import { useCallback, useSyncExternalStore } from 'react';
@@ -44,6 +50,12 @@ export interface SecurityState {
   autoLockMinutes: number;
   /** True once reloadSecurity() has run at least once. */
   loaded: boolean;
+  /**
+   * True when at least one PIN could open a lock — any active user's PIN or
+   * the Store PIN. While false, the register is "open access" (design §2)
+   * and locking is refused (soft-lock guard).
+   */
+  anyUnlockable: boolean;
 }
 
 let shared: SecurityState = {
@@ -52,6 +64,7 @@ let shared: SecurityState = {
   storePinSet: false,
   autoLockMinutes: AUTO_LOCK_DEFAULT,
   loaded: false,
+  anyUnlockable: false,
 };
 const listeners = new Set<() => void>();
 function commit(patch: Partial<SecurityState>) {
@@ -102,6 +115,7 @@ export function __resetSecurityForTests() {
     storePinSet: false,
     autoLockMinutes: AUTO_LOCK_DEFAULT,
     loaded: false,
+    anyUnlockable: false,
   };
   lastActivity = Date.now();
 }
@@ -114,6 +128,9 @@ export function touch() {
 /** Manual lock (owner's "lock" button on the Shift tab). */
 export async function lockNow(reason: LockReason = 'manual') {
   if (shared.locked) return;
+  // Soft-lock guard: never lock a register that no PIN could open again
+  // (only once we KNOW the PIN state — before the first reload, allow it).
+  if (shared.loaded && !shared.anyUnlockable) return;
   const actor = await getActiveUser();
   commit({ locked: true, lockReason: reason });
   await appendSecurityEvent({
@@ -136,17 +153,30 @@ export function checkIdle() {
 
 /** Load security config (store-PIN presence + auto-lock timeout) once at boot. */
 export async function reloadSecurity() {
-  const [storePinSet, autoLockMinutes] = await Promise.all([hasStorePin(), getAutoLockMinutes()]);
-  commit({ storePinSet, autoLockMinutes, loaded: true });
+  const [storePinSet, autoLockMinutes, users] = await Promise.all([
+    hasStorePin(),
+    getAutoLockMinutes(),
+    listActiveUsers(),
+  ]);
+  // Soft-lock guard: a user PIN or the Store PIN makes locking safe again.
+  const anyUnlockable = storePinSet || users.some((u) => u.pinHash != null);
+  commit({ storePinSet, autoLockMinutes, anyUnlockable, loaded: true });
 }
 
 /**
- * Attempt to unlock with an entered PIN (called by the lock-screen keypad).
- * Applies the resolution (switching the active user when identity changes) and
- * logs the attributed events. Returns the resolution (null = wrong PIN — the
- * caller keeps the lock up).
+ * The shared identity proof (design §5): resolve a PIN against every active
+ * user + the Store PIN, apply the result (switching the active user when the
+ * identity changes), and log the attributed events.
+ *
+ * @param surface 'lock' — the register is locked; the resolution ALWAYS logs
+ *   an 'unlock' event (proof of identity), plus 'user_switch' when the
+ *   register transfers. 'switch' — an explicit user switch from the Shift tab;
+ *   only a real transfer is logged ('user_switch'); a no-op PIN (the current
+ *   user's own) logs nothing.
  */
-export async function attemptUnlock(pin: string): Promise<UnlockResolution> {
+export type AuthSurface = 'lock' | 'switch';
+
+export async function authenticateRegister(pin: string, surface: AuthSurface): Promise<UnlockResolution> {
   const [current, users, storePinHash] = await Promise.all([
     getActiveUser(),
     listActiveUsers(),
@@ -155,20 +185,22 @@ export async function attemptUnlock(pin: string): Promise<UnlockResolution> {
   const res = resolveUnlock(pin, current, users, storePinHash);
   if (!res) return null;
 
-  // Who the register runs as after this unlock (switch → the other user).
+  // Who the register runs as after this proof (switch → the other user).
   const unlocker = res.kind === 'switch' ? res.to : res.user;
   // Identity changed (switch to another user, or Store-PIN → Owner)?
   const identityChanged = !current || unlocker.id !== current.id;
   if (identityChanged) await setActiveUser(unlocker.id);
 
-  // Always log the unlock (proof of identity), attributed to the unlocker.
-  await appendSecurityEvent({
-    user_id: unlocker.id,
-    event_type: 'unlock',
-    method: res.method,
-    from_user_id: identityChanged ? current?.id ?? null : null,
-    to_user_id: identityChanged ? unlocker.id : null,
-  });
+  if (surface === 'lock') {
+    // Always log the unlock (proof of identity), attributed to the unlocker.
+    await appendSecurityEvent({
+      user_id: unlocker.id,
+      event_type: 'unlock',
+      method: res.method,
+      from_user_id: identityChanged ? current?.id ?? null : null,
+      to_user_id: identityChanged ? unlocker.id : null,
+    });
+  }
   // The actual handover, when the register now runs as a DIFFERENT identity.
   if (identityChanged && current) {
     await appendSecurityEvent({
@@ -179,7 +211,16 @@ export async function attemptUnlock(pin: string): Promise<UnlockResolution> {
       to_user_id: unlocker.id,
     });
   }
+  return res;
+}
 
+/**
+ * Attempt to unlock with an entered PIN (called by the lock-screen keypad).
+ * Returns the resolution (null = wrong PIN — the caller keeps the lock up).
+ */
+export async function attemptUnlock(pin: string): Promise<UnlockResolution> {
+  const res = await authenticateRegister(pin, 'lock');
+  if (!res) return null;
   commit({ locked: false, lockReason: null });
   touch();
   return res;

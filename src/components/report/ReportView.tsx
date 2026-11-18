@@ -2,7 +2,7 @@ import { useT } from '../../hooks/useT';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { formatMoney } from '../../lib/money';
-import type { CashMove, SalesByMethod, XReport, ZReport } from '../../lib/shift';
+import type { AuditLine, CashMove, SalesByMethod, XReport, ZReport } from '../../lib/shift';
 import { fonts, radius, spacing, typography, type Palette } from '../../theme/tokens';
 import { useTheme } from '../../theme/ThemeContext';
 import { useMemo } from 'react';
@@ -70,6 +70,9 @@ export function ReportView({ report, currency }: Props) {
             <Row label={t('reportView.countedCash')} value={formatMoney(report.countedMinor, currency)} strong />
             <Divider />
             <VarianceRow varianceMinor={report.varianceMinor} varianceClass={report.varianceClass} currency={currency} />
+            {report.audit ? (
+              <AuditRow audit={report.audit} />
+            ) : null}
           </>
         ) : (
           <>
@@ -136,6 +139,21 @@ function VarianceRow({ varianceMinor, varianceClass, currency }: { varianceMinor
       <Text style={[styles.rowValue, { color, fontFamily: fonts.monoSemiBold }]}>
         {formatMoney(varianceMinor, currency)}
       </Text>
+    </View>
+  );
+}
+
+/** Issue #26 design §4: audit-log integrity at close time (Z-report only). */
+function AuditRow({ audit }: { audit: AuditLine }) {
+  const { colors } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { t } = useT();
+  const color = audit.ok ? colors.positive : colors.danger;
+  const label = audit.ok ? t('reportView.auditVerified') : t('reportView.auditTampered');
+  return (
+    <View style={styles.row}>
+      <Text style={[styles.rowLabel, { color: colors.slate500 }]}>{t('reportView.auditLog')}</Text>
+      <Text style={[styles.rowValue, { color, fontFamily: fonts.sansSemiBold }]}>{label}</Text>
     </View>
   );
 }

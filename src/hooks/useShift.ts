@@ -120,7 +120,7 @@ export interface UseShift {
   reload: () => Promise<void>;
   openShift: (input: OpenShiftInput) => Promise<Shift>;
   addCashMove: (shiftId: string, type: CashMoveType, amountMinor: number, reason: string) => Promise<void>;
-  closeShift: (shiftId: string, countedMinor: number, notes: string | null) => Promise<Shift>;
+  closeShift: (shiftId: string, countedMinor: number, notes: string | null, closedById?: string | null) => Promise<Shift>;
   /** FR-203: interim X-report for the open shift. */
   xReport: () => Promise<XReport | null>;
 }
@@ -163,8 +163,8 @@ export function useShift(): UseShift {
   );
 
   const closeShift = useCallback(
-    async (shiftId: string, countedMinor: number, notes: string | null) => {
-      const closed = await repoCloseShift({ shiftId, countedMinor, notes });
+    async (shiftId: string, countedMinor: number, notes: string | null, closedById?: string | null) => {
+      const closed = await repoCloseShift({ shiftId, countedMinor, notes, closedById });
       await reload();
       return closed;
     },

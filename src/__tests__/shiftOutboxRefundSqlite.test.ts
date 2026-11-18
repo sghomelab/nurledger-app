@@ -40,6 +40,7 @@ function mk(): any {
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
   raw.exec(SCHEMA_SQL);
+  let txQueue: Promise<unknown> = Promise.resolve();
   const db = {
     execAsync: async (s: string) => raw.exec(s),
     // Must return the run result: closeShift asserts on `changes`.
@@ -47,14 +48,24 @@ function mk(): any {
     getFirstAsync: async (s: string, p: unknown[] = []) => raw.prepare(s).get(...p) ?? null,
     getAllAsync: async (s: string, p: unknown[] = []) => raw.prepare(s).all(...p),
     withTransactionAsync: async (fn: () => Promise<void>) => {
-      raw.exec('BEGIN');
-      try {
-        await fn();
-        raw.exec('COMMIT');
-      } catch (e) {
-        raw.exec('ROLLBACK');
-        throw e;
-      }
+      // Serialize: the real driver queues statements on ONE connection, so a
+      // transaction can never BEGIN while another is in flight (a raw second
+      // BEGIN would throw "cannot start a transaction within a transaction").
+      const run = () => {
+        raw.exec('BEGIN');
+        return fn()
+          .then(() => raw.exec('COMMIT'))
+          .catch((e: unknown) => {
+            raw.exec('ROLLBACK');
+            throw e;
+          });
+      };
+      const p = txQueue.then(run, run);
+      txQueue = p.then(
+        () => undefined,
+        () => undefined,
+      );
+      return p;
     },
   };
   mockDb = db as unknown as SQLiteDatabase;

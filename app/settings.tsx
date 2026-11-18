@@ -43,6 +43,7 @@ import { Card } from '../src/components/Screen';
 import { PickerOverlay } from '../src/components/PickerOverlay';
 import { PinPrompt } from '../src/components/PinPrompt';
 import { DeleteAccountDialog } from '../src/components/DeleteAccountDialog';
+import { SecuritySettings } from '../src/components/security/SecuritySettings';
 import { roleCanAct } from '../src/lib/roles';
 import { fonts, radius, spacing, type Palette } from '../src/theme/tokens';
 
@@ -61,7 +62,7 @@ export default function SettingsScreen() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
-  const { active, users } = useUsers();
+  const { active, users, reload: reloadUsers } = useUsers();
   const [gateVisible, setGateVisible] = useState(false);
   const { outlet, reload } = useOutlet();
   const { t, lang, setLanguage } = useT();
@@ -454,6 +455,12 @@ export default function SettingsScreen() {
           />
           <Text style={styles.note}>{t('settings.themeNote')}</Text>
         </Card>
+
+        {/* Issue #26: register security — owner-only (the section's secrets
+         *  are the owner's; cashiers/ managers never see Store-PIN controls). */}
+        {active?.role === 'owner' && (
+          <SecuritySettings owner={active} users={users ?? []} onUsersChanged={reloadUsers} />
+        )}
 
         <Card>
           <SectionTitle>{t('settings.currency')}</SectionTitle>

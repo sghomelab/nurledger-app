@@ -44,6 +44,8 @@ jest.mock('../repositories/uiSettingsRepository', () => ({
 const ANN: AppUser = { id: 'a', name: 'Ann', role: 'cashier', pinHash: createPinHash('1111'), active: true, createdAt: 1 };
 const BOO: AppUser = { id: 'b', name: 'Boo', role: 'cashier', pinHash: createPinHash('2222'), active: true, createdAt: 1 };
 const OWNER: AppUser = { id: 'o', name: 'Owner', role: 'owner', pinHash: createPinHash('9999'), active: true, createdAt: 1 };
+/** A user with NO PIN (the soft-lock precondition). */
+const JUN: AppUser = { id: 'j', name: 'Jun', role: 'cashier', pinHash: null, active: true, createdAt: 1 };
 const STORE_HASH = createPinHash('7777');
 const USERS: AppUser[] = [ANN, BOO, OWNER];
 
@@ -187,5 +189,56 @@ describe('reloadSecurity loads config', () => {
     expect(s.storePinSet).toBe(true);
     expect(s.autoLockMinutes).toBe(15);
     expect(s.loaded).toBe(true);
+  });
+});
+
+describe('soft-lock guard (design §2: "No PIN set = open access")', () => {
+  /** A register where NO PIN could open a lock: no user PIN, no Store PIN. */
+  function noPinsAnywhere() {
+    mockListActiveUsers.mockResolvedValue([JUN]);
+    mockHasStorePin.mockResolvedValue(false);
+  }
+
+  it('checkIdle NEVER locks when no unlockable PIN exists', async () => {
+    noPinsAnywhere();
+    await reloadSecurity();
+    expect(__getSecurityStateForTests().anyUnlockable).toBe(false);
+    __setLastActivityForTests(NOW - 6 * 60_000); // past the 5-min timeout
+    checkIdle();
+    await Promise.resolve();
+    expect(__getSecurityStateForTests().locked).toBe(false);
+    expect(mockAppend).not.toHaveBeenCalled(); // no auto_lock event either
+  });
+
+  it('a manual lock is refused when no unlockable PIN exists', async () => {
+    noPinsAnywhere();
+    await reloadSecurity();
+    await lockNow('manual');
+    expect(__getSecurityStateForTests().locked).toBe(false);
+    expect(mockAppend).not.toHaveBeenCalled();
+  });
+
+  it('a user PIN alone is enough to arm the watchdog', async () => {
+    mockHasStorePin.mockResolvedValue(false); // no Store PIN
+    await reloadSecurity(); // USERS includes ANN with a PIN
+    expect(__getSecurityStateForTests().anyUnlockable).toBe(true);
+    __setLastActivityForTests(NOW - 6 * 60_000);
+    checkIdle();
+    await Promise.resolve();
+    expect(__getSecurityStateForTests().locked).toBe(true);
+  });
+
+  it('setting a Store PIN re-arms auto-lock (anyUnlockable flips)', async () => {
+    noPinsAnywhere();
+    await reloadSecurity();
+    expect(__getSecurityStateForTests().anyUnlockable).toBe(false);
+    // The owner sets the Store PIN → SecuritySettings calls reloadSecurity().
+    mockHasStorePin.mockResolvedValue(true);
+    await reloadSecurity();
+    expect(__getSecurityStateForTests().anyUnlockable).toBe(true);
+    __setLastActivityForTests(NOW - 6 * 60_000);
+    checkIdle();
+    await Promise.resolve();
+    expect(__getSecurityStateForTests().locked).toBe(true);
   });
 });
