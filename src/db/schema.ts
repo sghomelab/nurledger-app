@@ -3,7 +3,7 @@
  * Bump SCHEMA_VERSION and add a migration step in database.ts when changing existing tables.
  */
 
-export const SCHEMA_VERSION = 8;
+export const SCHEMA_VERSION = 9;
 
 /**
  * M2: active-cart persistence (NFR-3 — every cart mutation is written to SQLite
@@ -85,6 +85,32 @@ SELECT product_id,
        COALESCE(SUM(CASE WHEN qty_g_delta IS NOT NULL THEN qty_g_delta ELSE 0 END), 0) AS qty_g
 FROM stock_ledger
 GROUP BY product_id;
+`;
+
+/**
+ * v9 (issue #26): insert-only, hash-chained security events (the immutable
+ * audit log, design §4). `seq` is the unique monotonic chain position; each
+ * row's `row_hash` = sha256(prev_hash + '|' + canonical fields) (src/lib/auditChain.ts).
+ * NO UPDATE/DELETE path exists anywhere — the only writer is
+ * securityRepository.appendSecurityEvent (same discipline as the stock
+ * ledger, ADR-002). user_id/from_user_id/to_user_id are plain TEXT
+ * (deliberately NO foreign keys): a cashier row can be deactivated, but
+ * history must stay attributable forever.
+ */
+export const SECURITY_EVENTS_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS security_events (
+  seq INTEGER PRIMARY KEY,
+  ts INTEGER NOT NULL,
+  user_id TEXT,
+  from_user_id TEXT,
+  to_user_id TEXT,
+  event_type TEXT NOT NULL,
+  method TEXT,
+  detail TEXT,
+  prev_hash TEXT NOT NULL,
+  row_hash TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_security_events_ts ON security_events(ts);
 `;
 
 export const SCHEMA_SQL = `
@@ -380,6 +406,7 @@ CREATE TABLE IF NOT EXISTS delta_cursor (
 );
 ${EXPENSE_TABLE_SQL}
 ${CART_TABLES_SQL}
+${SECURITY_EVENTS_TABLE_SQL}
 `;
 
 /** v1 → v2 (M2): add the cart-persistence tables. Idempotent. */
@@ -508,3 +535,10 @@ export const OUTBOX_QUARANTINE_COLUMNS: ReadonlyArray<readonly [string, string]>
   ['quarantined_at', 'INTEGER'],
   ['discarded_at', 'INTEGER'],
 ];
+
+/**
+ * v9 (issue #26) migration + self-heal (see SECURITY_EVENTS_TABLE_SQL above —
+ * inserted into SCHEMA_SQL, so fresh installs get it too). Idempotent DDL.
+ */
+export const MIGRATE_V8_TO_V9_SQL = SECURITY_EVENTS_TABLE_SQL;
+export const ENSURE_M9_SQL = SECURITY_EVENTS_TABLE_SQL;
