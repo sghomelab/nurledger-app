@@ -56,3 +56,31 @@ export async function setUiTheme(theme: UiTheme): Promise<void> {
     theme,
   ]);
 }
+
+// ── Register auto-lock (issue #26 design §5) ────────────────────────────────
+
+/** Allowed timeouts in minutes. 0 = Never. Default (unknown/absent) = 5. */
+export const AUTO_LOCK_CHOICES = [0, 1, 5, 15, 30] as const;
+export type AutoLockMinutes = (typeof AUTO_LOCK_CHOICES)[number];
+export const AUTO_LOCK_DEFAULT: AutoLockMinutes = 5;
+const AUTO_LOCK_KEY = 'ui.auto_lock_minutes';
+
+/** The stored auto-lock timeout; a non-allowlisted stored value falls back to 5. */
+export async function getAutoLockMinutes(): Promise<AutoLockMinutes> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ value: string }>(
+    `SELECT value FROM settings WHERE key = '${AUTO_LOCK_KEY}'`,
+  );
+  const n = row ? Number(row.value) : NaN;
+  return (AUTO_LOCK_CHOICES as readonly number[]).includes(n)
+    ? (n as AutoLockMinutes)
+    : AUTO_LOCK_DEFAULT;
+}
+
+export async function setAutoLockMinutes(mins: AutoLockMinutes): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', [
+    AUTO_LOCK_KEY,
+    String(mins),
+  ]);
+}
