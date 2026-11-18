@@ -12,6 +12,15 @@ Offline-first POS + inventory for small grocery shops. **by NurLogic — nurlogi
 - No hardcoded country/tax — locale behavior via engines (TaxEngine/PaymentMethods/BarcodeParser, M5). Reference locale: SG/SGD/GST 9% inclusive.
 - Layout/nav follows the KitePOS prototype (ADR-005): 5 tabs **Sell · Inventory · Expiry · Insights · Shift**, Plus Jakarta Sans + JetBrains Mono, indigo-600/emerald-600/amber-500/rose-500/slate.
 
+## Development & Release Process (RULE)
+
+Full spec: `docs/DEV-PROCESS.md`. Reference example: **PR #28**.
+
+- **Feature request with design decisions** → reply with the three gates, then push the request to a **design-doc PR before any code** (`design/<topic>-<issue#>` branch, `docs/<TOPIC>-DESIGN.md` with decisions log, open items, release plan, verification plan). **PR merge = design approved** → then an implementation PR against the doc.
+- **No design decisions** (bug fix / hotfix / small change) → work **direct on `main`**.
+- **Three gates, three of Mas's say-so's** — (1) Design = merge the PR → (2) Build = explicit build GO in the current conversation → (3) Release = Mas's word. **Merging a PR never triggers a build.** "Ship it" / "release" = prepare and STOP at the queue line.
+- **Zero EAS build credits without Mas's explicit build GO in the current exchange.** Both platforms from the same commit; one hypothesis per build.
+
 ## Stack
 
 Expo SDK 58 / RN 0.88 / React 19.3 / expo-router / expo-sqlite (ADR-009 supersedes ADR-001's Flutter+Drift; SDK 57→58 upgrade in `afa92bd`). Metro port **8186**.
@@ -35,6 +44,7 @@ Expo SDK 58 / RN 0.88 / React 19.3 / expo-router / expo-sqlite (ADR-009 supersed
 
 ## Docs
 
+- `docs/DEV-PROCESS.md` — development & release process (RULE — see section above)
 - `docs/FR-COVERAGE.md` — update when implementing any FR (audited per milestone)
 - `docs/SPEC-DEVIATION.md` — log spec conflicts as DEV-NNN
 - Claude ↔ OpenCode handoffs go through the repo — see `docs/handoff/README.md` (tasks in `docs/handoff/`, reports in `docs/handoff/reports/`)
