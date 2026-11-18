@@ -53,7 +53,16 @@ export default function ShiftDetail() {
 
   return (
     <View style={styles.wrap}>
-      <Stack.Screen options={{ ...headerOptions, title: t('nav.shift'), headerBackTitle: t('nav.shifts') }} />
+      {/* 'default' display mode overrides the shared 'minimal': this screen
+          intentionally shows a "Shifts" back label. */}
+      <Stack.Screen
+        options={{
+          ...headerOptions,
+          title: t('nav.shift'),
+          headerBackTitle: t('nav.shifts'),
+          headerBackButtonDisplayMode: 'default',
+        }}
+      />
       {notFound ? (
         <View style={styles.center}>
           <Text style={styles.notFound}>{t('shiftDetail.shiftNotFound')}</Text>
