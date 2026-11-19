@@ -2,7 +2,7 @@
 
 Issue: [#26](https://github.com/sghomelab/nurledger-app/issues/26) · Target: **1.2.0**
 
-Status: **proposed — awaiting Mas's review/merge** (design discussed 2026-11-18).
+Status: **merged** (PR #28 design merged, PR #29 implementation merged @ `8127c96`).
 
 ## Problem
 

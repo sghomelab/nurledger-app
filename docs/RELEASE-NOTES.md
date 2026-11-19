@@ -6,6 +6,50 @@ FR → file/test mapping lives in `FR-COVERAGE.md`.
 
 ---
 
+## 1.2.0 — cashier authentication & register lock (target: 2026-11-xx)
+
+> Status: **not yet built** — awaiting Mas's explicit build GO (Gate 2).
+> Version: `1.2.0` · iOS build 10 · Android vc6 · commit to build from: TBD
+> Gates at commit time: tsc 0 · jest 643/643 (Node 22).
+
+**What's in 1.2.0:**
+
+- **Cashier authentication & register lock (issue #26)** — full 4-stage security
+  feature:
+  - **Store PIN + one-time offline recovery code** (owner-only master key;
+    generated and displayed once at setup with Copy / Print / Email me; stored
+    as a salted hash in the device Keystore — never in SQLite). Forgotten Store
+    PIN recovery via the 12-digit code available from the lock screen and from
+    Security Settings ("Forgot the Store PIN?").
+  - **SHA-256 hash-chained audit log** (`security_events` table, insert-only —
+    same discipline as the stock ledger). Any edit or deletion of an old row
+    breaks the chain; integrity verified automatically at every Z-report close
+    and on-demand from Security Settings. Chain status shown on the printed /
+    exported Z-report.
+  - **Configurable idle auto-lock** (Never / 1 / 5 / 15 / 30 min, default 5
+    min). Any screen tap resets the timer; returning from device sleep
+    re-evaluates immediately. Soft-lock guard: the register is never locked
+    when no PIN could open it ("No PIN set = open access" — single-operator
+    shops unaffected).
+  - **Full-screen terminal lock screen** (native Modal — covers in-app modals;
+    Android back key swallowed). Unlocks with any PIN: locked user's own PIN →
+    resume; another user's PIN → register transfers (logged `user_switch`);
+    Store PIN → register runs as Owner. Progressive 4–8 digit matching.
+    Prefix-collision guard: a new PIN that extends an existing PIN is rejected
+    at creation time.
+  - **Security Settings** (owner only): set/change Store PIN, reset any cashier
+    PIN, adjust auto-lock timeout, run manual audit-log integrity check.
+  - **Privilege gates**: close-shift and X-report require owner/manager PIN when
+    a cashier is active; open-shift proves identity when active user has a PIN.
+  - **i18n** in English, Bahasa Melayu, Filipino for all security strings.
+- **Receipt PDF share (issue #30)** — a Share button on the Payment Successful
+  screen hands the receipt to the system share sheet as a PDF (same HTML layout
+  as the on-screen receipt). Works alongside the existing Email option.
+- **iOS back-label fix (issue #7, folded from 1.1.1)** — `(tabs)` route-group
+  label no longer appears in the navigation back button on iOS.
+
+---
+
 ## 1.1.0 — tester enhancement batch (2026-11-17)
 
 > Status (2026-11-17): **both platforms built from the SAME commit `8106800`**
