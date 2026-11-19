@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.nurlogic.nurledger",
-      "buildNumber": "10",
+      "buildNumber": "11",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "NurLedger uses the camera to scan product barcodes and QR codes for customer emails."
@@ -24,7 +24,7 @@
       },
       "package": "com.nurlogic.nurledger",
       "allowBackup": false,
-      "versionCode": "6"
+      "versionCode": 7
     },
     "web": {
       "bundler": "metro",
