@@ -84,3 +84,25 @@ export function verifyPin(stored: string | null, pin: string): boolean {
   }
   return diff === 0;
 }
+
+/**
+ * Progressive-match prefix collision, checked at PIN CREATION time (the
+ * prompts match at every valid length — see pinEntryOutcome).
+ *
+ * True when `pin` EXTENDS a stored PIN: some valid-length prefix of `pin`
+ * equals the stored PIN. If such a pair existed, typing `pin` would
+ * auto-unlock the shorter-PIN holder after the prefix digits — the longer
+ * PIN could never be entered (permanent lockout of its owner).
+ *
+ * Known limitation (documented, owner-visible): the INVERSE — a new SHORTER
+ * PIN that is a prefix of an EXISTING longer one — is undetectable from
+ * salted hashes (the longer plaintext is never recoverable). Creating such
+ * a pair is a deliberate owner choice at setup time.
+ */
+export function extendsStoredPin(pin: string, stored: string | null): boolean {
+  if (!stored || !isValidPin(pin)) return false;
+  for (let len = PIN_MIN_LENGTH; len < pin.length; len += 1) {
+    if (verifyPin(stored, pin.slice(0, len))) return true;
+  }
+  return false;
+}

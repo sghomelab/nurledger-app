@@ -13,10 +13,13 @@ import { PickerOverlay } from '../../src/components/PickerOverlay';
 import { MoneyPrompt } from '../../src/components/register/MoneyPrompt';
 import { PinPrompt } from '../../src/components/PinPrompt';
 import { ReportView } from '../../src/components/report/ReportView';
+import { IdentityPrompt } from '../../src/components/security/IdentityPrompt';
 import { CashMovePrompt, CountedCashPrompt } from '../../src/components/shift/ShiftPrompts';
 import { useOutlet } from '../../src/hooks/useAppData';
 import { useShift, useUsers } from '../../src/hooks/useShift';
+import { authenticateRegister, lockNow, useSecurity } from '../../src/hooks/useSecurity';
 import { getDeviceId, type Shift } from '../../src/repositories/shiftRepository';
+import { appendSecurityEvent } from '../../src/repositories/securityRepository';
 import { taxEngineLabel } from '../../src/lib/currency';
 import { formatMoney } from '../../src/lib/money';
 import { buildReportHtml, type ReportHtmlLabels } from '../../src/lib/reportHtml';
@@ -61,8 +64,9 @@ export default function ShiftTab() {
   const { t } = useT();
   const router = useRouter();
   const { outlet } = useOutlet();
-  const { users, active, switchUser, addUser, changePin } = useUsers();
+  const { users, active, reload: reloadUsers, switchUser, addUser, changePin } = useUsers();
   const { open, snapshot, history, openShift, addCashMove, closeShift, xReport } = useShift();
+  const { anyUnlockable } = useSecurity();
 
   /** Localized row labels for the printable report (issue #18 follow-up) —
    *  the same i18n keys `ReportView` renders on-screen, so the PDF matches
@@ -87,6 +91,9 @@ export default function ShiftTab() {
       expectedCashNow: t('reportView.expectedCashNow'),
       notes: t('reportView.shiftNotes'),
       unknownUser: t('shift.noUser'),
+      auditLog: t('reportView.auditLog'),
+      auditVerified: t('reportView.auditVerified'),
+      auditTampered: t('reportView.auditTampered'),
     }),
     [t],
   );
@@ -104,6 +111,10 @@ export default function ShiftTab() {
   const [report, setReport] = useState<ZReport | XReport | null>(null);
   const [reportBusy, setReportBusy] = useState(false);
   const [newUser, setNewUser] = useState({ name: '', role: 'cashier' as UserRole, pin: '' });
+  // Issue #26 design §5: proof-of-identity prompt for explicit actions
+  // (switch user / open shift). The PIN determines the identity — the
+  // register runs as whoever's PIN was entered (or the Owner for the Store PIN).
+  const [identity, setIdentity] = useState<{ title: string; subtitle: string | null; onPin: (pin: string) => void } | null>(null);
 
   const currency = outlet?.currency ?? 'SGD';
 
@@ -117,6 +128,10 @@ export default function ShiftTab() {
           cashierId: active?.id ?? null,
           floatMinor,
         });
+        // Issue #26: audit the shift start, attributed to the identity the
+        // register is running as (the gated open-shift flow refreshed the
+        // active user before this ran).
+        await appendSecurityEvent({ user_id: active?.id ?? null, event_type: 'shift_start', method: 'system' });
         setOpenFloatVisible(false);
       } catch (e) {
         Alert.alert(t('sell.couldNotOpenShift'), errMsg(e));
@@ -156,15 +171,42 @@ export default function ShiftTab() {
     async (countedMinor: number, notes: string | null) => {
       if (!open) return;
       try {
-        const closed = await closeShift(open.id, countedMinor, notes);
+        const closedById = active?.id ?? null;
+        const closed = await closeShift(open.id, countedMinor, notes, closedById);
+        // The shift_end audit event is appended inside closeShift itself
+        // (review L10 — no crash gap between close and log).
         setCloseVisible(false);
         if (closed.zReport) setReport(closed.zReport);
       } catch (e) {
         Alert.alert(t('shift.closeFailed'), errMsg(e));
       }
     },
-    [open, closeShift],
+    [open, closeShift, active],
   );
+
+  /** Issue #26 design §5: opening a shift needs proof of identity when the
+   *  active user has a PIN — the float prompt only comes up after the PIN
+   *  resolves (and the active user is refreshed, so the shift is attributed
+   *  to the identity the PIN actually proved). */
+  const requestOpenShift = useCallback(() => {
+    if (active?.pinHash != null) {
+      setIdentity({
+        title: t('sell.openShift'),
+        subtitle: active.name,
+        onPin: (pin) => {
+          void (async () => {
+            setIdentity(null);
+            const res = await authenticateRegister(pin, 'switch');
+            if (!res) return;
+            await reloadUsers();
+            setOpenFloatVisible(true);
+          })();
+        },
+      });
+      return;
+    }
+    setOpenFloatVisible(true);
+  }, [active, t, reloadUsers]);
 
   const doXReport = useCallback(async () => {
     const r = await xReport();
@@ -224,7 +266,10 @@ export default function ShiftTab() {
   const doSwitchUser = useCallback(
     async (id: string) => {
       const target = (users ?? []).find((u) => u.id === id);
-      if (!target) return;
+      if (!target || id === active?.id) {
+        setUserSheet(false);
+        return;
+      }
       const perform = async () => {
         try {
           await switchUser(id);
@@ -233,6 +278,27 @@ export default function ShiftTab() {
           Alert.alert(t('shift.switchFailed'), errMsg(e));
         }
       };
+      // Issue #26 design §5: a target with a PIN needs proof of identity.
+      // The PIN decides who the register runs as — the target's own PIN
+      // switches to the target, but a DIFFERENT user's PIN (or the Store
+      // PIN → Owner) switches to whoever it is. The legacy role gate below
+      // only still applies to targets with NO PIN set.
+      if (target.pinHash != null) {
+        setUserSheet(false);
+        setIdentity({
+          title: t('shift.switch'),
+          subtitle: target.name,
+          onPin: (pin) => {
+            void (async () => {
+              setIdentity(null);
+              const res = await authenticateRegister(pin, 'switch');
+              if (!res) return;
+              await reloadUsers(); // stale-active hazard: the shared store
+            })();
+          },
+        });
+        return;
+      }
       // Switching UP (e.g. cashier -> owner) needs that role's PIN, or any
       // cashier could become the owner and bypass every PIN gate.
       const need = switchRankNeeded(active, target);
@@ -243,7 +309,7 @@ export default function ShiftTab() {
       }
       await perform();
     },
-    [switchUser, users, active, t],
+    [switchUser, users, active, t, reloadUsers],
   );
 
   const doAddUser = useCallback(async () => {
@@ -303,6 +369,18 @@ export default function ShiftTab() {
           <Pressable style={styles.switchBtn} onPress={() => setUserSheet(true)} hitSlop={8}>
             <Ionicons name="swap-horizontal" size={16} color={colors.primary} />
             <Text style={styles.switchBtnText}>{t('shift.switch')}</Text>
+          </Pressable>
+          {/* Issue #26: manual register lock (the idle auto-lock is global in _layout).
+              Disabled while no PIN could open the lock (soft-lock guard, design §2). */}
+          <Pressable
+            style={[styles.lockBtn, !anyUnlockable && { opacity: 0.4 }]}
+            onPress={() => void lockNow('manual')}
+            disabled={!anyUnlockable}
+            hitSlop={8}
+            accessibilityLabel={t('shift.lockRegister')}
+          >
+            <Ionicons name="lock-closed" size={16} color={colors.primary} />
+            <Text style={styles.switchBtnText}>{t('shift.lockRegister')}</Text>
           </Pressable>
         </View>
         <Pressable style={styles.addUserBtn} onPress={() => setAddUserVisible(true)}>
@@ -372,7 +450,7 @@ export default function ShiftTab() {
           <Text style={styles.lockedText}>
             {t('shift.lockedBody')}
           </Text>
-          <Pressable style={styles.openShiftBtn} onPress={() => setOpenFloatVisible(true)}>
+          <Pressable style={styles.openShiftBtn} onPress={requestOpenShift}>
             <Text style={styles.openShiftText}>{t('sell.openShift')}</Text>
           </Pressable>
         </Card>
@@ -421,6 +499,17 @@ export default function ShiftTab() {
             { key: '__pin', label: t('shift.changePin'), sublabel: '', onPress: () => { setUserSheet(false); setPinPicker(true); } },
           ]}
           onClose={() => setUserSheet(false)}
+        />
+      )}
+
+      {/* Issue #26 design §5: proof of identity for switch / open shift */}
+      {identity && (
+        <IdentityPrompt
+          visible
+          title={identity.title}
+          subtitle={identity.subtitle}
+          onSuccess={identity.onPin}
+          onCancel={() => setIdentity(null)}
         />
       )}
 
@@ -721,6 +810,7 @@ function makeStyles(colors: Palette) {
     userName: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.slate900 },
     userRole: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500, marginTop: 2 },
     switchBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.slate100, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: 8 },
+    lockBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.slate100, borderRadius: radius.control, paddingHorizontal: spacing.md, paddingVertical: 8 },
     switchBtnText: { fontFamily: fonts.sansSemiBold, fontSize: 13, color: colors.primary },
     addUserBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start', marginTop: spacing.md, paddingHorizontal: spacing.sm, paddingVertical: 4 },
     addUserText: { fontFamily: fonts.sans, fontSize: 12, color: colors.slate500 },

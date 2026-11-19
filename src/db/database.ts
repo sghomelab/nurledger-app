@@ -7,7 +7,7 @@
  */
 
 import { openDatabaseAsync, type SQLiteDatabase } from 'expo-sqlite';
-import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, MIGRATE_V3_TO_V4_SQL, MIGRATE_V4_TO_V5_SQL, MIGRATE_V5_TO_V6_SQL, MIGRATE_V6_TO_V7_SQL, ENSURE_M4_SQL, ENSURE_M6_SQL, ENSURE_M7_SQL, SCHEMA_SQL, SCHEMA_VERSION, OUTBOX_QUARANTINE_COLUMNS, OUTBOX_PENDING_INDEX_SQL, STOCK_VIEW_SQL } from './schema';
+import { MIGRATE_V1_TO_V2_SQL, MIGRATE_V2_TO_V3_SQL, MIGRATE_V3_TO_V4_SQL, MIGRATE_V4_TO_V5_SQL, MIGRATE_V5_TO_V6_SQL, MIGRATE_V6_TO_V7_SQL, MIGRATE_V8_TO_V9_SQL, ENSURE_M4_SQL, ENSURE_M6_SQL, ENSURE_M7_SQL, ENSURE_M9_SQL, SCHEMA_SQL, SCHEMA_VERSION, OUTBOX_QUARANTINE_COLUMNS, OUTBOX_PENDING_INDEX_SQL, STOCK_VIEW_SQL } from './schema';
 import { isSeeded, ensureDefaultUsers, ensureOutlet } from './seed';
 import { uuidv4 } from '../lib/ids';
 
@@ -82,6 +82,11 @@ export async function getDb(): Promise<SQLiteDatabase> {
             // ensureM7() below (every bootstrap).
             await database.execAsync(MIGRATE_V6_TO_V7_SQL);
           }
+          if (current < 9) {
+            // v9 (issue #26): security_events — insert-only hash-chained
+            // audit log (new table only; idempotent DDL).
+            await database.execAsync(MIGRATE_V8_TO_V9_SQL);
+          }
           // v8: outbox quarantine columns — guarded ALTERs in ensureM8() below.
           await database.runAsync('INSERT OR REPLACE INTO schema_meta (id, v) VALUES (1, ?)', [
             SCHEMA_VERSION,
@@ -117,6 +122,10 @@ export async function getDb(): Promise<SQLiteDatabase> {
 
       // v8 self-heal: the outbox quarantine columns (guarded ALTERs, EVERY bootstrap).
       await ensureM8(database);
+
+      // v9 self-heal: re-assert the security_events table (idempotent DDL,
+      // EVERY bootstrap — see ENSURE_M4_SQL for the pattern).
+      await database.execAsync(ENSURE_M9_SQL);
 
       // FR-200: shift = {device, cashier} pair — stable device identity
       // (created once on first run; persists across restarts).

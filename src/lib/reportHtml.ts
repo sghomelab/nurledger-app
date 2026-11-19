@@ -44,6 +44,10 @@ export interface ReportHtmlLabels {
   expectedCashNow: string;
   notes: string;
   unknownUser: string;
+  /** Issue #26 design §4: audit-log integrity line (Z-report). */
+  auditLog: string;
+  auditVerified: string;
+  auditTampered: string;
 }
 
 const DEFAULT_LABELS: ReportHtmlLabels = {
@@ -65,6 +69,9 @@ const DEFAULT_LABELS: ReportHtmlLabels = {
   expectedCashNow: 'Expected cash now',
   notes: 'Notes',
   unknownUser: 'Unknown',
+  auditLog: 'Audit log',
+  auditVerified: 'Verified — chain intact',
+  auditTampered: 'TAMPERED — investigate',
 };
 
 function esc(s: string): string {
@@ -130,6 +137,9 @@ export function buildReportHtml(
         `<tr class="strong"><td>${esc(L.expectedCash)}</td><td class="num">${esc(money(report.expectedMinor))}</td></tr>`,
         `<tr class="strong"><td>${esc(L.countedCash)}</td><td class="num">${esc(money(report.countedMinor))}</td></tr>`,
         `<tr class="strong"><td>${esc(L.variance)} (${esc(varianceLabel)})</td><td class="num">${esc(money(report.varianceMinor))}</td></tr>`,
+        ...(isZ && (report as ZReport).audit
+          ? [`<tr class="audit ${isZ && !(report as ZReport).audit!.ok ? 'bad' : ''}"><td>${esc(L.auditLog)}</td><td class="num">${esc((report as ZReport).audit!.ok ? L.auditVerified : L.auditTampered)}</td></tr>`]
+          : []),
       ].join('')
     : [
         ...(report.cashInMinor > 0 ? [`<tr><td>${esc(L.cashIn)}</td><td class="num">${esc(money(report.cashInMinor))}</td></tr>`] : []),
@@ -156,6 +166,8 @@ export function buildReportHtml(
   td.num { text-align: right; font-family: 'SF Mono', Menlo, monospace; white-space: nowrap; }
   tr.strong td { font-weight: 600; border-top: 1.5px solid #0f172a; }
   tr.indent td { padding-left: 18px; color: #475569; }
+  tr.audit td { color: #16a34a; }
+  tr.audit.bad td { color: #dc2626; font-weight: 600; }
   .notes { white-space: pre-wrap; }
 </style>
 </head>

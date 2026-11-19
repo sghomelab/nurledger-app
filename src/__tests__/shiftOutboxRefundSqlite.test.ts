@@ -40,6 +40,7 @@ function mk(): any {
   const raw = new DatabaseSync(':memory:');
   raw.exec('PRAGMA foreign_keys = ON;');
   raw.exec(SCHEMA_SQL);
+  let txQueue: Promise<unknown> = Promise.resolve();
   const db = {
     execAsync: async (s: string) => raw.exec(s),
     // Must return the run result: closeShift asserts on `changes`.
@@ -47,14 +48,24 @@ function mk(): any {
     getFirstAsync: async (s: string, p: unknown[] = []) => raw.prepare(s).get(...p) ?? null,
     getAllAsync: async (s: string, p: unknown[] = []) => raw.prepare(s).all(...p),
     withTransactionAsync: async (fn: () => Promise<void>) => {
-      raw.exec('BEGIN');
-      try {
-        await fn();
-        raw.exec('COMMIT');
-      } catch (e) {
-        raw.exec('ROLLBACK');
-        throw e;
-      }
+      // Serialize: the real driver queues statements on ONE connection, so a
+      // transaction can never BEGIN while another is in flight (a raw second
+      // BEGIN would throw "cannot start a transaction within a transaction").
+      const run = () => {
+        raw.exec('BEGIN');
+        return fn()
+          .then(() => raw.exec('COMMIT'))
+          .catch((e: unknown) => {
+            raw.exec('ROLLBACK');
+            throw e;
+          });
+      };
+      const p = txQueue.then(run, run);
+      txQueue = p.then(
+        () => undefined,
+        () => undefined,
+      );
+      return p;
     },
   };
   mockDb = db as unknown as SQLiteDatabase;
@@ -186,6 +197,43 @@ d('closeShift is atomic + validated', () => {
     await expect(closeShift({ shiftId: s.id, countedMinor: Number.NaN, notes: null }))
       .rejects.toThrow('Counted cash must be zero or a positive number');
     expect(shiftRow(raw, s.id)!.closed_at).toBeNull();
+  });
+});
+
+d('closeShift appends the shift_end audit event INSIDE (review L10)', () => {
+  const auditRows = (raw: { prepare: (s: string) => { all: () => Record<string, unknown>[] } }) =>
+    raw.prepare('SELECT event_type, user_id, method FROM security_events ORDER BY seq').all() as Record<string, unknown>[];
+
+  it('a successful close logs integrity_check THEN shift_end, attributed to the closer', async () => {
+    const raw = mk();
+    seedOutlet(raw);
+    const s = await openShift(openInput);
+    await closeShift({ shiftId: s.id, countedMinor: 1000, notes: null, closedById: 'cashier-1' });
+    const rows = auditRows(raw);
+    expect(rows.map((r) => r.event_type)).toEqual(['integrity_check', 'shift_end']);
+    expect(rows[1]!.user_id).toBe('cashier-1');
+    expect(rows[1]!.method).toBe('system');
+  });
+
+  it('a close without closedById still logs shift_end (user_id null)', async () => {
+    const raw = mk();
+    seedOutlet(raw);
+    const s = await openShift(openInput);
+    await closeShift({ shiftId: s.id, countedMinor: 1000, notes: null });
+    const rows = auditRows(raw);
+    expect(rows[rows.length - 1]!.event_type).toBe('shift_end');
+    expect(rows[rows.length - 1]!.user_id).toBeNull();
+  });
+
+  it('a FAILED close (double close) appends NO shift_end event', async () => {
+    const raw = mk();
+    seedOutlet(raw);
+    const s = await openShift(openInput);
+    await closeShift({ shiftId: s.id, countedMinor: 1000, notes: null, closedById: 'c1' });
+    const before = auditRows(raw).length;
+    await expect(closeShift({ shiftId: s.id, countedMinor: 9999, notes: null, closedById: 'c1' }))
+      .rejects.toThrow('Shift is already closed');
+    expect(auditRows(raw)).toHaveLength(before);
   });
 });
 

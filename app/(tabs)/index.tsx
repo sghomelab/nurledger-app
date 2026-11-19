@@ -18,11 +18,14 @@ import { EmailReceiptSheet } from '../../src/components/register/EmailReceiptShe
 import { BarcodeScanner } from '../../src/components/BarcodeScanner';
 import { MoneyPrompt } from '../../src/components/register/MoneyPrompt';
 import { PinPrompt } from '../../src/components/PinPrompt';
+import { IdentityPrompt } from '../../src/components/security/IdentityPrompt';
 import { NumberText } from '../../src/components/NumberText';
 import { formatMoney } from '../../src/lib/money';
 import { formatWeight, linePriceForWeight, parseWeightToG } from '../../src/lib/weighed';
 import { roleCanAct, type GateAction } from '../../src/lib/roles';
 import { getDeviceId } from '../../src/repositories/shiftRepository';
+import { appendSecurityEvent } from '../../src/repositories/securityRepository';
+import { authenticateRegister, touch } from '../../src/hooks/useSecurity';
 import { getEmailReceipts, getReceiptWidth, type ReceiptWidthSetting, type SaleReceipt } from '../../src/repositories/saleRepository';
 import { fonts, radius, spacing, typography, type Palette } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/ThemeContext';
@@ -53,7 +56,7 @@ export default function SellTab() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const cart = useCart();
   const { products, reload } = useProducts();
-  const { active, users } = useUsers();
+  const { active, users, reload: reloadUsers } = useUsers();
   const shift = useShift();
   const { t } = useT();
   const layout = useLayout();
@@ -76,6 +79,9 @@ export default function SellTab() {
   const sync = useSync();
   const [receiptWidth, setReceiptWidthState] = useState<ReceiptWidthSetting>('80mm');
   const [emailAsk, setEmailAsk] = useState(false);
+  // Issue #26 design §5: proof of identity before opening a shift from the
+  // Sell tab (same gate as the Shift tab — this path would bypass it).
+  const [identity, setIdentity] = useState<{ title: string; subtitle: string | null; onPin: (pin: string) => void } | null>(null);
   // Reload on FOCUS (not just mount): both are changed in Settings, which is a
   // pushed screen — returning to this tab must pick up the new values.
   useFocusEffect(
@@ -165,6 +171,7 @@ export default function SellTab() {
    *  Camera scans pass the decoded code directly (issues #10/#11/#12).
    *  Blocked while the register is locked (no open shift — FR-200). */
   const submitBarcode = useCallback(async (codeArg?: string) => {
+    touch(); // issue #26: register activity resets the idle auto-lock clock
     const code = (codeArg ?? barcode).trim();
     if (!code) return;
     if (codeArg === undefined) setBarcode('');
@@ -187,6 +194,7 @@ export default function SellTab() {
 
   const pickProduct = useCallback(
     async (p: ProductWithStock) => {
+      touch(); // issue #26: register activity
       if (!shiftOpen) {
         Alert.alert(t('sell.registerLocked'), t('sell.registerLockedSell'));
         return;
@@ -208,6 +216,7 @@ export default function SellTab() {
 
   const bumpQty = useCallback(
     async (key: string, current: number, delta: number) => {
+      touch(); // issue #26: register activity
       try {
         await cart.setQty(key, current + delta);
       } catch (e) {
@@ -219,6 +228,7 @@ export default function SellTab() {
 
   /** M5 (FR-103): confirm the weight prompt → add the weighed line. */
   const confirmWeigh = useCallback(async () => {
+    touch(); // issue #26: register activity
     if (!weigh) return;
     const g = parseWeightToG(weigh.text);
     if (g == null) {
@@ -240,6 +250,7 @@ export default function SellTab() {
   const weighG = weigh ? parseWeightToG(weigh.text) : null;
 
   const onCharge = useCallback(() => {
+    touch(); // issue #26: register activity
     if (!canCharge) return;
     if (!shiftOpen) {
       Alert.alert(t('sell.registerLocked'), t('sell.registerLockedPay'));
@@ -294,12 +305,40 @@ export default function SellTab() {
           cashierId: active?.id ?? null,
           floatMinor,
         });
+        // Issue #26: audit the shift start, attributed to the identity the
+        // register is running as (the gated flow refreshed the active user
+        // before the float prompt was shown).
+        await appendSecurityEvent({ user_id: active?.id ?? null, event_type: 'shift_start', method: 'system' });
       } catch (e) {
         Alert.alert(t('sell.couldNotOpenShift'), errMsg(e));
       }
     },
     [shift, cart.outlet, active],
   );
+
+  /** Issue #26 design §5: opening a shift needs proof of identity when the
+   *  active user has a PIN — the float prompt only comes up after the PIN
+   *  resolves (and the active user is refreshed, so the shift is attributed
+   *  to the identity the PIN actually proved). */
+  const requestOpenShift = useCallback(() => {
+    if (active?.pinHash != null) {
+      setIdentity({
+        title: t('sell.openShift'),
+        subtitle: active.name,
+        onPin: (pin) => {
+          void (async () => {
+            setIdentity(null);
+            const res = await authenticateRegister(pin, 'switch');
+            if (!res) return;
+            await reloadUsers();
+            setPrompt({ kind: 'openshift' });
+          })();
+        },
+      });
+      return;
+    }
+    setPrompt({ kind: 'openshift' });
+  }, [active, t, reloadUsers]);
 
   const onPromptSave = useCallback(
     (minor: number) => {
@@ -373,7 +412,7 @@ export default function SellTab() {
           <Text style={styles.lockText}>
             {t('sell.lockBanner')}
           </Text>
-          <Pressable style={styles.lockBtn} onPress={() => setPrompt({ kind: 'openshift' })} hitSlop={6}>
+          <Pressable style={styles.lockBtn} onPress={requestOpenShift} hitSlop={6}>
             <Text style={styles.lockBtnText}>{t('sell.openShift')}</Text>
           </Pressable>
         </View>
@@ -610,6 +649,17 @@ export default function SellTab() {
           users={users ?? []}
           onSuccess={onGateOk}
           onCancel={() => setGate(null)}
+        />
+      )}
+
+      {/* Issue #26 design §5: proof of identity before opening a shift */}
+      {identity && (
+        <IdentityPrompt
+          visible
+          title={identity.title}
+          subtitle={identity.subtitle}
+          onSuccess={identity.onPin}
+          onCancel={() => setIdentity(null)}
         />
       )}
     </View>

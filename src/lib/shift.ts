@@ -77,6 +77,18 @@ export interface ZReport {
   /** Refunds against this shift's sales (FR-110 — wired in M6). */
   refundsMinor: number;
   notes: string | null;
+  /** Issue #26 design §4: audit-log integrity at close time (null = pre-v9
+   *  reports / X-reports don't carry one). */
+  audit: AuditLine | null;
+}
+
+/** The audit line shown on a Z-report (issue #26 design §4). */
+export interface AuditLine {
+  ok: boolean;
+  /** Rows checked by the chain verification. */
+  checked: number;
+  /** seq of the first broken row (ok=false only). */
+  firstBadSeq: number | null;
 }
 
 export interface ZReportInput {
@@ -92,6 +104,8 @@ export interface ZReportInput {
   notes: string | null;
   /** M6 (FR-110): refunds recorded against this shift's sales (minor). */
   refundsMinor?: number;
+  /** Issue #26: audit-log integrity line (set by closeShift). */
+  audit?: AuditLine | null;
 }
 
 export function buildZReport(input: ZReportInput): ZReport {
@@ -113,6 +127,7 @@ export function buildZReport(input: ZReportInput): ZReport {
     varianceClass: classifyVariance(v),
     refundsMinor: input.refundsMinor ?? 0,
     notes: input.notes,
+    audit: input.audit ?? null,
   };
 }
 

@@ -26,6 +26,7 @@ import {
 } from '../repositories/shiftRepository';
 import type { CashMoveType, XReport } from '../lib/shift';
 import { buildXReport } from '../lib/shift';
+import { reloadSecurity } from './useSecurity';
 import type { AppUser, UserRole } from '../types';
 
 // ---- shared active user (module-level, like useAppData's low-stock count) ---
@@ -96,6 +97,7 @@ export function useUsers(): UseUsers {
     async (name: string, role: UserRole, pin?: string | null) => {
       const created = await createUser({ name, role, pin });
       await reload();
+      if (pin) void reloadSecurity(); // a PIN now exists → re-arm the soft-lock guard
       return created;
     },
     [reload],
@@ -105,6 +107,7 @@ export function useUsers(): UseUsers {
     async (id: string, pin: string) => {
       await setUserPin(id, pin);
       await reload();
+      void reloadSecurity(); // PIN state changed → refresh anyUnlockable
     },
     [reload],
   );
@@ -120,7 +123,7 @@ export interface UseShift {
   reload: () => Promise<void>;
   openShift: (input: OpenShiftInput) => Promise<Shift>;
   addCashMove: (shiftId: string, type: CashMoveType, amountMinor: number, reason: string) => Promise<void>;
-  closeShift: (shiftId: string, countedMinor: number, notes: string | null) => Promise<Shift>;
+  closeShift: (shiftId: string, countedMinor: number, notes: string | null, closedById?: string | null) => Promise<Shift>;
   /** FR-203: interim X-report for the open shift. */
   xReport: () => Promise<XReport | null>;
 }
@@ -163,8 +166,8 @@ export function useShift(): UseShift {
   );
 
   const closeShift = useCallback(
-    async (shiftId: string, countedMinor: number, notes: string | null) => {
-      const closed = await repoCloseShift({ shiftId, countedMinor, notes });
+    async (shiftId: string, countedMinor: number, notes: string | null, closedById?: string | null) => {
+      const closed = await repoCloseShift({ shiftId, countedMinor, notes, closedById });
       await reload();
       return closed;
     },
