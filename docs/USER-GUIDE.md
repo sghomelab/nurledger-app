@@ -24,6 +24,7 @@ stock, shifts and reports — all on one device.
 - [Settings](#settings)
 - [Setting up cloud sync](#setting-up-cloud-sync)
 - [Adding more devices / cashiers](#adding-more-devices-a-second-tablet-or-phone)
+- [The register lock and forgotten PINs](#the-register-lock--forgotten-pins)
 - [Turning it off / leaving / privacy](#turning-it-all-off--leaving)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
@@ -104,14 +105,19 @@ locked — tap the banner to open one (the Shift tab).
      confirm it was paid.
    - *Card* records a card payment (use your terminal for the actual charge).
 5. **Done** — the on-screen receipt appears. Stock goes down **immediately,
-   even offline**, and the sale is saved on the device. If you turned on
-   **Ask to email the receipt** (Settings → Receipt), NurLedger now offers to
-   email the receipt to the customer — type their address or scan their email
-   QR code.
+   even offline**, and the sale is saved on the device. The receipt screen has
+   two ways to get it to the customer: **Email** (if you turned on **Ask to
+   email the receipt** in Settings → Receipt, you're offered right away — type
+   their address or scan their email QR code) and **Share** — the receipt as a
+   **PDF** into WhatsApp / Telegram / Messages, or saved to print later. The
+   PDF is exactly what's on the screen, so there's never a mismatch.
 
 **Staff permissions:** cashiers can sell, but **discounts and price overrides**
-ask for the manager/owner PIN. The PIN is device-only and never leaves the
-device.
+ask for the manager/owner PIN. Cashiers can also have their **own PIN** — it
+lets them unlock the register after it auto-locks, and it's needed to switch
+back to them. The register itself **locks when nobody is using it** (see *The
+register lock and forgotten PINs* below). All PINs are device-only and never
+leave the device.
 
 ---
 
@@ -260,15 +266,17 @@ applies to every tab below it. The tab is split into four sections:
 
 ## Shifts and the cash drawer
 
-1. **Open a shift** — enter the **float** (the cash you start with). The
-   register unlocks.
+1. **Open a shift** — enter the **float** (the cash you start with). If the
+   person at the register has a PIN, they enter it first (proof of identity).
+   The register unlocks.
 2. During the shift: **cash in / cash out** with a reason (e.g. personal
    purchase, petty cash), and a **Shift snapshot** (the X-report) anytime — a
    non-destructive snapshot of sales by method and the cash expected in the
    drawer.
 3. **Close the shift** — enter the **counted cash**. The app compares it with
    the expected cash (float + cash sales − cash out + refunds given in cash)
-   and shows **exact / over / short**.
+   and shows **exact / over / short**. When a **cashier** is at the register,
+   both the X-report and closing the shift ask for the manager/owner PIN.
 4. The **Shift Close report** (the Z-report) is generated and saved with the
    shift: sales by payment method, cash movements, **refunds**, and the
    variance. The register locks again.
@@ -307,7 +315,13 @@ Open it from the **gear icon (⚙) at the top right of the Sell tab**.
   anywhere.
 - **Receipt** — **Printer width** (58 mm or 80 mm) and **Ask to email the
   receipt** — when on, after every payment NurLedger offers to email the
-  receipt to the customer (type their address or scan an email QR code).
+  receipt to the customer (type their address or scan an email QR code). The
+  receipt can also be **Shared as a PDF** from the Payment Successful screen.
+- **Security** (owner only) — the **Store PIN** (the shop's master PIN, with
+  its one-time **recovery code**), **Auto-lock register** (Never / 1 / 5 / 15 /
+  30 min of inactivity, default 5), **Reset a PIN** (any user), and **Verify
+  audit log** (the tamper-evident record of every lock, unlock, user switch
+  and privileged action). See *The register lock and forgotten PINs*.
 - **Cloud sync** — see below.
 - **Staff** — managed on the **Shift** tab (see *Adding cashiers and managing
   PINs* below), not in Settings. PIN-gated actions (discounts, price overrides,
@@ -481,11 +495,58 @@ Staff **don't need a Supabase account.** You (the owner) manage them on the **Sh
 - **Change PIN…** (in the Switch list) asks for an owner/manager PIN every time, then lets you set a new 4–8 digit PIN for the person you pick. Only an owner PIN can change the owner's PIN.
 - Discounts, price overrides, refunds, stocktakes, closing a shift and settings ask for the manager/owner PIN when a cashier is at the register.
 
-**If the owner PIN is lost:** NurLogic cannot recover it (PINs exist only on the device, as a salted hash, and never go to Supabase). Options: use another owner's PIN if there is one; otherwise **Settings → Reset all data** on this device (this erases local data, so sync to the cloud first if you can, then sign in again afterwards). A fresh install starts with a default Owner PIN, so change it right away in **Change PIN…**.
+**If the owner PIN is lost:** the Store PIN can be reset with its **one-time
+recovery code** — tap **Forgot the Store PIN?** (lock screen or Settings →
+Security) and enter the code shown when the PIN was set. That code lives on
+the device only; **NurLogic cannot recover a PIN** (PINs are salted hashes
+that never leave the device or go to Supabase). If the recovery code is also
+lost, the remaining option is **Settings → Reset all data** on this device
+(this erases local data, so sync to the cloud first if you can, then sign in
+again afterwards). A fresh install starts with a default Owner PIN, so change
+it right away in **Change PIN…**.
 
 The PIN is a **local safeguard against mistakes and casual misuse**, not a vault: someone with the unlocked phone and technical skills can get around it. Keep the phone itself secure.
 
 There is no "deactivate user" action yet. To stop someone using the register, ask them to hand back the device and change the PIN of any manager/owner account they know.
+
+---
+
+## The register lock and forgotten PINs
+
+The register **locks itself when nobody is using it** — so someone who walks
+up to the counter can't see the day's totals or sell things.
+
+- **Auto-lock** — **Settings → Security → Auto-lock register**: **Never, 1,
+  5, 15 or 30 minutes** of inactivity (default 5). Any tap on the screen
+  resets the timer, so an active cashier is never locked mid-sale.
+- **When it locks** — a full-screen "Register locked" screen appears. Nothing
+  behind it is visible or tappable, and the phone's back button doesn't open
+  it.
+- **Unlocking** — enter **any** PIN (the screen says so: "Any PIN is proof of
+  identity — yours, a coworker's, or the Store PIN."):
+  - the **locked user's own PIN** — they continue right where they left off;
+  - **another user's PIN** — the register switches to that person (recorded in
+    the audit log);
+  - the **Store PIN** — the register runs as the **Owner**.
+- **No PINs at all?** If nobody in the shop has a PIN set, the register never
+  locks (open access) — single-operator shops are unaffected.
+
+**If the Store PIN is forgotten** — on the lock screen (or in **Settings →
+Security**) tap **Forgot the Store PIN?** and enter the **one-time recovery
+code**. That code was shown **once** when the Store PIN was first set, with
+Copy / Print / Email-me options — the app says "Store this offline. It can
+reset the Store PIN once, on this device only. It is shown now and never
+again." After the code you set a new PIN and get a **fresh** recovery code
+(shown once, again). The code lives on the device only — **NurLogic cannot
+recover a Store PIN**.
+
+**The audit log** — every lock, unlock, user switch, shift open/close and
+privileged action is written to an **append-only, tamper-evident log** (the
+same discipline as the stock ledger — rows can never be edited or deleted).
+Its integrity is checked automatically at every Z-report close and on demand
+(**Settings → Security → Verify audit log** → "Audit log verified — n rows
+checked"), and the Z-report's printed / exported copy carries the chain
+status — so you can prove the log was never altered.
 
 ---
 
@@ -544,6 +605,7 @@ Need help? See the [NurLedger support page](https://nurlogic.ai/support) or emai
 | "Schema still not detected" / "Still on schema vN" after running the SQL | Make sure the SQL Editor query **finished without errors** (a red error means it stopped early), then check again in the app. |
 | A weighed item shows the wrong weight | Re-check the scale's barcode format matches your locale's scale (Settings → the store's locale drives the barcode parser). You can always edit the weight before adding it to the order. |
 | Printed labels don't scan | Make sure you printed at 100% scale (no "fit to page"). Regenerate and print again; the barcodes are standard UPC-A/Code 39 and scan with any scanner. |
+| The register is locked and I don't know anyone's PIN | Unlocking works with **any** PIN — the locked user's, a coworker's, or the **Store PIN**. If the Store PIN is forgotten too, tap **Forgot the Store PIN?** and enter the **one-time recovery code** from when it was set. If the code is also lost, **Settings → Reset all data** is the only way (sync to the cloud first if you can). |
 
 ## FAQ
 
@@ -566,7 +628,9 @@ scan with the phone's camera. Or type the code by hand.
 No. The receipt appears on screen, and receipts, labels and purchase orders can be
 generated as files you can print on any device, any printer. X/Z reports can be
 printed or saved as PDF. You can also **email the receipt to the customer**
-(Settings → Receipt → Ask to email the receipt). (Connecting a physical printer
+(Settings → Receipt → Ask to email the receipt) or **share it as a PDF**
+(the **Share** button on the Payment Successful screen — WhatsApp, Telegram,
+Messages, or save it to print later). (Connecting a physical printer
 directly is on the roadmap.)
 
 ### How do refunds work?
@@ -575,9 +639,26 @@ sale or individual lines. Returned items are restocked (per line), you record a
 reason, and cashiers are asked for the manager/owner PIN.
 
 ### Who needs a PIN?
-You (the owner) and any managers — a 4–8 digit PIN each; cashiers don't have one. When a
-cashier is at the register, the PIN gates discounts, price overrides, refunds, stocktakes,
-closing shifts and settings.
+You (the owner) hold the **Store PIN** — the shop's master PIN — and you can
+give managers, and if you want **cashiers**, their own 4–8 digit PINs. When a
+cashier is at the register, the manager/owner PIN gates discounts, price
+overrides, refunds, stocktakes, closing shifts and settings. PINs also unlock
+the register after it auto-locks (see *The register lock and forgotten PINs*).
+
+### What happens when the register locks itself?
+A full-screen lock screen covers the app until someone enters a PIN — the
+locked user's own (they resume), a coworker's (the register transfers to
+them), or the Store PIN (the register runs as Owner). The timeout is set in
+**Settings → Security** (Never / 1 / 5 / 15 / 30 minutes; default 5). If
+nobody in the shop has a PIN set, the register never locks.
+
+### I forgot my PIN — can NurLogic reset it?
+No — PINs never leave the device. For the **Store PIN**, tap **Forgot the
+Store PIN?** (lock screen or Settings → Security) and enter the **one-time
+recovery code** shown when it was set. For a **cashier's or manager's PIN**,
+an owner/manager resets it in **Settings → Security → Reset a PIN**. If the
+recovery code is also lost, **Settings → Reset all data** starts over (sync to
+the cloud first if you can, then rejoin afterwards).
 
 ### Which currencies and taxes can I use?
 Any ISO currency. For tax, pick a regime (for example Singapore GST 9% inclusive,

@@ -6,11 +6,21 @@ FR → file/test mapping lives in `FR-COVERAGE.md`.
 
 ---
 
-## 1.2.0 — cashier authentication & register lock (target: 2026-11-xx)
+## 1.2.0 — cashier authentication & register lock (built 2026-11-19)
 
-> Status: **not yet built** — awaiting Mas's explicit build GO (Gate 2).
-> Version: `1.2.0` · iOS build 10 · Android vc6 · commit to build from: TBD
-> Gates at commit time: tsc 0 · jest 643/643 (Node 22).
+> Status (2026-11-19): **both platforms built from the SAME commit `aa1df33`**
+> (Mas's explicit build GO). iOS 1.2.0 = **build 11** (EAS auto-bumped the
+> configured 10 → 11; verified from the IPA `Info.plist`, not the CLI) —
+> binary uploaded to App Store Connect via `eas submit --path` (the known
+> non-interactive trap fired again: EAS build showed FINISHED without the ASC
+> upload; recovered with zero credits, per the 1.1.0 playbook). Android 1.2.0
+> = **vc7** — AAB artifact verified (`com.nurlogic.nurledger` / 1.2.0 / vc7);
+> Play submission pending Mas's track decision.
+>
+> EAS builds: iOS `db58a78a-a0bb-44a5-9bfe-5052ea9eea7c` / Android
+> `d01fa953-0adc-4e00-8683-43942be28e87`. Gates at queue time: tsc 0 · jest
+> 643/643 (Node 22) · `prebuild --clean` OK · expo SDK 58.0.22 · app.json
+> auto-increment drift committed `37ed2a9`.
 
 **What's in 1.2.0:**
 
