@@ -9,6 +9,8 @@ import { useShift, useUsers } from '../../src/hooks/useShift';
 import { useSync } from '../../src/hooks/useSync';
 import { useT } from '../../src/hooks/useT';
 import { useLayout } from '../../src/hooks/useLayout';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { QuickChips } from '../../src/components/register/QuickChips';
 import { CartLineRow } from '../../src/components/register/CartLineRow';
 import { TotalsBlock } from '../../src/components/register/TotalsBlock';
@@ -21,6 +23,7 @@ import { PinPrompt } from '../../src/components/PinPrompt';
 import { IdentityPrompt } from '../../src/components/security/IdentityPrompt';
 import { NumberText } from '../../src/components/NumberText';
 import { formatMoney } from '../../src/lib/money';
+import { layoutReceipt, receiptDataFrom, renderReceiptHtml } from '../../src/lib/receipt';
 import { formatWeight, linePriceForWeight, parseWeightToG } from '../../src/lib/weighed';
 import { roleCanAct, type GateAction } from '../../src/lib/roles';
 import { getDeviceId } from '../../src/repositories/shiftRepository';
@@ -66,6 +69,8 @@ export default function SellTab() {
   const [payVisible, setPayVisible] = useState(false);
   const [receipt, setReceipt] = useState<SaleReceipt | null>(null);
   const [changeMinor, setChangeMinor] = useState(0);
+  /** Issue #30: share-in-flight guard (PDF render + share sheet). */
+  const [sharing, setSharing] = useState(false);
   const [prompt, setPrompt] = useState<PromptState | null>(null);
   const [gate, setGate] = useState<{ action: GateAction; onOk: () => void } | null>(null);
   /** M5 (FR-103): weighed-item weight prompt (pre-filled from the scale barcode). */
@@ -281,6 +286,35 @@ export default function SellTab() {
     },
     [cart, reload, active, shift.open, emailAsk],
   );
+
+  /** Issue #30: share the receipt as a PDF (rendered on-device via expo-print,
+   * then handed to the system share sheet — same `ReceiptRow[]` source as the
+   * on-screen view, so what the customer gets is exactly what was shown). */
+  const shareReceipt = useCallback(async () => {
+    if (!receipt || sharing) return;
+    setSharing(true);
+    try {
+      const data = receiptDataFrom(receipt, {
+        outletName: cart.outlet?.name ?? 'NURLEDGER',
+        cashierName: users?.find((u) => u.id === receipt.sale.cashierId)?.name ?? null,
+        locale: cart.outlet?.locale ?? null,
+        currency,
+        changeMinor,
+      });
+      const file = await Print.printToFileAsync({ html: renderReceiptHtml(layoutReceipt(data, receiptWidth)) });
+      if (!(await Sharing.isAvailableAsync())) {
+        throw new Error('Sharing is not available on this device');
+      }
+      await Sharing.shareAsync(file.uri, {
+        dialogTitle: t('receipt.shareTitle'),
+        mimeType: 'application/pdf',
+      });
+    } catch (e) {
+      Alert.alert(t('receipt.shareFailed'), e instanceof Error ? e.message : String(e));
+    } finally {
+      setSharing(false);
+    }
+  }, [receipt, sharing, cart.outlet, users, currency, changeMinor, receiptWidth, t]);
 
   const promptLine =
     prompt !== null && (prompt.kind === 'price' || prompt.kind === 'discount')
@@ -543,6 +577,7 @@ export default function SellTab() {
             locale={cart.outlet?.locale ?? null}
             width={receiptWidth}
             onEmail={() => setEmailReceipt(receipt)}
+            onShare={() => void shareReceipt()}
             onDone={() => setReceipt(null)}
           />
           </ModalFrame>

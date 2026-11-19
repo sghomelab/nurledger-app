@@ -5,7 +5,7 @@
  * behavior is hardcoded. 58mm = 32 cols, 80mm = 48 cols.
  */
 
-import { layoutReceipt, renderReceiptText, WIDTH_COLS, type ReceiptData } from '../lib/receipt';
+import { escapeHtml, layoutReceipt, renderReceiptHtml, renderReceiptText, WIDTH_COLS, type ReceiptData } from '../lib/receipt';
 import type { TaxLine } from '../lib/tax';
 
 const fmt = (minor: number) => `$${(minor / 100).toFixed(2)}`;
@@ -146,5 +146,40 @@ describe('renderReceiptText alignment', () => {
     expect(totalLine).toMatch(/\$8\.75$/); // total 875 → ends at the right edge
     const cashLine = text.split('\n').find((l) => l.startsWith('Cash '))!;
     expect(cashLine).toMatch(/\$10\.00$/);
+  });
+});
+
+describe('renderReceiptHtml (issue #30 — Share PDF)', () => {
+  it('renders a complete HTML document with the same rows as the on-screen view', () => {
+    const html = renderReceiptHtml(layoutReceipt(baseData(), '80mm'));
+    expect(html).toContain('<!DOCTYPE html>');
+    expect(html).toContain('<div class="rule"></div>'); // dashed dividers
+    expect(html).toContain('<div class="center bold">Test Grocer</div>'); // header
+    expect(html).toContain('<span>TOTAL</span>'); // bold left/right rows
+    expect(html).toContain('<div class="center">Thank you — come again!</div>');
+  });
+
+  it('applies bold and indent classes from the row flags', () => {
+    const rows = layoutReceipt(baseData({ mode: 'exclusive', taxLines: [
+      { category: 'standard', ratePct: 9, amountMinor: 803, taxMinor: 72 },
+      { category: 'zero', ratePct: 0, amountMinor: 72, taxMinor: 0 },
+    ] }), '80mm');
+    const html = renderReceiptHtml(rows);
+    expect(html).toContain('class="lr bold"'); // multi-category tax total
+    expect(html).toContain('indent'); // per-category breakdown
+  });
+
+  it('escapes HTML in user-entered content (XSS via product name)', () => {
+    const rows = layoutReceipt(
+      baseData({ lines: [{ name: '<script>alert(1)</script>', qty: 1, qtyG: null, unitPriceMinor: 100, lineTotalMinor: 100 }] }),
+      '80mm',
+    );
+    const html = renderReceiptHtml(rows);
+    expect(html).not.toContain('<script>');
+    expect(html).toContain('&lt;script&gt;');
+  });
+
+  it('escapeHtml covers & < > "', () => {
+    expect(escapeHtml('&<>"')).toBe('&amp;&lt;&gt;&quot;');
   });
 });

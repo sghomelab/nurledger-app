@@ -19,6 +19,8 @@ interface Props {
   width: ReceiptWidth;
   /** Optional: offer to email the receipt (issue #19). Renders an extra button. */
   onEmail?: () => void;
+  /** Optional: share the receipt as a PDF via the system share sheet (issue #30). */
+  onShare?: () => void;
   onDone: () => void;
 }
 
@@ -29,7 +31,7 @@ interface Props {
  * (FR-108), weighed lines show grams (FR-103), QR payments carry their
  * reference (FR-601).
  */
-export function ReceiptView({ receipt, currency, changeMinor, outletName, cashierName, locale, width, onEmail, onDone }: Props) {
+export function ReceiptView({ receipt, currency, changeMinor, outletName, cashierName, locale, width, onEmail, onShare, onDone }: Props) {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { t } = useT();
@@ -63,12 +65,22 @@ export function ReceiptView({ receipt, currency, changeMinor, outletName, cashie
         <Text style={styles.paper}>{text}</Text>
       </ScrollView>
 
-      {onEmail && (
-        <Pressable style={styles.emailBtn} onPress={onEmail}>
-          <Ionicons name="mail-outline" size={18} color={colors.primary} />
-          <Text style={styles.emailText}>{t('receipt.email')}</Text>
-        </Pressable>
-      )}
+      {/* Secondary actions (Share — issue #30, Email — issue #19): side by
+          side when both offered, full width when only one is. */}
+      <View style={styles.actionsRow}>
+        {onShare && (
+          <Pressable style={styles.emailBtn} onPress={onShare}>
+            <Ionicons name="share-social-outline" size={18} color={colors.primary} />
+            <Text style={styles.emailText}>{t('receipt.share')}</Text>
+          </Pressable>
+        )}
+        {onEmail && (
+          <Pressable style={styles.emailBtn} onPress={onEmail}>
+            <Ionicons name="mail-outline" size={18} color={colors.primary} />
+            <Text style={styles.emailText}>{t('receipt.email')}</Text>
+          </Pressable>
+        )}
+      </View>
       <Pressable style={styles.doneBtn} onPress={onDone}>
         <Text style={styles.doneText}>{t('common.done')}</Text>
       </Pressable>
@@ -94,8 +106,9 @@ function makeStyles(colors: Palette) {
     paper: { fontFamily: fonts.mono, fontSize: 11, color: colors.slate900, lineHeight: 16 },
     doneBtn: { height: 54, borderRadius: radius.control, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
     doneText: { fontFamily: fonts.sansBold, fontSize: typography.body, color: colors.white },
-    emailBtn: { minHeight: 48, borderRadius: radius.control, borderWidth: 1.5, borderColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+    emailBtn: { flex: 1, minHeight: 48, borderRadius: radius.control, borderWidth: 1.5, borderColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
     emailText: { fontFamily: fonts.sansSemiBold, fontSize: typography.body, color: colors.primary },
+    actionsRow: { flexDirection: 'row', gap: spacing.sm },
 
   });
 }

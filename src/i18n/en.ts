@@ -708,6 +708,9 @@ const en = {
   'scan.close': 'Close scanner',
 
   // ── email receipt ─────────────────────────────────────────────────────
+  'receipt.share': 'Share receipt',
+  'receipt.shareTitle': 'Share receipt',
+  'receipt.shareFailed': 'Share failed',
   'receipt.email': 'Email receipt',
   'receipt.emailTitle': 'Email this receipt',
   'receipt.emailAddress': 'Customer email',

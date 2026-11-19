@@ -654,6 +654,9 @@ const fil: Record<keyof EnDict, string> = {
   'scan.close': 'Isara ang scanner',
 
   // ── i-email na resit ──────────────────────────────────────────────────
+  'receipt.share': 'Ibahagi ang resit',
+  'receipt.shareTitle': 'Ibahagi ang resit',
+  'receipt.shareFailed': 'Hindi ma-ibahagi',
   'receipt.email': 'I-email ang resit',
   'receipt.emailTitle': 'I-email ang resit na ito',
   'receipt.emailAddress': 'Email ng customer',

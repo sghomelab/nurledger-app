@@ -164,6 +164,49 @@ export function renderReceiptText(rows: ReceiptRow[], cols = 48): string {
     .join('\n');
 }
 
+/** Escape text for safe embedding in HTML (receipt content is user-entered). */
+export function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+/**
+ * Full HTML document for the receipt (issue #30 — Share button: rendered to a
+ * PDF on-device via expo-print, then handed to the system share sheet).
+ *
+ * Styled like a thermal printout (monospace, ~80mm content width) so what the
+ * customer receives on WhatsApp/Telegram matches what the on-screen view
+ * showed — same `ReceiptRow[]` source, zero drift.
+ */
+export function renderReceiptHtml(rows: ReceiptRow[]): string {
+  const body = rows
+    .map((r) => {
+      if (r.rule) return '<div class="rule"></div>';
+      if (r.center) return `<div class="center${r.bold ? ' bold' : ''}">${escapeHtml(r.center)}</div>`;
+      if (r.right != null) {
+        const left = r.left != null ? escapeHtml(r.left) : '';
+        return `<div class="lr${r.bold ? ' bold' : ''}${r.indent ? ' indent' : ''}"><span>${left}</span><span>${escapeHtml(r.right)}</span></div>`;
+      }
+      return `<div class="left${r.bold ? ' bold' : ''}${r.indent ? ' indent' : ''}">${escapeHtml(r.left ?? '')}</div>`;
+    })
+    .join('\n');
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8" />
+<style>
+  @page { size: 80mm auto; margin: 4mm; }
+  body { font-family: 'Courier New', Menlo, monospace; font-size: 11px; color: #111; width: 72mm; margin: 0 auto; padding: 8px; }
+  .rule { border-top: 1px dashed #999; margin: 6px 0; }
+  .center { text-align: center; margin: 2px 0; }
+  .left { margin: 1px 0; }
+  .lr { display: flex; justify-content: space-between; margin: 1px 0; }
+  .bold { font-weight: 700; }
+  .indent { padding-left: 14px; }
+  h1 { font-size: 13px; text-align: center; margin: 0 0 8px; }
+</style></head>
+<body>
+${body}
+</body></html>`;
+}
+
 // ── SaleReceipt → ReceiptData (shared by the on-screen view and email) ──────
 
 /** Locale-aware payment label (FR-601): 'PayNow QR' in en-SG, etc. */

@@ -707,6 +707,9 @@ const ms: Record<keyof EnDict, string> = {
   'scan.close': 'Tutup pembimbas',
 
   // ── resit e-mel ───────────────────────────────────────────────────────
+  'receipt.share': 'Kongsi resit',
+  'receipt.shareTitle': 'Kongsi resit',
+  'receipt.shareFailed': 'Gagal berkongsi',
   'receipt.email': 'Resit e-mel',
   'receipt.emailTitle': 'Hantar resit ini',
   'receipt.emailAddress': 'E-mel pelanggan',
