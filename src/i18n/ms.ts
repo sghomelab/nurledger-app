@@ -12,6 +12,7 @@ import type { EnDict } from './en';
 const ms: Record<keyof EnDict, string> = {
   // ── shared ────────────────────────────────────────────────────────────
   'common.cancel': 'Batal',
+  'common.next': 'Seterusnya',
   'common.save': 'Simpan',
   'common.done': 'Selesai',
   'common.add': 'Tambah',
@@ -734,10 +735,11 @@ const ms: Record<keyof EnDict, string> = {
   'lock.reasonManual': 'Dikunci secara manual',
   'lock.hint': 'Masukkan PIN anda ({n}–8 digit)',
   'lock.hintStore': 'Sebarang PIN adalah bukti identiti — anda, rakan sekerja, atau PIN Kedai.',
+  'lock.forgot': 'Lupa PIN Kedai?',
   'shift.lockRegister': 'Kunci',
   'reportView.auditLog': 'Log audit',
   'reportView.auditVerified': 'Disahkan — rantai utuh',
-  'reportView.auditTampered': 'DISELIAI — siasat',
+  'reportView.auditTampered': 'DIUSIK — siasat',
   'settings.security': 'Keselamatan',
   'settings.autoLock': 'Kunci automatik pendaftaran',
   'settings.autoLockNote': 'Mengkunci pendaftaran selepas tidak aktif. PIN diperlukan untuk sambung.',
@@ -753,6 +755,9 @@ const ms: Record<keyof EnDict, string> = {
   'sec.pinInvalid': 'PIN mesti 4–8 digit',
   'sec.pinMismatch': 'PIN baharu tidak sepadan',
   'sec.wrongCurrent': 'PIN Kedai salah',
+  'sec.recoveryCodeLabel': 'Masukkan kod pemulihan sekali guna anda',
+  'sec.recoveryInvalid': 'Kod pemulihan tidak sah atau sudah digunakan',
+  'sec.pinPrefix': 'PIN ini bermula dengan PIN yang sedia ada — pilih yang lain',
   'sec.recoveryTitle': 'Kod pemulihan sekali guna',
   'sec.recoveryBody': 'Simpan kod ini secara luar talian. Ia boleh set semula PIN Kedai sekali sahaja, pada peranti ini sahaja. Ia ditunjukkan sekarang dan tidak akan ditunjukkan lagi.',
   'sec.copy': 'Salin',
@@ -766,7 +771,7 @@ const ms: Record<keyof EnDict, string> = {
   'sec.verifyAudit': 'Sahkan log audit',
   'sec.verifyAuditDesc': 'Semak semula rantai hash dan rekod hasilnya.',
   'sec.auditOk': 'Log audit disahkan — {n} baris disemak',
-  'sec.auditFail': 'Log audit DISELIAI — baris rosak pertama #{n}',
+  'sec.auditFail': 'Log audit DIUSIK — baris rosak pertama #{n}',
 };
 
 export default ms;

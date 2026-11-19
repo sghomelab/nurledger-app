@@ -173,9 +173,8 @@ export default function ShiftTab() {
       try {
         const closedById = active?.id ?? null;
         const closed = await closeShift(open.id, countedMinor, notes, closedById);
-        // Issue #26: audit the shift end (the Z-report integrity line was
-        // already captured inside closeShift, before this row is appended).
-        await appendSecurityEvent({ user_id: closedById, event_type: 'shift_end', method: 'system' });
+        // The shift_end audit event is appended inside closeShift itself
+        // (review L10 — no crash gap between close and log).
         setCloseVisible(false);
         if (closed.zReport) setReport(closed.zReport);
       } catch (e) {

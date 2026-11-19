@@ -13,6 +13,7 @@ import type { EnDict } from './en';
 
 const fil: Record<keyof EnDict, string> = {
   'common.cancel': 'Kanselahin',
+  'common.next': 'Sunod',
   'common.save': 'I-save',
   'common.done': 'Tapos na',
   'common.add': 'Idagdag',
@@ -681,10 +682,11 @@ const fil: Record<keyof EnDict, string> = {
   'lock.reasonManual': 'Manwal na pinag-lock',
   'lock.hint': 'Ilagay ang iyong PIN ({n}–8 digits)',
   'lock.hintStore': 'Ang alinmang PIN ay patunay ng pagkakakilanlan — ikaw, kasamahan, o ang Store PIN.',
+  'lock.forgot': 'Nakalimutan ang Store PIN?',
   'shift.lockRegister': 'I-lock',
   'reportView.auditLog': 'Audit log',
   'reportView.auditVerified': 'Veripikado — buo ang chain',
-  'reportView.auditTampered': 'NAIPALIWANAG — usadhin',
+  'reportView.auditTampered': 'PINAKIALAMAN — imbestigahan',
   'settings.security': 'Seguridad',
   'settings.autoLock': 'Auto-lock ng rehistro',
   'settings.autoLockNote': 'Nakalock ang rehistro pagkatapos maging idle. Kailangan ng PIN para magpatuloy.',
@@ -697,9 +699,12 @@ const fil: Record<keyof EnDict, string> = {
   'sec.currentPin': 'Kasalukuyang Store PIN',
   'sec.newPin': 'Bagong PIN',
   'sec.confirmPin': 'Kumpirmahin ang bagong PIN',
-  'sec.pinInvalid': 'Ang PIN ay 4–8 digits',
+    'sec.pinInvalid': 'Ang PIN ay 4–8 digits',
   'sec.pinMismatch': 'Hindi tumutugma ang mga bagong PIN',
   'sec.wrongCurrent': 'Maling Store PIN',
+  'sec.recoveryCodeLabel': 'Ilagay ang iyong one-time recovery code',
+  'sec.recoveryInvalid': 'Hindi wastis ang recovery code o gamit na ito',
+  'sec.pinPrefix': 'Nagsisimula ang PIN na ito sa isang umiiral na PIN — pumili ng iba',
   'sec.recoveryTitle': 'One-time recovery code',
   'sec.recoveryBody': 'I-save ito offline. Pwede nitong i-reset ang Store PIN nang isang beses lamang, sa device na ito lamang. Ipinapakita ito ngayon at hindi na ulit.',
   'sec.copy': 'Kopyahin',
@@ -713,7 +718,7 @@ const fil: Record<keyof EnDict, string> = {
   'sec.verifyAudit': 'Veripihain ang audit log',
   'sec.verifyAuditDesc': 'Gagamutin ulit ang hash chain at ilalagay ang resulta.',
   'sec.auditOk': 'Veripikado ang audit log — {n} na linya ang nasuri',
-  'sec.auditFail': 'NAIPALIWANAG ang audit log — unang masamang linya #{n}',
+  'sec.auditFail': 'PINAKIALAMAN ang audit log — unang masamang linya #{n}',
 };
 
 export default fil;

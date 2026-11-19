@@ -26,6 +26,7 @@ import {
 } from '../repositories/shiftRepository';
 import type { CashMoveType, XReport } from '../lib/shift';
 import { buildXReport } from '../lib/shift';
+import { reloadSecurity } from './useSecurity';
 import type { AppUser, UserRole } from '../types';
 
 // ---- shared active user (module-level, like useAppData's low-stock count) ---
@@ -96,6 +97,7 @@ export function useUsers(): UseUsers {
     async (name: string, role: UserRole, pin?: string | null) => {
       const created = await createUser({ name, role, pin });
       await reload();
+      if (pin) void reloadSecurity(); // a PIN now exists → re-arm the soft-lock guard
       return created;
     },
     [reload],
@@ -105,6 +107,7 @@ export function useUsers(): UseUsers {
     async (id: string, pin: string) => {
       await setUserPin(id, pin);
       await reload();
+      void reloadSecurity(); // PIN state changed → refresh anyUnlockable
     },
     [reload],
   );

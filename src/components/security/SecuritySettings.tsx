@@ -23,9 +23,10 @@ import * as Clipboard from 'expo-clipboard';
 import * as Print from 'expo-print';
 import { Card } from '../Screen';
 import { PickerOverlay } from '../PickerOverlay';
-import { isValidPin } from '../../lib/pin';
+import { isValidPin, extendsStoredPin } from '../../lib/pin';
 import {
   appendSecurityEvent,
+  consumeRecoveryCode,
   hasStorePin,
   runIntegrityCheck,
   setStorePin,
@@ -58,6 +59,9 @@ interface PinFormState {
   current: string; // required only when a Store PIN already exists
   next: string;
   confirm: string;
+  /** True when the flow was entered via a consumed recovery code — the
+   *  current-PIN proof is the (already verified) code, so it's skipped. */
+  viaRecovery: boolean;
 }
 
 export function SecuritySettings({ owner, users, onUsersChanged }: Props) {
@@ -72,6 +76,11 @@ export function SecuritySettings({ owner, users, onUsersChanged }: Props) {
   const [pinForm, setPinForm] = useState<PinFormState | null>(null);
   const [pinFormErr, setPinFormErr] = useState<string | null>(null);
   const [pinFormBusy, setPinFormBusy] = useState(false);
+  /** Forgot-Store-PIN flow (design §3): enter the one-time recovery code. */
+  const [forgotVisible, setForgotVisible] = useState(false);
+  const [forgotCode, setForgotCode] = useState('');
+  const [forgotErr, setForgotErr] = useState<string | null>(null);
+  const [forgotBusy, setForgotBusy] = useState(false);
   /** One-time recovery code (shown once, then gone). */
   const [recoveryCode, setRecoveryCode] = useState<string | null>(null);
   const [resetTarget, setResetTarget] = useState<AppUser | null>(null);
@@ -106,11 +115,17 @@ export function SecuritySettings({ owner, users, onUsersChanged }: Props) {
       setPinFormErr(t('sec.pinMismatch'));
       return;
     }
-    if (storePinSet) {
+    if (storePinSet && !pinForm.viaRecovery) {
       if (!pinForm.current || !(await verifyStorePin(pinForm.current))) {
         setPinFormErr(t('sec.wrongCurrent'));
         return;
       }
+    }
+    // Progressive-match guard: a new Store PIN that extends an existing
+    // user PIN would be shadowed by the shorter holder (review H3).
+    if (users.some((u) => extendsStoredPin(pinForm.next, u.pinHash))) {
+      setPinFormErr(t('sec.pinPrefix'));
+      return;
     }
     setPinFormBusy(true);
     try {
@@ -124,6 +139,29 @@ export function SecuritySettings({ owner, users, onUsersChanged }: Props) {
       Alert.alert(t('settings.storePin'), e instanceof Error ? e.message : String(e));
     } finally {
       setPinFormBusy(false);
+    }
+  };
+
+  /** Forgot-Store-PIN (review H1): consume the one-time code, then morph
+   *  into the regular set/change form WITHOUT the current-PIN field — the
+   *  consumed code IS the ownership proof. */
+  const submitForgot = async () => {
+    if (forgotBusy) return;
+    setForgotBusy(true);
+    setForgotErr(null);
+    try {
+      const ok = await consumeRecoveryCode(forgotCode, owner.id);
+      if (!ok) {
+        setForgotErr(t('sec.recoveryInvalid'));
+        setForgotCode('');
+        return;
+      }
+      setForgotVisible(false);
+      setForgotCode('');
+      setPinFormErr(null);
+      setPinForm({ current: '', next: '', confirm: '', viaRecovery: true });
+    } finally {
+      setForgotBusy(false);
     }
   };
 
@@ -175,7 +213,13 @@ export function SecuritySettings({ owner, users, onUsersChanged }: Props) {
       setResetPin('');
       setResetErr(null);
     } catch (e) {
-      setResetErr(e instanceof Error ? e.message : String(e));
+      setResetErr(
+        e instanceof Error && e.message === 'PIN_PREFIX_COLLISION'
+          ? t('sec.pinPrefix')
+          : e instanceof Error
+            ? e.message
+            : String(e),
+      );
     }
   };
 
@@ -220,7 +264,7 @@ export function SecuritySettings({ owner, users, onUsersChanged }: Props) {
               style={styles.textBtn}
               onPress={() => {
                 setPinFormErr(null);
-                setPinForm({ current: '', next: '', confirm: '' });
+                setPinForm({ current: '', next: '', confirm: '', viaRecovery: false });
               }}
             >
               <Text style={styles.textBtnText}>
@@ -229,6 +273,24 @@ export function SecuritySettings({ owner, users, onUsersChanged }: Props) {
             </Pressable>
           }
         />
+
+        {/* Review H1: the recovery path lives here too (and on LockScreen
+            for the fully-locked state). */}
+        {storePinSet ? (
+          <Pressable
+            onPress={() => {
+              setForgotErr(null);
+              setForgotCode('');
+              setForgotVisible(true);
+            }}
+            hitSlop={8}
+            style={{ alignSelf: 'flex-start', marginBottom: spacing.sm }}
+          >
+            <Text style={{ fontFamily: fonts.sansSemiBold, fontSize: typography.micro, color: colors.primary, textDecorationLine: 'underline' }}>
+              {t('lock.forgot')}
+            </Text>
+          </Pressable>
+        ) : null}
 
         <Row
           label={t('sec.resetCashierPin')}
@@ -280,9 +342,11 @@ export function SecuritySettings({ owner, users, onUsersChanged }: Props) {
         <View style={styles.sheetBackdrop}>
           <View style={[styles.sheetBody, { paddingBottom: spacing.xl + insets.bottom }]}>
             <Text style={styles.sheetTitle}>
-              {storePinSet ? t('settings.storePinChange') : t('settings.storePinSet')}
+              {storePinSet && !pinForm?.viaRecovery
+                ? t('settings.storePinChange')
+                : t('settings.storePinSet')}
             </Text>
-            {storePinSet ? (
+            {storePinSet && !pinForm?.viaRecovery ? (
               <PinField label={t('sec.currentPin')} value={pinForm?.current ?? ''} onChange={(v) => setPinForm((f) => (f ? { ...f, current: v } : f))} />
             ) : null}
             <PinField label={t('sec.newPin')} value={pinForm?.next ?? ''} onChange={(v) => setPinForm((f) => (f ? { ...f, next: v } : f))} />
@@ -347,6 +411,54 @@ export function SecuritySettings({ owner, users, onUsersChanged }: Props) {
                 <Text style={[styles.sheetBtnText, styles.sheetBtnTextPrimary]}>{t('common.done')}</Text>
               </Pressable>
             </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Forgot Store PIN (review H1): the one-time recovery code gates a
+          new-PIN form — no current PIN required. */}
+      <Modal visible={forgotVisible} animationType="slide" onRequestClose={() => setForgotVisible(false)}>
+        <View style={styles.sheetBackdrop}>
+          <View style={[styles.sheetBody, { paddingBottom: spacing.xl + insets.bottom }]}>
+            <Text style={styles.sheetTitle}>{t('lock.forgot')}</Text>
+            <View style={{ marginBottom: spacing.sm }}>
+              <Text style={{ fontFamily: fonts.sansSemiBold, fontSize: typography.caption, color: colors.slate700, marginBottom: 4 }}>
+                {t('sec.recoveryCodeLabel')}
+              </Text>
+              <TextInput
+                style={{
+                  borderWidth: 1,
+                  borderColor: colors.slate300,
+                  borderRadius: radius.control,
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  fontFamily: fonts.mono,
+                  fontSize: 16,
+                  color: colors.slate900,
+                  letterSpacing: 2,
+                  textAlign: 'center',
+                }}
+                value={forgotCode}
+                onChangeText={(v) => { setForgotCode(v); setForgotErr(null); }}
+                keyboardType="number-pad"
+                maxLength={14}
+                placeholder="0000-0000-0000"
+                placeholderTextColor={colors.slate400}
+              />
+            </View>
+            {forgotErr ? <Text style={styles.errText}>{forgotErr}</Text> : null}
+            <View style={styles.sheetActions}>
+              <Pressable style={styles.sheetBtn} onPress={() => setForgotVisible(false)}>
+                <Text style={styles.sheetBtnText}>{t('common.cancel')}</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.sheetBtn, styles.sheetBtnPrimary, forgotBusy && { opacity: 0.6 }]}
+                onPress={() => void submitForgot()}
+                disabled={forgotBusy || forgotCode.replace(/[\s-]/g, '').length < 12}
+              >
+                <Text style={[styles.sheetBtnText, styles.sheetBtnTextPrimary]}>{t('common.next')}</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>

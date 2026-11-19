@@ -24,7 +24,7 @@ import {
   type SalesByMethod,
   type ZReport,
 } from '../lib/shift';
-import { runIntegrityCheck } from './securityRepository';
+import { appendSecurityEvent, runIntegrityCheck } from './securityRepository';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
 export interface Shift {
@@ -308,6 +308,16 @@ export async function closeShift(input: CloseShiftInput): Promise<Shift> {
     [closedAt, report.countedMinor, report.expectedMinor, report.varianceMinor, report.notes, JSON.stringify(report), shift.id],
   );
   if (res.changes === 0) throw new Error('Shift is already closed');
+
+  // shift_end audit event (review L10): appended INSIDE closeShift, right
+  // after the winning UPDATE — a crash before this line now leaves no
+  // closed shift without its event (previously the component appended it,
+  // leaving a gap window).
+  await appendSecurityEvent({
+    user_id: input.closedById ?? null,
+    event_type: 'shift_end',
+    method: 'system',
+  });
 
   const done = await getShift(shift.id);
   if (!done || done.closedAt === null) throw new Error('Shift is already closed');

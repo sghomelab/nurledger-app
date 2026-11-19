@@ -6,8 +6,22 @@
 
 import { getDb } from '../db/database';
 import { uuidv4 } from '../lib/ids';
-import { createPinHash, isValidPin } from '../lib/pin';
+import { createPinHash, extendsStoredPin, isValidPin } from '../lib/pin';
+import { getStorePinHash } from './securityRepository';
 import type { AppUser, UserRole } from '../types';
+
+/**
+ * Progressive-match guard (see pin.extendsStoredPin): a new PIN that extends
+ * an existing one would be permanently shadowed by the shorter holder.
+ * Checked against every OTHER active user plus the Store PIN.
+ */
+async function assertNoPrefixCollision(pin: string, selfId?: string): Promise<void> {
+  const [others, storeHash] = await Promise.all([listActiveUsers(), getStorePinHash()]);
+  const collides =
+    others.some((u) => u.id !== selfId && extendsStoredPin(pin, u.pinHash)) ||
+    extendsStoredPin(pin, storeHash);
+  if (collides) throw new Error('PIN_PREFIX_COLLISION');
+}
 
 const ACTIVE_USER_KEY = 'active_user_id';
 
@@ -85,6 +99,7 @@ export async function createUser(input: CreateUserInput): Promise<AppUser> {
   const name = input.name.trim();
   if (!name) throw new Error('User name is required');
   if (input.pin && !isValidPin(input.pin)) throw new Error('PIN must be 4–8 digits');
+  if (input.pin) await assertNoPrefixCollision(input.pin);
 
   const db = await getDb();
   const id = uuidv4();
@@ -100,6 +115,9 @@ export async function createUser(input: CreateUserInput): Promise<AppUser> {
 /** Set or replace a user's PIN (hashed, salted). Callers must have re-authenticated (GateAction 'change_pin'). */
 export async function setUserPin(id: string, pin: string): Promise<void> {
   if (!isValidPin(pin)) throw new Error('PIN must be 4–8 digits');
+  // Self is excluded: replacing one's own PIN with an extension of it is fine
+  // (the old hash is gone). Other users + Store PIN must not be shadowed.
+  await assertNoPrefixCollision(pin, id);
   const user = await getUser(id);
   if (!user || !user.active) throw new Error('Unknown or inactive user');
   const db = await getDb();

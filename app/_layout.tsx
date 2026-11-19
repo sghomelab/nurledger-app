@@ -1,6 +1,6 @@
 import { AppFrame } from '../src/components/AppFrame';
 import { LockScreen } from '../src/components/security/LockScreen';
-import { Pressable, Text, View } from 'react-native';
+import { AppState, Pressable, Text, View } from 'react-native';
 import { Stack, useNavigationContainerRef } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -164,6 +164,16 @@ function SecurityGate() {
       unsub?.();
     };
   }, [navRef]);
+
+  // App foregrounded → re-evaluate the idle clock immediately. JS timers are
+  // paused while backgrounded, so without this a long background stint would
+  // leave the register unlocked until the next 15s tick (M7).
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') checkIdle();
+    });
+    return () => sub.remove();
+  }, []);
 
   if (!locked) return null; // unmounts the instant a PIN is accepted
 

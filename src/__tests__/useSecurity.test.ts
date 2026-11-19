@@ -118,6 +118,7 @@ describe('idle watchdog → lock (design #6/#7)', () => {
   });
 
   it('a manual lock is logged with detail "manual"', async () => {
+    await reloadSecurity(); // the app always reloads at boot before any lock
     await lockNow('manual');
     await Promise.resolve();
     expect(__getSecurityStateForTests().locked).toBe(true);
@@ -126,6 +127,7 @@ describe('idle watchdog → lock (design #6/#7)', () => {
   });
 
   it('locking twice does not double-log', async () => {
+    await reloadSecurity();
     await lockNow('manual');
     await lockNow('manual');
     await Promise.resolve();
@@ -136,6 +138,7 @@ describe('idle watchdog → lock (design #6/#7)', () => {
 
 describe('unlock flow — proof of identity (design §5)', () => {
   it('the locked user\'s own PIN resumes: no user switch, one unlock event', async () => {
+    await reloadSecurity();
     await lockNow('idle');
     mockGetActiveUser.mockResolvedValue(ANN); // register was running as Ann
     const res = await attemptUnlock('1111');
@@ -148,6 +151,7 @@ describe('unlock flow — proof of identity (design §5)', () => {
   });
 
   it('another user\'s PIN transfers the register: setActiveUser + unlock AND user_switch', async () => {
+    await reloadSecurity();
     await lockNow('idle');
     mockGetActiveUser.mockResolvedValue(ANN); // locked as Ann
     const res = await attemptUnlock('2222'); // Boo's PIN
@@ -161,6 +165,7 @@ describe('unlock flow — proof of identity (design §5)', () => {
   });
 
   it('the Store PIN runs the register as the OWNER (attribution rule)', async () => {
+    await reloadSecurity();
     await lockNow('idle');
     mockGetActiveUser.mockResolvedValue(BOO); // locked as Boo
     const res = await attemptUnlock('7777'); // Store PIN
@@ -171,6 +176,7 @@ describe('unlock flow — proof of identity (design §5)', () => {
   });
 
   it('a wrong PIN keeps the lock up and logs nothing', async () => {
+    await reloadSecurity();
     await lockNow('idle');
     const before = mockAppend.mock.calls.length;
     const res = await attemptUnlock('0000');
@@ -240,5 +246,22 @@ describe('soft-lock guard (design §2: "No PIN set = open access")', () => {
     checkIdle();
     await Promise.resolve();
     expect(__getSecurityStateForTests().locked).toBe(true);
+  });
+
+  it('is FAIL-CLOSED before the first reload (review M6): no PIN state known yet', async () => {
+    // No reloadSecurity() — the guard must REFUSE, not assume open access.
+    expect(__getSecurityStateForTests().loaded).toBe(false);
+    await lockNow('manual');
+    await Promise.resolve();
+    expect(__getSecurityStateForTests().locked).toBe(false);
+    expect(mockAppend).not.toHaveBeenCalled();
+  });
+
+  it('checkIdle is also refused before the first reload (review M6)', async () => {
+    __setLastActivityForTests(NOW - 6 * 60_000); // past timeout
+    checkIdle();
+    await Promise.resolve();
+    expect(__getSecurityStateForTests().locked).toBe(false);
+    expect(mockAppend).not.toHaveBeenCalled();
   });
 });

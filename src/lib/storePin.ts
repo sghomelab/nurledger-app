@@ -44,10 +44,15 @@ export function hashRecoveryCode(input: string): string | null {
   return bare ? sha256Hex(`recovery:${bare}`) : null;
 }
 
-/** Verify a presented code against a stored hash (constant-shape compare). */
+/** Verify a presented code against a stored hash (constant-time compare, matching pin.ts). */
 export function verifyRecoveryCode(input: string, storedHash: string): boolean {
   const h = hashRecoveryCode(input);
-  return h !== null && h === storedHash;
+  if (h === null) return false;
+  let diff = h.length ^ storedHash.length;
+  for (let i = 0; i < h.length; i++) {
+    diff |= h.charCodeAt(i) ^ (i < storedHash.length ? storedHash.charCodeAt(i) : 0);
+  }
+  return diff === 0;
 }
 
 /** The Store PIN itself reuses cashier-PIN validity rules (4–8 digits). */

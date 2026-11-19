@@ -13,6 +13,7 @@
 const en = {
   // ── shared ────────────────────────────────────────────────────────────
   'common.cancel': 'Cancel',
+  'common.next': 'Next',
   'common.save': 'Save',
   'common.done': 'Done',
   'common.add': 'Add',
@@ -735,6 +736,7 @@ const en = {
   'lock.reasonManual': 'Locked manually',
   'lock.hint': 'Enter your PIN ({n}–8 digits)',
   'lock.hintStore': 'Any PIN is proof of identity — yours, a coworker’s, or the Store PIN.',
+  'lock.forgot': 'Forgot the Store PIN?',
   'shift.lockRegister': 'Lock',
   'reportView.auditLog': 'Audit log',
   'reportView.auditVerified': 'Verified — chain intact',
@@ -754,6 +756,9 @@ const en = {
   'sec.pinInvalid': 'PIN must be 4–8 digits',
   'sec.pinMismatch': 'New PINs do not match',
   'sec.wrongCurrent': 'Wrong Store PIN',
+  'sec.recoveryCodeLabel': 'Enter your one-time recovery code',
+  'sec.recoveryInvalid': 'That recovery code is invalid or was already used',
+  'sec.pinPrefix': 'This PIN starts with an existing PIN — pick a different one',
   'sec.recoveryTitle': 'One-time recovery code',
   'sec.recoveryBody': 'Store this offline. It can reset the Store PIN once, on this device only. It is shown now and never again.',
   'sec.copy': 'Copy',

@@ -128,9 +128,10 @@ export function touch() {
 /** Manual lock (owner's "lock" button on the Shift tab). */
 export async function lockNow(reason: LockReason = 'manual') {
   if (shared.locked) return;
-  // Soft-lock guard: never lock a register that no PIN could open again
-  // (only once we KNOW the PIN state — before the first reload, allow it).
-  if (shared.loaded && !shared.anyUnlockable) return;
+  // Soft-lock guard: never lock a register that no PIN could open again.
+  // FAIL-CLOSED: before the first reload we don't KNOW the PIN state, so
+  // refuse — the boot reloadSecurity() (SecurityGate) runs first thing.
+  if (!shared.loaded || !shared.anyUnlockable) return;
   const actor = await getActiveUser();
   commit({ locked: true, lockReason: reason });
   await appendSecurityEvent({

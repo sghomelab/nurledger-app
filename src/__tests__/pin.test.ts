@@ -8,6 +8,7 @@
 import { sha256Hex } from '../lib/sha256';
 import {
   createPinHash,
+  extendsStoredPin,
   hashPin,
   isValidPin,
   PIN_MAX_LENGTH,
@@ -152,5 +153,46 @@ describe('pinEntryOutcome (CR-15 — progressive 4–8 digit matching)', () => {
     expect(pinEntryOutcome('1', () => false)).toEqual({ kind: 'keep-entering' });
     expect(pinEntryOutcome('12', () => false)).toEqual({ kind: 'keep-entering' });
     expect(pinEntryOutcome('123', () => false)).toEqual({ kind: 'keep-entering' });
+  });
+});
+
+describe('extendsStoredPin (review H3 — progressive-match prefix shadowing)', () => {
+  it('detects a new PIN that EXTENDS a stored 4-digit PIN', () => {
+    const stored = createPinHash('1234');
+    expect(extendsStoredPin('12345', stored)).toBe(true);
+    expect(extendsStoredPin('123456', stored)).toBe(true);
+    expect(extendsStoredPin('12345678', stored)).toBe(true);
+  });
+
+  it('detects a new PIN that extends a stored 5-digit PIN (prefix not at min length)', () => {
+    const stored = createPinHash('12345');
+    expect(extendsStoredPin('123456', stored)).toBe(true);
+    expect(extendsStoredPin('1234567', stored)).toBe(true);
+  });
+
+  it('does NOT flag unrelated or unrelated-same-prefix-at-other-positions PINs', () => {
+    const stored = createPinHash('1234');
+    expect(extendsStoredPin('4321', stored)).toBe(false);
+    expect(extendsStoredPin('1111', stored)).toBe(false);
+    expect(extendsStoredPin('12341234', stored)).toBe(true); // 1234 is a prefix
+    expect(extendsStoredPin('21234', stored)).toBe(false);  // 1234 is not a prefix
+  });
+
+  it('does NOT flag the same PIN (identical hashes are a different problem)', () => {
+    const stored = createPinHash('1234');
+    expect(extendsStoredPin('1234', stored)).toBe(false);
+  });
+
+  it('the INVERSE (new shorter prefix of an existing longer PIN) is undetectable', () => {
+    // Documented limitation: salted hashes never reveal the longer plaintext,
+    // so "1234" as a NEW PIN over a stored "123456" cannot be caught here.
+    const stored = createPinHash('123456');
+    expect(extendsStoredPin('1234', stored)).toBe(false);
+  });
+
+  it('fails safe on null / malformed / invalid input', () => {
+    expect(extendsStoredPin('12345', null)).toBe(false);
+    expect(extendsStoredPin('12345', 'garbage')).toBe(false);
+    expect(extendsStoredPin('123', createPinHash('123'))).toBe(false); // invalid pin
   });
 });

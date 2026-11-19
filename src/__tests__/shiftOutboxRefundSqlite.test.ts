@@ -200,6 +200,43 @@ d('closeShift is atomic + validated', () => {
   });
 });
 
+d('closeShift appends the shift_end audit event INSIDE (review L10)', () => {
+  const auditRows = (raw: { prepare: (s: string) => { all: () => Record<string, unknown>[] } }) =>
+    raw.prepare('SELECT event_type, user_id, method FROM security_events ORDER BY seq').all() as Record<string, unknown>[];
+
+  it('a successful close logs integrity_check THEN shift_end, attributed to the closer', async () => {
+    const raw = mk();
+    seedOutlet(raw);
+    const s = await openShift(openInput);
+    await closeShift({ shiftId: s.id, countedMinor: 1000, notes: null, closedById: 'cashier-1' });
+    const rows = auditRows(raw);
+    expect(rows.map((r) => r.event_type)).toEqual(['integrity_check', 'shift_end']);
+    expect(rows[1]!.user_id).toBe('cashier-1');
+    expect(rows[1]!.method).toBe('system');
+  });
+
+  it('a close without closedById still logs shift_end (user_id null)', async () => {
+    const raw = mk();
+    seedOutlet(raw);
+    const s = await openShift(openInput);
+    await closeShift({ shiftId: s.id, countedMinor: 1000, notes: null });
+    const rows = auditRows(raw);
+    expect(rows[rows.length - 1]!.event_type).toBe('shift_end');
+    expect(rows[rows.length - 1]!.user_id).toBeNull();
+  });
+
+  it('a FAILED close (double close) appends NO shift_end event', async () => {
+    const raw = mk();
+    seedOutlet(raw);
+    const s = await openShift(openInput);
+    await closeShift({ shiftId: s.id, countedMinor: 1000, notes: null, closedById: 'c1' });
+    const before = auditRows(raw).length;
+    await expect(closeShift({ shiftId: s.id, countedMinor: 9999, notes: null, closedById: 'c1' }))
+      .rejects.toThrow('Shift is already closed');
+    expect(auditRows(raw)).toHaveLength(before);
+  });
+});
+
 d('refund payment_method = the sale\'s largest tender', () => {
   const refundInput = (saleId: string) => ({
     saleId,
