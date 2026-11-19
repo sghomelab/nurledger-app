@@ -19,6 +19,7 @@ Full spec: `docs/DEV-PROCESS.md`. Reference example: **PR #28**.
 - **Feature request with design decisions** → reply with the three gates, then push the request to a **design-doc PR before any code** (`design/<topic>-<issue#>` branch, `docs/<TOPIC>-DESIGN.md` with decisions log, open items, release plan, verification plan). **PR merge = design approved** → then an implementation PR against the doc.
 - **No design decisions** (bug fix / hotfix / small change) → work **direct on `main`**.
 - **Three gates, three of Mas's say-so's** — (1) Design = merge the PR → (2) Build = explicit build GO in the current conversation → (3) Release = Mas's word. **Merging a PR never triggers a build.** "Ship it" / "release" = prepare and STOP at the queue line.
+- **Pre-build question sweep (2026-11-19, after the 1.2.0 §6 incident):** before queueing ANY build, list every open decision item that affects what goes in that build — design-doc open items, scope questions, pending calls — and get Mas's explicit answer or explicit deferral for each **in the current conversation, before the build GO is acted on**. A documented default ("needs GO to include") is NOT a substitute for his explicit deferral. Never queue a build while a scope-relevant question is unanswered — an unanswered question risks a follow-up build, which wastes credits. The question costs nothing; the wasted build doesn't come back.
 - **Zero EAS build credits without Mas's explicit build GO in the current exchange.** Both platforms from the same commit; one hypothesis per build.
 
 ## Stack
