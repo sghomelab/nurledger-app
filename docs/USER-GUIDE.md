@@ -339,7 +339,10 @@ the people who make NurLedger can never see it. You can switch it off or delete 
 any time, and your data on the device is never affected.
 
 You only need to do this **once per shop** (about 5–10 minutes). Every other device in
-the shop then connects using the same details.
+the shop then connects using the same details (see *Adding more devices*).
+
+This section is the **complete Supabase onboarding, step by step** — follow it in order,
+and stop only at the one manual step (a short SQL script in Supabase's editor).
 
 ### What you'll need
 - A phone or tablet with NurLedger installed (this "first" device).
@@ -443,6 +446,21 @@ That's it — **your shop is now connected**.
 You can flip this switch **On/Off anytime**. Turning it **Off** stops syncing but **never
 deletes anything** — your sales keep being saved on the device, and they upload the next
 time you turn it back on.
+
+### Step 7 — Verify it's actually working
+1. Make a small test sale (any product, any payment method), or change one product's
+   stock count.
+2. Watch the **sync banner** at the top of the Sell tab: **"Syncing…"** — then
+   **"Synced just now"**.
+3. To be completely sure, open the Supabase dashboard → your project → **Table Editor**
+   (left menu): your products — and the test sale — now appear as rows.
+
+### What happens next
+- You don't need to touch Supabase again. Every sale, stock change, product and refund
+  backs up automatically, and all devices in the shop stay in step.
+- The only times you'll open the dashboard again: a free project **goes to sleep** after
+  ~a week idle (open it once to wake it), or you want to **delete it** (Project settings
+  → General → Delete project — your device's data is never affected).
 
 ### Common setup problems
 
@@ -612,7 +630,9 @@ Need help? See the [NurLedger support page](https://nurlogic.ai/support) or emai
 ### Does NurLedger work without internet?
 Yes. The whole register — selling, stock, refunds and shifts — runs on your device. You
 can run a full day with no internet at all; anything queued goes to the cloud later, when
-sync is on and the device is back online.
+sync is on and the device is back online. If you'd like that cloud backup / multi-device
+sharing, set it up once in [Setting up cloud sync](#setting-up-cloud-sync) (about 5–10
+minutes).
 
 ### What happens if two tablets sell the same item offline?
 NurLedger combines them correctly when both sync: **no sale is counted twice**, and stock
@@ -681,8 +701,8 @@ Per-device, and it never changes your data.
 
 ### What if my tablet breaks, is lost, or I need a new one?
 If cloud sync is on, your data is backed up in your own Supabase project. On the new
-device, join the store again with an invite code and it downloads your latest products,
-stock and sales.
+device, join the store again with an invite code (see *Adding more devices*) and it
+downloads your latest products, stock and sales.
 
 ### My free Supabase project stopped syncing — is it broken?
 Probably not. Free Supabase projects **sleep after about a week of inactivity** —
@@ -695,5 +715,5 @@ above). You can also export your whole product list as a CSV at any time.
 
 ### Does NurLogic see or collect my sales data?
 No. Everything is stored on your device first; optional cloud sync goes only to your own
-Supabase project. There are no ads, no analytics and no tracking — see *Is my data
-private?* above.
+Supabase project (the step-by-step setup is in *Setting up cloud sync*). There are no ads,
+no analytics and no tracking — see *Is my data private?* above.
