@@ -68,6 +68,12 @@ stock, shifts and reports — all on one device.
 
 ## The five tabs
 
+The first time you open the app you'll be asked how you'd like to start — with
+a **sample store** (a full set of demo products, so you can try every screen)
+or **start empty** and add your own:
+
+![First-launch screen — Set up your store](https://nurlogic.ai/screenshots/firstrun.png)
+
 | Tab | What it's for |
 |---|---|
 | **Sell** | The register: scan (camera, physical scanner, or typed) or search items, take payment, on-screen receipt with optional email. Gear icon at the top right opens Settings. |
@@ -112,6 +118,10 @@ locked — tap the banner to open one (the Shift tab).
    **PDF** into WhatsApp / Telegram / Messages, or saved to print later. The
    PDF is exactly what's on the screen, so there's never a mismatch.
 
+![Sell tab — item in the cart, live margin, CHARGE](https://nurlogic.ai/screenshots/sell-tab.png)
+
+![Payment successful — receipt on screen, Share / Email buttons](https://nurlogic.ai/screenshots/payment-successful.png)
+
 **Staff permissions:** cashiers can sell, but **discounts and price overrides**
 ask for the manager/owner PIN. Cashiers can also have their **own PIN** — it
 lets them unlock the register after it auto-locks, and it's needed to switch
@@ -147,6 +157,14 @@ shift's Z-report shows a **Refunds** line so your cash count matches.
 The Inventory tab opens with five quick rows above the product list:
 **Purchase orders · Stocktake · Label printing · Suppliers · Product data (CSV)**,
 then the products themselves (search by name/SKU, filter **Low Stock Only**).
+
+![Inventory tab — quick actions and the product list with stock badges](https://nurlogic.ai/screenshots/inventory-list.png)
+
+**New products** are added with the **+** button (bottom right). Name, SKU and
+retail price are required (marked *); cost, barcode, category, supplier, carton
+size and velocity tier are optional.
+
+![New product form](https://nurlogic.ai/screenshots/add-product.png)
 
 ### Products
 Tap a product for its detail: barcode(s), category, unit, cost, price,
@@ -240,12 +258,16 @@ the soonest-to-expire stock is at the top, colour-coded (rose = expired/very
 near, amber = soon). It shows the waste you've already lost to expiry. Sell
 from the top of this list and your shrinkage drops.
 
+![Expiry tab — batches ranked by nearest expiry](https://nurlogic.ai/screenshots/expiry.png)
+
 ---
 
 ## Insights (reports)
 
 A **period selector** (Today · Current period · All time) sits on top and
 applies to every tab below it. The tab is split into four sections:
+
+![Insights tab — period selector and the Overview KPIs](https://nurlogic.ai/screenshots/insights.png)
 
 - **Overview** — KPI cards (revenue net, gross profit, operating net margin,
   discounted items, units, transactions, average basket, UPT), **Payment Mix**
@@ -281,9 +303,13 @@ applies to every tab below it. The tab is split into four sections:
    shift: sales by payment method, cash movements, **refunds**, and the
    variance. The register locks again.
 
+![Shift tab — open shift, drawer totals, X-report and close actions](https://nurlogic.ai/screenshots/shift-tab.png)
+
 Every report sheet has two export actions: **Print** (the system print
 dialog — AirPrint on iOS) and **Save / share PDF** — the file matches the
 on-screen numbers, in your app language.
+
+![Shift snapshot (X-report) — sales by payment method and expected drawer cash](https://nurlogic.ai/screenshots/x-report.png)
 
 Shifts work **fully offline** — close the day's shift with no internet and it
 all syncs later.
@@ -328,6 +354,8 @@ Open it from the **gear icon (⚙) at the top right of the Sell tab**.
   refunds, stocktakes, closing shifts, settings) ask for the manager/owner PIN.
 - **Danger zone** — **Reset all data** wipes everything on this device
   (PIN-gated, type-to-confirm). If cloud sync is on, sync first.
+
+![Settings — the Security section](https://nurlogic.ai/screenshots/settings-security.png)
 
 ---
 
@@ -548,6 +576,8 @@ up to the counter can't see the day's totals or sell things.
   - the **Store PIN** — the register runs as the **Owner**.
 - **No PINs at all?** If nobody in the shop has a PIN set, the register never
   locks (open access) — single-operator shops are unaffected.
+
+![Register locked screen — enter any PIN to continue](https://nurlogic.ai/screenshots/register-locked.png)
 
 **If the Store PIN is forgotten** — on the lock screen (or in **Settings →
 Security**) tap **Forgot the Store PIN?** and enter the **one-time recovery
